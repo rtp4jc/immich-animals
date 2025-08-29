@@ -8,6 +8,8 @@ Use these prompts by providing them to an LLM agent that has file-system access 
 
 > You are an autonomous LLM-based code agent with access to the repository at `E:\Code\GitHub\immich-dogs` on a Windows machine. All actions you take must be deterministic and logged to the repository. Work concisely: this is a prototype; prefer minimal, well-commented scripts over heavy frameworks. Use Python 3.12+, PyTorch with CUDA, and **Ultralytics YOLOv8** (pose/keypoint variant) for a single model that outputs bounding boxes and landmarks (keypoints). Export artifacts under `E:\Code\GitHub\immich-dogs\outputs\phase1\` and place scripts under `E:\Code\GitHub\immich-dogs\scripts\phase1\`. Whenever you run commands, they will be run on the windows command prompt, not bash. Use conda environment name `python312`. Always create or update `.planning/prompt-X.md` describing: (1) what you did, (2) commands run, (3) files created, (4) test results / metrics, (5) next steps / blockers. Commit code changes on branch `phase1/detection` with small commits. Keep scripts short (≤ 200 LOC each) and well-documented. Do not modify other repository areas without logging. Assume one CUDA GPU is available as `torch.cuda.is_available()`; verify early. If you need additional files/data the user must download, specify exact local destination paths and do not attempt to fetch them yourself. Use relative repo paths from `E:\Code\GitHub\immich-dogs`.
 
+NEVER read a full file under the data directory. Ask the user to provide sample content if you need to see the contents. You are able to write scripts that parse and work with files in the data directory, but DO NOT read the full file content yourself.
+
 ---
 
 # Prompt 1 — Setup dev environment & verify GPU
