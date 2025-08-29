@@ -6,13 +6,13 @@ Use these prompts by providing them to an LLM agent that has file-system access 
 
 # Overarching prompt (prelude; include with every prompt)
 
-> You are an autonomous LLM-based code agent with access to the repository at `E:\Code\GitHub\immich-dogs` on a Windows machine. All actions you take must be deterministic and logged to the repository. Work concisely: this is a prototype; prefer minimal, well-commented scripts over heavy frameworks. Use Python 3.10+, PyTorch with CUDA, and **Ultralytics YOLOv8** (pose/keypoint variant) for a single model that outputs bounding boxes and landmarks (keypoints). Export artifacts under `E:\Code\GitHub\immich-dogs\outputs\phase1\` and place scripts under `E:\Code\GitHub\immich-dogs\scripts\phase1\`. Use PowerShell or CMD commands as shown. Use conda environment name `immich-dogs`. Always create or update `.planning/prompt-X.md` describing: (1) what you did, (2) commands run, (3) files created, (4) test results / metrics, (5) next steps / blockers. Commit code changes on branch `phase1/detection` with small commits. Keep scripts short (≤ 200 LOC each) and well-documented. Do not modify other repository areas without logging. Assume one CUDA GPU is available as `torch.cuda.is_available()`; verify early. If you need additional files/data the user must download, specify exact local destination paths and do not attempt to fetch them yourself. Use relative repo paths from `E:\Code\GitHub\immich-dogs`.
+> You are an autonomous LLM-based code agent with access to the repository at `E:\Code\GitHub\immich-dogs` on a Windows machine. All actions you take must be deterministic and logged to the repository. Work concisely: this is a prototype; prefer minimal, well-commented scripts over heavy frameworks. Use Python 3.12+, PyTorch with CUDA, and **Ultralytics YOLOv8** (pose/keypoint variant) for a single model that outputs bounding boxes and landmarks (keypoints). Export artifacts under `E:\Code\GitHub\immich-dogs\outputs\phase1\` and place scripts under `E:\Code\GitHub\immich-dogs\scripts\phase1\`. Whenever you run commands, they will be run on the windows command prompt, not bash. Use conda environment name `python312`. Always create or update `.planning/prompt-X.md` describing: (1) what you did, (2) commands run, (3) files created, (4) test results / metrics, (5) next steps / blockers. Commit code changes on branch `phase1/detection` with small commits. Keep scripts short (≤ 200 LOC each) and well-documented. Do not modify other repository areas without logging. Assume one CUDA GPU is available as `torch.cuda.is_available()`; verify early. If you need additional files/data the user must download, specify exact local destination paths and do not attempt to fetch them yourself. Use relative repo paths from `E:\Code\GitHub\immich-dogs`.
 
 ---
 
 # Prompt 1 — Setup dev environment & verify GPU
 
-**Task (agent):** Create a short PowerShell setup script that creates/activates the `immich-dogs` conda environment, installs dependencies (PyTorch + CUDA, ultralytics, pycocotools, opencv-python, pillow, tqdm, pandas), and runs a GPU test. Add an easy-to-run README snippet and write progress to `.planning/prompt-1.md`.
+**Task (agent):** Create a short PowerShell setup script that creates/activates the `python312` conda environment, installs dependencies (PyTorch + CUDA, ultralytics, pycocotools, opencv-python, pillow, tqdm, pandas), and runs a GPU test. Add an easy-to-run README snippet and write progress to `.planning/prompt-1.md`.
 
 **Prerequisites (user must do first):**
 
@@ -28,8 +28,8 @@ Use these prompts by providing them to an LLM agent that has file-system access 
    * Creates conda env:
 
      ```powershell
-     conda create -n immich-dogs python=3.10 -y
-     conda activate immich-dogs
+     conda create -n python312 python=3.12 -y
+     conda activate python312
      ```
    * Installs PyTorch with the right CUDA for the system. Use the recommended `pip` command but include a guard to use `torch` with CUDA if available. Example (concise):
 
@@ -372,7 +372,7 @@ Agents must fill this template with accurate content.
 * **Windows specifics:** Use forward slashes or escaped backslashes consistently in Python. For shell commands in scripts, use PowerShell syntax in `*.ps1` wrappers. Example to activate conda in PowerShell:
 
   ```powershell
-  conda activate immich-dogs
+  conda activate python312
   python scripts/phase1/train_detector.py
   ```
 * **Logging and reproducibility:** All runtime commands must be echoed to `.planning/prompt-X.md`. Save log files under `outputs/phase1/logs/`.
