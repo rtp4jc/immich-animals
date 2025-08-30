@@ -19,7 +19,7 @@ from pathlib import Path
 import cv2
 from PIL import Image
 import argparse
-
+from tqdm import tqdm
 
 class CocoKeypointsConverter:
     """Convert various dog datasets to COCO keypoints format."""
@@ -122,7 +122,7 @@ class CocoKeypointsConverter:
     def _load_stanford_extra(self, json_path):
         """Load StanfordExtra keypoints dataset."""
         if not os.path.exists(json_path):
-            return []
+            return [], []
 
         with open(json_path, 'r') as f:
             data = json.load(f)
@@ -137,9 +137,10 @@ class CocoKeypointsConverter:
             # Create COCO image entry
             image_entry = {
                 'id': self.image_id,
-                'file_name': entry['img_path'],
+                'file_name': f"stanford_dogs/images/{entry['img_path']}",
                 'width': entry['img_width'],
-                'height': entry['img_height']
+                'height': entry['img_height'],
+                'source_dataset': 'stanford_dogs'
             }
             images.append(image_entry)
 
@@ -172,21 +173,48 @@ class CocoKeypointsConverter:
         with open(json_path, 'r') as f:
             data = json.load(f)
 
-        images = data.get('images', [])
+        original_images = data.get('images', [])
+        original_annotations = data.get('annotations', [])
+        
+        images = []
         annotations = []
+        
+        # COCO category ID for 'dog' is 18
+        dog_category_id = 18
 
-        # Update image IDs to be unique
-        for img in images:
-            img['id'] = self.image_id
+        # Filter annotations to only include dogs
+        dog_annotations = [ann for ann in original_annotations if ann['category_id'] == dog_category_id]
+        
+        # Get the set of image IDs that contain dogs
+        dog_image_ids = {ann['image_id'] for ann in dog_annotations}
+
+        # Filter images to only include those with dogs
+        dog_images = [img for img in original_images if img['id'] in dog_image_ids]
+
+        # Create a mapping from old image IDs to new ones
+        image_id_map = {}
+        for img in dog_images:
+            old_id = img['id']
+            new_id = self.image_id
+            image_id_map[old_id] = new_id
+            
+            img['id'] = new_id
+            img['file_name'] = f"coco/train2017/{img['file_name']}"
+            img['source_dataset'] = 'coco'
+            images.append(img)
             self.image_id += 1
 
-        for ann in data.get('annotations', []):
-            ann['id'] = self.annotation_id
-            ann['keypoints'] = [0] * 15  # 5 keypoints * 3 values each
-            ann['num_keypoints'] = 0
-            ann['category_id'] = 1  # dog
-            annotations.append(ann)
-            self.annotation_id += 1
+        # Update annotation image_ids
+        for ann in dog_annotations:
+            old_image_id = ann['image_id']
+            if old_image_id in image_id_map:
+                ann['id'] = self.annotation_id
+                ann['image_id'] = image_id_map[old_image_id]
+                ann['keypoints'] = [0] * 15  # 5 keypoints * 3 values each
+                ann['num_keypoints'] = 0
+                ann['category_id'] = 1  # Our model's only category is 'dog'
+                annotations.append(ann)
+                self.annotation_id += 1
 
         return images, annotations
 
@@ -199,10 +227,10 @@ class CocoKeypointsConverter:
         annotations = []
 
         # Get all PNG masks
-        mask_files = Path(mask_dir).glob("*.png")
-        for mask_path in mask_files:
+        mask_files = list(Path(mask_dir).glob("*.png"))
+        for mask_path in tqdm(mask_files, desc="Synthesizing from masks"):
             # Assuming mask filename gives original image path
-            img_filename = mask_path.stem.replace('_', '.') + '.jpg'
+            img_filename = f"{mask_path.stem}.jpg"
             img_path = f"oxford_pets/images/{img_filename}"
 
             # Load mask
@@ -242,7 +270,8 @@ class CocoKeypointsConverter:
                 'id': self.image_id,
                 'file_name': img_path,
                 'width': width,
-                'height': height
+                'height': height,
+                'source_dataset': 'oxford_pets'
             }
             images.append(image_entry)
 
@@ -305,6 +334,7 @@ class CocoKeypointsConverter:
             print(f"Loaded {len(images)} Oxford mask-synthesized images")
 
         # Split train/val (90/10)
+        print("Splitting dataset into train/val sets...")
         random.seed(42)
         random.shuffle(all_images)
         split_idx = int(len(all_images) * 0.9)
@@ -312,9 +342,17 @@ class CocoKeypointsConverter:
         train_images = all_images[:split_idx]
         val_images = all_images[split_idx:]
 
-        # Filter annotations for train/val
-        train_annotations = [ann for ann in all_annotations if ann['image_id'] in {img['id'] for img in train_images}]
-        val_annotations = [ann for ann in all_annotations if ann['image_id'] in {img['id'] for img in val_images}]
+        train_image_ids = {img['id'] for img in train_images}
+        val_image_ids = {img['id'] for img in val_images}
+
+        train_annotations = []
+        val_annotations = []
+
+        for ann in tqdm(all_annotations, desc="Filtering annotations"):
+            if ann['image_id'] in train_image_ids:
+                train_annotations.append(ann)
+            elif ann['image_id'] in val_image_ids:
+                val_annotations.append(ann)
 
         # Create output files
         train_coco = self.coco_template.copy()
@@ -326,6 +364,7 @@ class CocoKeypointsConverter:
         val_coco['annotations'] = val_annotations
 
         # Save
+        print("Saving annotation files...")
         train_path = self.output_dir / 'annotations_train.json'
         val_path = self.output_dir / 'annotations_val.json'
 
@@ -333,6 +372,8 @@ class CocoKeypointsConverter:
             json.dump(train_coco, f, indent=2)
         with open(val_path, 'w') as f:
             json.dump(val_coco, f, indent=2)
+        print(f"Saved train annotations to {train_path}")
+        print(f"Saved val annotations to {val_path}")
 
         # Generate debug outputs for first 20 images
         self._generate_debug_outputs(train_images[:20], train_annotations, "train")
@@ -356,6 +397,7 @@ class CocoKeypointsConverter:
             'with_bbox_only': total_bbox_only
         }
 
+
     def _generate_debug_outputs(self, images, annotations, split_type):
         """Generate debug JSON for first 20 images."""
         debug_data = []
@@ -377,7 +419,7 @@ def main():
     """Main entry point."""
     config = {
         'stanford_json': 'data/stanford_dogs/stanford_extra_keypoints.json',
-        'coco_json': 'data/coco/trainval.json',  # Add if available
+        'coco_json': 'data/coco/annotations/instances_train2017.json',  # Add if available
         'oxford_mask_dir': 'data/oxford_pets/annotations/trimaps',
         'dogfacenet_crop_dir': 'data/dogfacenet/DogFaceNet_224resized',
         'output_dir': 'data/coco_keypoints'
