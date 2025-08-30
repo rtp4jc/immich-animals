@@ -35,21 +35,26 @@ def main():
     print(f"Device: {device_name}")
 
     # Load pretrained YOLOv8 pose model
-    model = YOLO('yolov8n-pose.pt')
+    model = YOLO('yolo11n-pose.pt')
 
     # Training configuration for prototype
     # Small epochs for initial testing - user can extend
     train_config = {
         'data': 'data/dogs_keypoints.yaml',
-        'epochs': 10,  # Prototype: small epochs
+        'epochs': 30,  # Increased epochs for better learning
         'imgsz': 640,
-        'batch': 8,    # Small batch for testing
+        'batch': 8,
         'project': 'models/phase1',
-        'name': 'pose_run1',
-        'device': 0,   # Use first GPU
-        'patience': 5, # Early stopping patience
-        'save_period': 5,  # Save every 5 epochs
-        'cache': False,    # Disable caching for debugging
+        'name': 'pose_run_augmented', # New name for the run
+        'device': 0,
+        'patience': 10, # Increased patience
+        'save_period': 5,
+        'cache': False,
+        'augment': True, # Enable augmentation
+        'fliplr': 0.5,   # Horizontal flip (50% probability)
+        'degrees': 10,   # Rotation augmentation (+/- 10 degrees)
+        'translate': 0.1, # Translation augmentation (+/- 10%)
+        'scale': 0.2,    # Scale augmentation (+/- 20%)
     }
 
     print(f"\nStarting training with config: {train_config}")

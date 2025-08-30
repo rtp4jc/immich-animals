@@ -125,7 +125,8 @@ def create_yaml_config(train_image_paths, val_image_paths):
         'val': Path(val_txt_path.resolve()).as_posix(),
         'nc': 1,
         'names': ['dog'],
-        'kpt_shape': [5, 3], # 5 keypoints, 3 dimensions (x, y, visibility)
+        'kpt_shape': [5, 3],  # 5 keypoints, 3 dimensions (x, y, visibility)
+        'flip_idx': [1, 0, 2, 4, 3], # For horizontal flip augmentation
     }
 
     with open(YOLO_YAML_PATH, 'w') as f:
