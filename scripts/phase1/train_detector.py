@@ -35,13 +35,13 @@ def main():
     print(f"Device: {device_name}")
 
     # Load pretrained YOLOv8 pose model
-    model = YOLO('yolo11n-pose.pt')
+    model = YOLO('yolov11n-pose.yaml')
 
     # Training configuration for prototype
     # Small epochs for initial testing - user can extend
     train_config = {
         'data': 'data/dogs_keypoints.yaml',
-        'epochs': 30,  # Increased epochs for better learning
+        'epochs': 100,  # Increased epochs for better learning
         'imgsz': 640,
         'batch': 8,
         'project': 'models/phase1',

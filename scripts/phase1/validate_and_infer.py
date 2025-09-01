@@ -14,6 +14,8 @@ import csv
 import torch
 from ultralytics import YOLO
 from pathlib import Path
+import numpy as np
+import shutil
 
 def find_latest_model():
     """Find the latest model weights (best.pt) from phase1 runs"""
@@ -24,8 +26,7 @@ def find_latest_model():
     if not model_paths:
         raise FileNotFoundError("No best.pt model found in models/phase1/")
 
-    # Sort by run number (pose_run14 > pose_run13 > etc.)
-    model_paths.sort(key=lambda x: int(x.split("\\pose_run")[1].split("\\")[0]), reverse=True)
+    model_paths.sort(key=os.path.getmtime, reverse=True)
     return model_paths[0]
 
 def validate_model(model_path, data_yaml):
@@ -36,7 +37,6 @@ def validate_model(model_path, data_yaml):
     print("Running validation...")
     results = model.val(data=data_yaml, verbose=True)
 
-    # Extract key metrics from results
     metrics = {
         'mAP50': results.box.map50,
         'mAP50-95': results.box.map,
@@ -52,63 +52,74 @@ def validate_model(model_path, data_yaml):
 
 def run_inference(model, sample_dir, output_dir):
     """Run inference on sample images and return results data"""
-    print(f"Running inference on: {sample_dir}")
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    print(f"\nRunning inference on: {sample_dir}")
+    
+    # Clear and recreate output directory
+    if os.path.exists(output_dir):
+        shutil.rmtree(output_dir)
+    os.makedirs(output_dir)
 
-    # Run prediction with saving enabled
     results = model.predict(
         source=sample_dir,
         save=True,
-        save_dir=output_dir,
-        conf=0.25,  # confidence threshold
-        verbose=True
+        project=output_dir, # Save to a parent folder
+        name='predictions', # Sub-folder name
+        exist_ok=True,
+        conf=0.25,
+        verbose=False # We will print our own summary
     )
 
-    # Collect results data for CSV
     inference_data = []
-
     for result in results:
-        img_path = result.path
-        img_name = os.path.basename(img_path)
+        img_path = Path(result.path)
+        print(f"\n--- Predictions for: {img_path.name} ---")
 
-        # Get boxes and keypoints
         boxes = result.boxes
         keypoints = result.keypoints
 
-        detected_dog = len(boxes) > 0 if boxes is not None else False
-        num_boxes = len(boxes) if boxes is not None else 0
+        if not boxes or len(boxes) == 0:
+            print("  No detections.")
+            inference_data.append({'image_path': img_path.name, 'detected_dog': False, 'num_boxes': 0, 'num_keypoints_detected': 0, 'avg_score': 0.0})
+            continue
 
-        # Count keypoints detected (visibility > 0)
-        if keypoints is not None and hasattr(keypoints, 'data'):
-            kp_data = keypoints.data
-            if kp_data.numel() > 0:  # Check if tensor has elements
-                # Keypoints shape is [num_predictions, num_keypoints, 3] where 3=(x,y,visibility)
-                num_keypoints_detected = torch.sum(kp_data[..., 2] > 0).item()
+        # Get keypoint data once
+        kp_data = keypoints.data if hasattr(keypoints, 'data') else torch.empty(0)
+        num_keypoints_detected_total = 0
+
+        for i in range(len(boxes)):
+            box = boxes[i]
+            bbox_coords = box.xywh.cpu().numpy()[0]
+            confidence = box.conf.cpu().numpy()[0]
+            
+            print(f"  Detection #{i + 1}: Confidence: {confidence:.4f}")
+            print(f"    Bbox (xywh): {np.round(bbox_coords, 2)}")
+
+            num_kpts_this_detection = 0
+            if i < len(kp_data):
+                kpts = kp_data[i]
+                print("    Keypoints (x, y, conf):")
+                visible_kpts = kpts[kpts[:, 2] > 0] # Filter for visible keypoints
+                num_kpts_this_detection = len(visible_kpts)
+                num_keypoints_detected_total += num_kpts_this_detection
+                for j, kpt in enumerate(kpts):
+                    print(f"      - Kpt {j + 1}: ({kpt[0]:.2f}, {kpt[1]:.2f}) - Conf: {kpt[2]:.4f}")
             else:
-                num_keypoints_detected = 0
-        else:
-            num_keypoints_detected = 0
+                print("    No keypoints for this detection.")
 
-        # Get average confidence score for boxes
-        if boxes is not None and len(boxes) > 0:
-            avg_score = boxes.conf.mean().item() if hasattr(boxes, 'conf') else 0.0
-        else:
-            avg_score = 0.0
-
+        # For CSV, aggregate info for the image
         inference_data.append({
-            'image_path': img_name,
-            'detected_dog': detected_dog,
-            'num_boxes': num_boxes,
-            'num_keypoints_detected': num_keypoints_detected,
-            'avg_score': avg_score
+            'image_path': img_path.name,
+            'detected_dog': True,
+            'num_boxes': len(boxes),
+            'num_keypoints_detected': num_keypoints_detected_total,
+            'avg_score': boxes.conf.mean().item()
         })
 
     return inference_data
 
 def generate_csv_report(inference_data, output_path):
     """Generate CSV report from inference data"""
-    print(f"Generating CSV report: {output_path}")
-
+    print(f"\nGenerating CSV report: {output_path}")
     with open(output_path, 'w', newline='') as csvfile:
         fieldnames = ['image_path', 'detected_dog', 'num_boxes', 'num_keypoints_detected', 'avg_score']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
@@ -117,69 +128,39 @@ def generate_csv_report(inference_data, output_path):
 
 def main():
     """Main execution function"""
-    # Verify CUDA availability
     print(f"CUDA available: {torch.cuda.is_available()}")
     if torch.cuda.is_available():
         print(f"GPU: {torch.cuda.get_device_name(0)}")
 
-    # Configuration
     sample_images_dir = "outputs/phase1/sample_images"
     inference_dir = "outputs/phase1/inference"
     csv_report_path = "outputs/phase1/inference_report.csv"
     data_yaml = "data/dogs_keypoints.yaml"
 
-    # Verify prerequisites
     if not os.path.exists(sample_images_dir):
         raise FileNotFoundError(f"Sample images directory not found: {sample_images_dir}")
-
     if not os.path.exists(data_yaml):
         raise FileNotFoundError(f"Data YAML not found: {data_yaml}")
 
-    # Find and load the latest model
     model_path = find_latest_model()
     print(f"Using model: {model_path}")
 
-    # Run validation
     model, metrics = validate_model(model_path, data_yaml)
 
     print("\n=== VALIDATION METRICS ===")
     for key, value in metrics.items():
-        print(".4f")
+        print(f"  {key:<20}: {value:.4f}")
 
-    # Run inference on sample images
     inference_data = run_inference(model, sample_images_dir, inference_dir)
-
-    # Generate CSV report
     generate_csv_report(inference_data, csv_report_path)
 
-    # Summary statistics
+    print("\n=== INFERENCE SUMMARY ===")
     total_images = len(inference_data)
     images_with_dogs = sum(1 for item in inference_data if item['detected_dog'])
-    avg_keypoints = sum(item['num_keypoints_detected'] for item in inference_data) / total_images
-
-    print("=== INFERENCE SUMMARY ===")
     print(f"Total sample images: {total_images}")
     print(f"Images with detected dogs: {images_with_dogs} ({images_with_dogs/total_images*100:.1f}%)")
-    print(".1f")
-    print(f"Visualized outputs saved to: {inference_dir}")
+    print(f"Visualized outputs saved to: {os.path.join(inference_dir, 'predictions')}")
     print(f"CSV report saved to: {csv_report_path}")
 
-    # Find potential issues
-    no_detection = [item for item in inference_data if not item['detected_dog']]
-    low_keypoints = [item for item in inference_data if item['detected_dog'] and item['num_keypoints_detected'] < 3]
-
-    if no_detection:
-        print("Top images with no detection:")
-        for item in no_detection[:5]:  # Show first 5
-            print(f"  {item['image_path']}")
-
-    if low_keypoints:
-        print("Top images with low keypoints (< 3):")
-        for item in low_keypoints[:5]:  # Show first 5
-            print(f"  {item['image_path']}: {item['num_keypoints_detected']} keypoints")
-
-    return metrics, inference_data
-
 if __name__ == "__main__":
-    # This will be run via command line
     main()

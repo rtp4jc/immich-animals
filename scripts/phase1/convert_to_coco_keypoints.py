@@ -2,15 +2,9 @@
 """
 Convert available keypoints/masks to COCO-style keypoints annotations for dog detection.
 
-This script creates COCO-format annotations with bounding boxes and 5-point keypoints:
-[left_eye_x, left_eye_y, v, right_eye_x, right_eye_y, v, nose_x, nose_y, v,
- left_ear_x, left_ear_y, v, right_ear_x, right_ear_y, v]
-
-Where v = 0 (not visible), 1 (visible/occluded), 2 (fully visible)
-
-Maps StanfordExtra keypoints (24-point) to our compact 5-point schema.
-Synthesizes keypoints from masks when explicit landmarks unavailable.
+This script creates COCO-format annotations with bounding boxes and 4-point keypoints.
 """
+
 import os
 import json
 import random
@@ -20,6 +14,8 @@ import cv2
 from PIL import Image
 import argparse
 from tqdm import tqdm
+import xml.etree.ElementTree as ET
+import shutil
 
 class CocoKeypointsConverter:
     """Convert various dog datasets to COCO keypoints format."""
@@ -27,8 +23,15 @@ class CocoKeypointsConverter:
     def __init__(self, config):
         self.config = config
         self.output_dir = Path(config['output_dir'])
+
+        # Clear existing directory to prevent stale data
+        if self.output_dir.exists():
+            print(f"Clearing existing COCO annotations directory: {self.output_dir}")
+            shutil.rmtree(self.output_dir)
+        self.output_dir.mkdir(parents=True)
+
         self.debug_dir = self.output_dir / 'debug_annotations'
-        self.debug_dir.mkdir(parents=True, exist_ok=True)
+        self.debug_dir.mkdir(parents=True)
 
         # COCO format structure
         self.coco_template = {
@@ -37,8 +40,8 @@ class CocoKeypointsConverter:
             'categories': [{
                 'id': 1,
                 'name': 'dog',
-                'keypoints': ['left_eye', 'right_eye', 'nose', 'left_ear', 'right_ear'],
-                'skeleton': []  # Empty for pose estimation
+                'keypoints': ['nose', 'chin', 'left_ear_base', 'right_ear_base'],
+                'skeleton': []
             }]
         }
 
@@ -47,76 +50,23 @@ class CocoKeypointsConverter:
 
     def _map_stanford_keypoints(self, joints):
         """
-        Map StanfordExtra 24-point joints to our 5-point keypoint schema.
-
-        Stanford joints appear to follow this pattern:
-        - 0-5: Head/snout area
-        - 6-8: Right side landmarks
-        - 9-13: Left side landmarks
-        - 14-15: Eyes
-        - 16-23: Additional face/body points
-
-        Returns: [x,y,v, x,y,v, ...] for 5 keypoints (10 values)
+        Map StanfordExtra 24-point joints to our 4-point keypoint schema.
         """
+        keypoint_map = {
+            'nose': 16,
+            'chin': 17,
+            'left_ear_base': 14,
+            'right_ear_base': 15,
+        }
+
         keypoints = []
-
-        # Extract available joints, preferring visible ones (v > 0)
-        candidate_eyes = []
-        candidate_ears = []
-
-        # Eyes: typically joints 14, 15 (face level points)
-        if len(joints) > 15 and joints[15][2] > 0:  # Left eye (eye level)
-            keypoints.extend(joints[15][:2] + [joints[15][2]])
-        else:
-            keypoints.extend([0, 0, 0])  # Not visible
-
-        if len(joints) > 14 and joints[14][2] > 0:  # Right eye
-            keypoints.extend(joints[14][:2] + [joints[14][2]])
-        else:
-            keypoints.extend([0, 0, 0])
-
-        # Nose: try joint 17, or centroid of face joints
-        nose_candidates = []
-        if len(joints) > 17 and joints[17][2] > 0:
-            nose_candidates.append(joints[17][:2])
-        if len(joints) > 16 and joints[16][2] > 0:
-            nose_candidates.append(joints[16][:2])
-        if len(joints) > 12 and joints[12][2] > 0:
-            nose_candidates.append(joints[12][:2])
-
-        if nose_candidates:
-            nose_x = sum(p[0] for p in nose_candidates) / len(nose_candidates)
-            nose_y = sum(p[1] for p in nose_candidates) / len(nose_candidates)
-            keypoints.extend([nose_x, nose_y, 1])  # Visible since we detected it
-        else:
-            keypoints.extend([0, 0, 0])
-
-        # Left ear: try joints near head/torso area (joints 6, 9-13)
-        left_candidates = []
-        for i in [6, 13, 9, 10, 11, 12]:  # Prioritize outer points
-            if len(joints) > i and joints[i][2] > 0:
-                left_candidates.append(joints[i][:2])
-
-        if left_candidates:
-            left_ear_x = sum(p[0] for p in left_candidates) / len(left_candidates)
-            left_ear_y = sum(p[1] for p in left_candidates) / len(left_candidates)
-            keypoints.extend([left_ear_x, left_ear_y, 1])  # Approximate
-        else:
-            keypoints.extend([0, 0, 0])
-
-        # Right ear: joints near head (joints 8, 0-5)
-        right_candidates = []
-        for i in [8, 0, 1, 2, 3, 4, 5]:
-            if len(joints) > i and joints[i][2] > 0:
-                right_candidates.append(joints[i][:2])
-
-        if right_candidates:
-            right_ear_x = sum(p[0] for p in right_candidates) / len(right_candidates)
-            right_ear_y = sum(p[1] for p in right_candidates) / len(right_candidates)
-            keypoints.extend([right_ear_x, right_ear_y, 1])  # Approximate
-        else:
-            keypoints.extend([0, 0, 0])
-
+        for name in ['nose', 'chin', 'left_ear_base', 'right_ear_base']:
+            idx = keypoint_map[name]
+            if len(joints) > idx and joints[idx][2] > 0:
+                keypoints.extend(joints[idx])
+            else:
+                keypoints.extend([0, 0, 0])
+        
         return keypoints
 
     def _load_stanford_extra(self, json_path):
@@ -132,9 +82,8 @@ class CocoKeypointsConverter:
 
         for entry in data:
             if entry.get('is_multiple_dogs', False):
-                continue  # Skip images with multiple dogs for now
+                continue
 
-            # Create COCO image entry
             image_entry = {
                 'id': self.image_id,
                 'file_name': f"stanford_dogs/images/{entry['img_path']}",
@@ -144,17 +93,16 @@ class CocoKeypointsConverter:
             }
             images.append(image_entry)
 
-            # Create COCO annotation
-            bbox = entry['img_bbox']  # [x, y, w, h]
+            bbox = entry['img_bbox']
             keypoints = self._map_stanford_keypoints(entry.get('joints', []))
 
             annotation = {
                 'id': self.annotation_id,
                 'image_id': self.image_id,
-                'category_id': 1,  # dog
+                'category_id': 1,
                 'bbox': bbox,
                 'keypoints': keypoints,
-                'num_keypoints': sum(1 for i in range(2, 10, 3) if keypoints[i] > 0),
+                'num_keypoints': sum(1 for i in range(2, 12, 3) if keypoints[i] > 0),
                 'area': bbox[2] * bbox[3],
                 'iscrowd': 0
             }
@@ -165,8 +113,8 @@ class CocoKeypointsConverter:
 
         return images, annotations
 
-    def _load_coco_bbox_only(self, json_path):
-        """Load COCO dataset for bbox-only annotations (set keypoints to zeros)."""
+    def _load_coco_bbox_only(self, json_path, num_negatives=5000):
+        """Load COCO dataset, including dog images and a sample of negative images."""
         if not os.path.exists(json_path):
             return [], []
 
@@ -179,19 +127,16 @@ class CocoKeypointsConverter:
         images = []
         annotations = []
         
-        # COCO category ID for 'dog' is 18
         dog_category_id = 18
 
-        # Filter annotations to only include dogs
-        dog_annotations = [ann for ann in original_annotations if ann['category_id'] == dog_category_id]
-        
-        # Get the set of image IDs that contain dogs
-        dog_image_ids = {ann['image_id'] for ann in dog_annotations}
+        dog_image_ids = {ann['image_id'] for ann in original_annotations if ann['category_id'] == dog_category_id}
 
-        # Filter images to only include those with dogs
         dog_images = [img for img in original_images if img['id'] in dog_image_ids]
+        negative_images = [img for img in original_images if img['id'] not in dog_image_ids]
 
-        # Create a mapping from old image IDs to new ones
+        random.shuffle(negative_images)
+        sampled_negatives = negative_images[:num_negatives]
+
         image_id_map = {}
         for img in dog_images:
             old_id = img['id']
@@ -204,112 +149,76 @@ class CocoKeypointsConverter:
             images.append(img)
             self.image_id += 1
 
-        # Update annotation image_ids
+        dog_annotations = [ann for ann in original_annotations if ann['category_id'] == dog_category_id]
         for ann in dog_annotations:
             old_image_id = ann['image_id']
             if old_image_id in image_id_map:
                 ann['id'] = self.annotation_id
                 ann['image_id'] = image_id_map[old_image_id]
-                ann['keypoints'] = [0] * 15  # 5 keypoints * 3 values each
+                ann['keypoints'] = [0] * 12
                 ann['num_keypoints'] = 0
-                ann['category_id'] = 1  # Our model's only category is 'dog'
+                ann['category_id'] = 1
                 annotations.append(ann)
                 self.annotation_id += 1
 
+        for img in sampled_negatives:
+            img['id'] = self.image_id
+            img['file_name'] = f"coco/train2017/{img['file_name']}"
+            img['source_dataset'] = 'coco_negative'
+            images.append(img)
+            self.image_id += 1
+
         return images, annotations
 
-    def _synthesize_from_masks(self, mask_dir):
-        """Synthesize keypoints from segmentation masks (Oxford Pets style)."""
-        if not os.path.exists(mask_dir):
+    def _load_oxford_pets_negatives(self, xml_dir):
+        """
+        Loads non-dog images from the Oxford-IIIT Pets dataset as negative samples.
+
+        It parses the XML annotations to identify the species. If the species
+        is not 'dog', it is added to the dataset as a negative sample.
+        Dog images from this dataset are ignored to avoid using their face-only boxes.
+        """
+        if not os.path.exists(xml_dir):
             return [], []
 
         images = []
-        annotations = []
+        xml_files = list(Path(xml_dir).glob("*.xml"))
 
-        # Get all PNG masks
-        mask_files = list(Path(mask_dir).glob("*.png"))
-        for mask_path in tqdm(mask_files, desc="Synthesizing from masks"):
-            # Assuming mask filename gives original image path
-            img_filename = f"{mask_path.stem}.jpg"
-            img_path = f"oxford_pets/images/{img_filename}"
+        for xml_path in tqdm(xml_files, desc="Processing Oxford annotations for negative samples"):
+            try:
+                tree = ET.parse(xml_path)
+                root = tree.getroot()
 
-            # Load mask
-            mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
-            if mask is None:
+                # Get species name from <object><name>
+                species_name = root.find('object/name').text
+                
+                # If the object is not a dog, treat it as a negative sample.
+                if species_name != 'dog':
+                    img_filename = root.find('filename').text
+                    size = root.find('size')
+                    width = int(size.find('width').text)
+                    height = int(size.find('height').text)
+
+                    image_entry = {
+                        'id': self.image_id,
+                        'file_name': f"oxford_pets/images/{img_filename}",
+                        'width': width,
+                        'height': height,
+                        'source_dataset': 'oxford_pets_negative'
+                    }
+                    images.append(image_entry)
+                    self.image_id += 1
+            except ET.ParseError:
+                print(f"Warning: Could not parse XML file, skipping: {xml_path}")
                 continue
-
-            height, width = mask.shape
-
-            # Find head centroid (weak supervision)
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            if not contours:
-                continue
-
-            # Use largest contour (dog body)
-            main_contour = max(contours, key=cv2.contourArea)
-            moments = cv2.moments(main_contour)
-
-            if moments['m00'] == 0:
-                continue
-
-            center_x = int(moments['m10'] / moments['m00'])
-            center_y = int(moments['m01'] / moments['m00'])
-
-            # Synthesize keypoints based on head centroid
-            # Nose: slightly in front of centroid
-            nose_x, nose_y = center_x, center_y - 30
-            # Eyes: offset horizontally from centroid
-            left_eye_x, left_eye_y = center_x - 20, center_y - 20
-            right_eye_x, right_eye_y = center_x + 20, center_y - 20
-            # Ears: higher and outer
-            left_ear_x, left_ear_y = center_x - 35, center_y - 40
-            right_ear_x, right_ear_y = center_x + 35, center_y - 40
-
-            # Create image entry
-            image_entry = {
-                'id': self.image_id,
-                'file_name': img_path,
-                'width': width,
-                'height': height,
-                'source_dataset': 'oxford_pets'
-            }
-            images.append(image_entry)
-
-            # Create bbox from contour
-            x, y, w, h = cv2.boundingRect(main_contour)
-            bbox = [x, y, w, h]
-
-            keypoints = [
-                left_eye_x, left_eye_y, 1,    # left eye
-                right_eye_x, right_eye_y, 1,  # right eye
-                nose_x, nose_y, 1,           # nose
-                left_ear_x, left_ear_y, 1,    # left ear
-                right_ear_x, right_ear_y, 1   # right ear
-            ]
-
-            annotation = {
-                'id': self.annotation_id,
-                'image_id': self.image_id,
-                'category_id': 1,  # dog
-                'bbox': bbox,
-                'keypoints': keypoints,
-                'num_keypoints': 5,
-                'area': w * h,
-                'iscrowd': 0
-            }
-
-            annotations.append(annotation)
-            self.image_id += 1
-            self.annotation_id += 1
-
-        return images, annotations
+        
+        return images, [] # No annotations are created
 
     def convert(self):
         """Main conversion function."""
         all_images = []
         all_annotations = []
 
-        # Load StanfordExtra keypoints
         if os.path.exists(self.config.get('stanford_json', '')):
             print("Loading StanfordExtra keypoints...")
             images, annotations = self._load_stanford_extra(self.config['stanford_json'])
@@ -317,24 +226,20 @@ class CocoKeypointsConverter:
             all_annotations.extend(annotations)
             print(f"Loaded {len(images)} StanfordExtra images")
 
-        # Load COCO bbox-only (set keypoints to zeros)
         if os.path.exists(self.config.get('coco_json', '')):
-            print("Loading COCO bbox-only...")
+            print("Loading COCO bbox-only and negative samples...")
             images, annotations = self._load_coco_bbox_only(self.config['coco_json'])
             all_images.extend(images)
             all_annotations.extend(annotations)
-            print(f"Loaded {len(images)} COCO bbox-only images")
+            print(f"Loaded {len(images)} COCO images")
 
-        # Synthesize from Oxford masks
-        if os.path.exists(self.config.get('oxford_mask_dir', '')):
-            print("Synthesizing from Oxford masks...")
-            images, annotations = self._synthesize_from_masks(self.config['oxford_mask_dir'])
+        if os.path.exists(self.config.get('oxford_xml_dir', '')):
+            print("Loading Oxford Pets negative samples (cats)...")
+            images, annotations = self._load_oxford_pets_negatives(self.config['oxford_xml_dir'])
             all_images.extend(images)
             all_annotations.extend(annotations)
-            print(f"Loaded {len(images)} Oxford mask-synthesized images")
+            print(f"Loaded {len(images)} Oxford Pets negative samples.")
 
-        # Split train/val (90/10)
-        print("Splitting dataset into train/val sets...")
         random.seed(42)
         random.shuffle(all_images)
         split_idx = int(len(all_images) * 0.9)
@@ -345,16 +250,9 @@ class CocoKeypointsConverter:
         train_image_ids = {img['id'] for img in train_images}
         val_image_ids = {img['id'] for img in val_images}
 
-        train_annotations = []
-        val_annotations = []
+        train_annotations = [ann for ann in all_annotations if ann['image_id'] in train_image_ids]
+        val_annotations = [ann for ann in all_annotations if ann['image_id'] in val_image_ids]
 
-        for ann in tqdm(all_annotations, desc="Filtering annotations"):
-            if ann['image_id'] in train_image_ids:
-                train_annotations.append(ann)
-            elif ann['image_id'] in val_image_ids:
-                val_annotations.append(ann)
-
-        # Create output files
         train_coco = self.coco_template.copy()
         train_coco['images'] = train_images
         train_coco['annotations'] = train_annotations
@@ -363,8 +261,6 @@ class CocoKeypointsConverter:
         val_coco['images'] = val_images
         val_coco['annotations'] = val_annotations
 
-        # Save
-        print("Saving annotation files...")
         train_path = self.output_dir / 'annotations_train.json'
         val_path = self.output_dir / 'annotations_val.json'
 
@@ -372,67 +268,22 @@ class CocoKeypointsConverter:
             json.dump(train_coco, f, indent=2)
         with open(val_path, 'w') as f:
             json.dump(val_coco, f, indent=2)
+
         print(f"Saved train annotations to {train_path}")
         print(f"Saved val annotations to {val_path}")
-
-        # Generate debug outputs for first 20 images
-        self._generate_debug_outputs(train_images[:20], train_annotations, "train")
-        self._generate_debug_outputs(val_images[:min(20, len(val_images))], val_annotations, "val")
-
-        print("Conversion complete!")
-        print(f"Train set: {len(train_images)} images, {len(train_annotations)} annotations")
-        print(f"Val set: {len(val_images)} images, {len(val_annotations)} annotations")
-        print(f"Files saved to: {train_path}, {val_path}")
-
-        # Return stats
-        total_with_keypoints = len([ann for ann in all_annotations if ann['num_keypoints'] > 0])
-        total_synthesized = len([ann for ann in all_annotations if ann['num_keypoints'] == 5])
-        total_bbox_only = len([ann for ann in all_annotations if ann['num_keypoints'] == 0])
-
-        return {
-            'total_images': len(all_images),
-            'total_annotations': len(all_annotations),
-            'with_full_keypoints': total_with_keypoints - total_synthesized,
-            'with_synthesized_keypoints': total_synthesized,
-            'with_bbox_only': total_bbox_only
-        }
-
-
-    def _generate_debug_outputs(self, images, annotations, split_type):
-        """Generate debug JSON for first 20 images."""
-        debug_data = []
-
-        for img in images[:20]:
-            img_anns = [ann for ann in annotations if ann['image_id'] == img['id']]
-            debug_entry = {
-                'image_meta': img,
-                'annotations': img_anns
-            }
-            debug_data.append(debug_entry)
-
-        debug_path = self.debug_dir / f'debug_{split_type}_first_20.json'
-        with open(debug_path, 'w') as f:
-            json.dump(debug_data, f, indent=2)
 
 
 def main():
     """Main entry point."""
     config = {
         'stanford_json': 'data/stanford_dogs/stanford_extra_keypoints.json',
-        'coco_json': 'data/coco/annotations/instances_train2017.json',  # Add if available
-        'oxford_mask_dir': 'data/oxford_pets/annotations/trimaps',
-        'dogfacenet_crop_dir': 'data/dogfacenet/DogFaceNet_224resized',
+        'coco_json': 'data/coco/annotations/instances_train2017.json',
+        'oxford_xml_dir': 'data/oxford_pets/annotations/xmls',
         'output_dir': 'data/coco_keypoints'
     }
 
     converter = CocoKeypointsConverter(config)
-    stats = converter.convert()
-
-    print("Conversion Statistics:")
-    print(f"Total images converted: {stats['total_images']}")
-    print(f"Images with full keypoints: {stats['with_full_keypoints']}")
-    print(f"Images with synthesized keypoints: {stats['with_synthesized_keypoints']}")
-    print(f"Images with bbox-only: {stats['with_bbox_only']}")
+    converter.convert()
 
 
 if __name__ == '__main__':
