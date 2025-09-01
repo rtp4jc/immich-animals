@@ -12,6 +12,7 @@ import os
 import glob
 from pathlib import Path
 from ultralytics import YOLO
+import shutil
 
 def find_latest_model():
     """Find the latest model weights (best.pt) from phase1 runs"""
@@ -40,25 +41,38 @@ def main():
 
     export_dir = Path("models/phase1/export")
     export_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Exporting to directory: {export_dir.resolve()}")
+    print(f"Ensuring export directory exists: {export_dir.resolve()}")
 
     # Export to ONNX
     try:
         print("\nExporting to ONNX format...")
-        onnx_path = model.export(format='onnx', imgsz=640)
-        print(f"ONNX export successful: {onnx_path}")
+        # The export function saves next to the original model, so we move it after.
+        source_onnx_path_str = model.export(format='onnx', imgsz=640)
+        source_onnx_path = Path(source_onnx_path_str)
+        
+        destination_onnx_path = export_dir / source_onnx_path.name
+        
+        # Move the file to our desired export directory
+        shutil.move(str(source_onnx_path), str(destination_onnx_path))
+        
+        print(f"ONNX export successful. Model moved to: {destination_onnx_path}")
     except Exception as e:
         print(f"Error during ONNX export: {e}")
 
-    # Export to TFLite
+    # Export to TFLite (currently failing, but let's keep the logic)
     try:
         print("\nExporting to TFLite format...")
-        tflite_path = model.export(format='tflite', imgsz=640)
-        print(f"TFLite export successful: {tflite_path}")
+        source_tflite_path_str = model.export(format='tflite', imgsz=640)
+        source_tflite_path = Path(source_tflite_path_str)
+        
+        destination_tflite_path = export_dir / source_tflite_path.name
+        
+        shutil.move(str(source_tflite_path), str(destination_tflite_path))
+        print(f"TFLite export successful. Model moved to: {destination_tflite_path}")
     except Exception as e:
         print(f"Error during TFLite export: {e}")
 
-    print(f"\nExport complete. Models saved in {export_dir.resolve()}")
+    print(f"\nExport complete. Check {export_dir.resolve()} for models.")
     print("=" * 60)
 
 if __name__ == '__main__':

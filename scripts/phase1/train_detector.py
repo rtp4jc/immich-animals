@@ -50,11 +50,14 @@ def main():
         'patience': 10, # Increased patience
         'save_period': 5,
         'cache': False,
-        'augment': True, # Enable augmentation
+        # Augmentation settings from https://docs.ultralytics.com/guides/yolo-data-augmentation
         'fliplr': 0.5,   # Horizontal flip (50% probability)
         'degrees': 10,   # Rotation augmentation (+/- 10 degrees)
         'translate': 0.1, # Translation augmentation (+/- 10%)
-        'scale': 0.2,    # Scale augmentation (+/- 20%)
+        'scale': 0.5,    # Scale augmentation (+/- 20%)
+        'shear': 10.0,    # Shear augmentation (+/- 10 degrees)
+        'perspective': 0.0005,
+
     }
 
     print(f"\nStarting training with config: {train_config}")

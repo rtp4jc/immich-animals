@@ -72,40 +72,28 @@ def run_inference(model, sample_dir, output_dir):
     inference_data = []
     for result in results:
         img_path = Path(result.path)
-        print(f"\n--- Predictions for: {img_path.name} ---")
-
         boxes = result.boxes
         keypoints = result.keypoints
 
         if not boxes or len(boxes) == 0:
-            print("  No detections.")
+            print(f"{img_path}: No detections")
             inference_data.append({'image_path': img_path.name, 'detected_dog': False, 'num_boxes': 0, 'num_keypoints_detected': 0, 'avg_score': 0.0})
             continue
+
+        print(f"{img_path}: {len(boxes)} detections")
 
         # Get keypoint data once
         kp_data = keypoints.data if hasattr(keypoints, 'data') else torch.empty(0)
         num_keypoints_detected_total = 0
 
         for i in range(len(boxes)):
-            box = boxes[i]
-            bbox_coords = box.xywh.cpu().numpy()[0]
-            confidence = box.conf.cpu().numpy()[0]
-            
-            print(f"  Detection #{i + 1}: Confidence: {confidence:.4f}")
-            print(f"    Bbox (xywh): {np.round(bbox_coords, 2)}")
-
             num_kpts_this_detection = 0
             if i < len(kp_data):
                 kpts = kp_data[i]
-                print("    Keypoints (x, y, conf):")
                 visible_kpts = kpts[kpts[:, 2] > 0] # Filter for visible keypoints
                 num_kpts_this_detection = len(visible_kpts)
                 num_keypoints_detected_total += num_kpts_this_detection
-                for j, kpt in enumerate(kpts):
-                    print(f"      - Kpt {j + 1}: ({kpt[0]:.2f}, {kpt[1]:.2f}) - Conf: {kpt[2]:.4f}")
-            else:
-                print("    No keypoints for this detection.")
-
+            
         # For CSV, aggregate info for the image
         inference_data.append({
             'image_path': img_path.name,
