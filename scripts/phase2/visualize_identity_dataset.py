@@ -5,6 +5,8 @@ from torch.utils.data import DataLoader
 import matplotlib.pyplot as plt
 import numpy as np
 import math
+from collections import defaultdict
+from PIL import Image
 
 # Adjust the path to where your training module is located
 import sys
@@ -14,84 +16,91 @@ from training.datasets import IdentityDataset
 
 # --- Configuration ---
 VAL_JSON_PATH = 'data/identity_val.json'
-BATCH_SIZE = 16
-IMG_SIZE = 112
+IMG_SIZE = 224 # Larger size for better viewing
+NUM_IDENTITIES_TO_SHOW = 4
+MIN_IMAGES_PER_ID = 3
 
-def visualize_dataset():
+def visualize_dataset_by_id():
     """
-    Loads the validation dataset and displays a batch of images
-    with their identity and breed labels.
+    Loads the validation dataset, groups images by identity,
+    and displays a gallery to verify identity groupings.
     """
     if not os.path.exists(VAL_JSON_PATH):
         print(f"Error: Validation JSON not found at {VAL_JSON_PATH}")
         print("Please run `scripts/phase2/prepare_identity_dataset.py` first.")
         return
 
-    # Basic transform for visualization
+    # Cleaner transform for visualization to avoid distortion
     transform = transforms.Compose([
-        transforms.Resize((IMG_SIZE, IMG_SIZE)),
+        transforms.Resize(IMG_SIZE),
+        transforms.CenterCrop(IMG_SIZE),
         transforms.ToTensor()
     ])
 
-    # Load dataset
-    val_dataset = IdentityDataset(json_path=VAL_JSON_PATH, transform=transform)
-    
-    # Load breed labels from the json for display
     with open(VAL_JSON_PATH, 'r') as f:
         annotations = json.load(f)
-    
-    # Check if dataset is empty
-    if len(val_dataset) == 0:
-        print("Validation dataset is empty. Cannot visualize.")
+
+    # Group images by identity
+    ids_to_images = defaultdict(list)
+    for anno in annotations:
+        ids_to_images[anno['identity_label']].append(anno)
+
+    # Filter for identities with enough images to display
+    valid_ids = [id for id, annos in ids_to_images.items() if len(annos) >= MIN_IMAGES_PER_ID]
+    if not valid_ids:
+        print(f"No identities found with at least {MIN_IMAGES_PER_ID} images. Cannot create verification plot.")
         return
-
-    val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=True)
-
-    # Get one batch
-    images, identity_labels = next(iter(val_loader))
-
-    # Get corresponding breed labels for the batch
-    # This is a bit inefficient but fine for a small visualization script
-    breed_labels = []
-    # This is not robust if shuffle is on, we need to get the indices
-    # For visualization, let's just pull from the first N items without shuffle
+        
+    # Select which identities to show
+    ids_to_show = valid_ids[:NUM_IDENTITIES_TO_SHOW]
     
-    val_loader_no_shuffle = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
-    images, identity_labels = next(iter(val_loader_no_shuffle))
-    
-    breed_labels = [anno['breed_label'] for anno in annotations[:images.size(0)]]
+    # Find max number of images for a single ID to set subplot columns
+    max_cols = 0
+    for id_to_show in ids_to_show:
+        if len(ids_to_images[id_to_show]) > max_cols:
+            max_cols = len(ids_to_images[id_to_show])
+
+    fig, axes = plt.subplots(len(ids_to_show), max_cols, figsize=(max_cols * 3, len(ids_to_show) * 3))
+    fig.suptitle('Verification of Identity Grouping', fontsize=16, y=1.03)
+
+    for i, identity in enumerate(ids_to_show):
+        image_annos = ids_to_images[identity]
+        breed = image_annos[0]['breed_label'] # Breed is the same for all
+        
+        # Set row title
+        axes[i, 0].set_ylabel(f'ID: {identity}\nBreed: {breed}', rotation=0, labelpad=60, verticalalignment='center', fontsize=10)
 
 
-    # --- Visualization ---
-    num_images = images.size(0)
-    grid_size = math.ceil(math.sqrt(num_images))
-    fig, axes = plt.subplots(grid_size, grid_size, figsize=(12, 12))
-    axes = axes.flatten()
+        for j, anno in enumerate(image_annos):
+            img_path = anno['file_path']
+            try:
+                image = Image.open(img_path).convert('RGB')
+                image_tensor = transform(image)
+            except FileNotFoundError:
+                print(f"Warning: File not found: {img_path}. Skipping.")
+                continue
 
-    for i in range(num_images):
-        img = images[i].permute(1, 2, 0).numpy() # Convert from (C, H, W) to (H, W, C)
-        identity = identity_labels[i].item()
-        breed = breed_labels[i]
+            ax = axes[i, j]
+            ax.imshow(image_tensor.permute(1, 2, 0).numpy())
+            ax.set_xticks([])
+            ax.set_yticks([])
+            if i == 0:
+                ax.set_title(f'Image {j+1}')
 
-        axes[i].imshow(img)
-        axes[i].set_title(f"ID: {identity}\nBreed: {breed}", fontsize=8)
-        axes[i].axis('off')
+        # Hide unused subplots in the row
+        for j in range(len(image_annos), max_cols):
+            axes[i, j].axis('off')
 
-    # Hide unused subplots
-    for j in range(num_images, len(axes)):
-        axes[j].axis('off')
-
-    plt.tight_layout()
-    plt.suptitle("Identity Dataset Samples", fontsize=16, y=1.02)
+    plt.tight_layout(rect=[0.05, 0, 1, 0.95])
     
     # Save the figure
     output_dir = 'outputs/phase2_visualizations'
     os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, 'identity_dataset_sample.png')
+    save_path = os.path.join(output_dir, 'identity_verification.png')
     plt.savefig(save_path)
-    print(f"Saved visualization to {save_path}")
+    print(f"Saved verification plot to {save_path}")
     plt.show()
 
 
 if __name__ == '__main__':
-    visualize_dataset()
+    visualize_dataset_by_id()
