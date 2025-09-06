@@ -123,12 +123,8 @@ def print_comparison(coco_ann, yolo_data, ann_index, has_keypoints):
 
 def get_yolo_label_path(relative_img_path):
     """Constructs the expected path to the YOLO label file."""
-    relative_img_path_str = str(Path(relative_img_path))
-    if 'images' in relative_img_path_str:
-        relative_label_path_str = relative_img_path_str.replace('images', 'labels', 1)
-    else:
-        p = Path(relative_img_path)
-        relative_label_path_str = str(p.parent.parent / 'labels' / p.parent.name / p.name)
+    # All paths now follow the simple .../images/... -> .../labels/... structure
+    relative_label_path_str = str(relative_img_path).replace('images', 'labels', 1)
     return (DATA_ROOT / Path(relative_label_path_str)).with_suffix('.txt')
 
 def main(args):

@@ -75,12 +75,32 @@ def convert_split(split_name):
                 if len(annotations) > 0:
                     written_labels_count += 1
                 for ann in annotations:
+                    if "n02092002_2372" in relative_img_path:
+                        print(f"--- FINAL DEBUG for {relative_img_path} ---")
+                        print(f"--- Image Info from JSON: {image_info}")
+                        print(f"--- Annotation from JSON: {ann}")
                     bbox = ann['bbox']
                     x, y, w, h = bbox
-                    x_center_norm = (x + w / 2) / img_width
-                    y_center_norm = (y + h / 2) / img_height
-                    width_norm = w / img_width
-                    height_norm = h / img_height
+
+                    # Redundant clamping to definitively fix any stale data issues
+                    x1 = max(0, x)
+                    y1 = max(0, y)
+                    x2 = min(img_width, x + w)
+                    y2 = min(img_height, y + h)
+
+                    # Log if clamping was necessary
+                    if x1 != x or y1 != y or x2 != (x + w) or y2 != (y + h):
+                        print(f"[WARN] Clamped bbox for {relative_img_path}. Original: {[x, y, w, h]}")
+
+                    final_w = x2 - x1
+                    final_h = y2 - y1
+
+                    if final_w <= 0 or final_h <= 0: continue
+
+                    x_center_norm = (x1 + final_w / 2) / img_width
+                    y_center_norm = (y1 + final_h / 2) / img_height
+                    width_norm = final_w / img_width
+                    height_norm = final_h / img_height
 
                     f_label.write(f"0 {x_center_norm:.6f} {y_center_norm:.6f} {width_norm:.6f} {height_norm:.6f}\n")
 
