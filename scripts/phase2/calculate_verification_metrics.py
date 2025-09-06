@@ -1,3 +1,36 @@
+"""
+Calculates quantitative verification metrics for a trained embedding model.
+
+What it's for:
+This script provides a standard, numerical way to evaluate the performance of the
+embedding model. It answers the question: "How good is the model at telling dogs apart?"
+by calculating the True Accept Rate (TAR) at various False Accept Rates (FAR).
+
+What it does:
+1. Loads the best trained embedding model.
+2. Computes embedding vectors for all images in the validation set.
+3. Generates pairs of images:
+   - Positive pairs: two different images of the same dog.
+   - Negative pairs: two images of different dogs.
+4. Calculates the cosine similarity score for all positive and negative pairs.
+5. For several given FARs (e.g., 1%, 0.1%), it finds the similarity threshold that
+   would cause that percentage of negative pairs to be incorrectly accepted.
+6. At that threshold, it calculates the TAR - the percentage of positive pairs that
+   are correctly accepted.
+
+How to run it:
+- This script should be run after `training/train_embedding.py` has produced a model.
+- Run from the root of the project:
+  `python scripts/phase2/calculate_verification_metrics.py`
+
+How to interpret the results:
+The script prints its progress and concludes with a table of metrics:
+- `TAR @ FAR=1.000%: 83.97% (Threshold: 0.3275)`
+- This means: "At a similarity threshold of 0.3275, 1% of different-dog pairs are
+  falsely accepted, and at that same threshold, 83.97% of same-dog pairs are
+  correctly accepted."
+- Higher TAR values at lower FAR values indicate a better, more reliable model.
+"""
 import torch
 import numpy as np
 from torch.utils.data import DataLoader

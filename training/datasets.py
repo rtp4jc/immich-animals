@@ -1,3 +1,23 @@
+"""
+Defines the custom PyTorch Dataset objects for this project.
+
+What it's for:
+This script acts as the bridge between our prepared data (the `.json` files) and the
+PyTorch training pipeline. It defines how to load, open, and transform a single
+item from the dataset so the `DataLoader` in the training script can efficiently
+batch them and feed them to the model.
+
+What it does:
+1. Defines the `IdentityDataset` class, which inherits from `torch.utils.data.Dataset`.
+2. The class is initialized with a path to a `.json` file containing the annotations.
+3. The `__getitem__` method defines how to load a single image by its index, apply
+   any specified transformations (like resizing and augmentation), and return the
+   image tensor and its corresponding identity label.
+
+How to run it:
+- This script is not run directly. It is imported by other scripts, primarily
+  `training/train_embedding.py` and the visualization scripts.
+"""
 import json
 from PIL import Image
 from torch.utils.data import Dataset

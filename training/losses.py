@@ -1,3 +1,36 @@
+"""
+Defines the loss functions for metric learning.
+
+What it's for:
+This script contains the loss functions that drive the embedding model's training.
+Instead of just classifying, these losses teach the model to create a geometrically
+meaningful embedding space, where similar items are close together and dissimilar
+items are far apart.
+
+What it does:
+1. Implements `ArcFaceLoss`, a state-of-the-art loss function that works by enforcing
+   an additive angular margin between embeddings and their class prototypes.
+   The `ArcFaceLoss` module itself is a layer with trainable weights representing the
+   class prototypes. It outputs modified logits, which are then fed into a standard
+   CrossEntropyLoss in the main training script.
+2. Provides access to the standard PyTorch `TripletLoss` for comparison or alternative
+   training strategies.
+3. Includes a self-testing block to verify that both loss functions are implemented
+   correctly and produce valid, non-zero loss values for non-trivial cases.
+
+How to run it:
+- This script is not typically run directly. It is imported by `training/train_embedding.py`.
+- To run the self-tests and verify the loss implementations, run from the project root:
+  `python training/losses.py`
+
+How to interpret the results:
+When running the self-test, the script will:
+- Instantiate both ArcFaceLoss and TripletLoss.
+- Run forward passes with controlled dummy data.
+- Assert that the outputs are of the correct shape and that the loss values are
+  behaving as expected (e.g., zero for easy cases, positive for hard cases).
+- A successful run indicates the loss functions are correctly implemented.
+"""
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -82,7 +115,8 @@ class ArcFaceLoss(nn.Module):
 
 
 # For Triplet Loss, we can use the standard PyTorch implementation.
-# The main complexity of Triplet Loss is in the data sampling (finding triplets), which is handled by a custom DataLoader sampler, not the loss function itself.
+# The main complexity of Triplet Loss is in the data sampling (finding triplets),
+# which is handled by a custom DataLoader sampler, not the loss function itself.
 TripletLoss = nn.TripletMarginLoss
 
 

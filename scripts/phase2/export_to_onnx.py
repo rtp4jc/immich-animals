@@ -1,3 +1,31 @@
+"""
+Exports the trained PyTorch embedding model to the ONNX format.
+
+What it's for:
+This script is the final step in the model production pipeline. It converts the
+model from PyTorch's internal format (`.pt`) to ONNX (`.onnx`), a standardized,
+interoperable format for machine learning models.
+
+What it does:
+1. Loads the best trained model weights from `models/dog_embedding_best.pt`.
+2. Instantiates the `EmbeddingNet` model architecture.
+3. Creates a dummy input tensor with the correct shape (`1, 3, 224, 224`).
+4. Calls `torch.onnx.export` to trace the model with the dummy input and save the
+   resulting computational graph and weights as an ONNX file.
+5. The export is configured with dynamic axes, allowing the final model to process
+   variable-sized batches of images.
+
+How to run it:
+- This script should be run after `training/train_embedding.py` has produced a model.
+- Run from the root of the project:
+  `python scripts/phase2/export_to_onnx.py`
+
+How to interpret the results:
+The script will print its progress. A successful run will create a new file:
+- `models/dog_embedding.onnx`
+This `.onnx` file can then be used with various ONNX-compatible runtimes (like ONNX
+Runtime, TensorRT, etc.) for deployment in different applications.
+"""
 import torch
 import os
 import sys

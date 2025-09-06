@@ -1,3 +1,31 @@
+"""
+Prepares the identity-labeled dataset for training the embedding model.
+
+What it's for:
+This script is the first step in the embedding model pipeline. It takes raw, organized
+source datasets (DogFaceNet, Stanford Dogs) and converts them into a unified format
+that our PyTorch Dataset class can easily consume.
+
+What it does:
+1. Scans the DogFaceNet directory, treating each sub-folder as a unique dog identity.
+2. Scans the Stanford Dogs dataset to create a mapping from filenames to breed names.
+3. Filters out identities that have fewer than a specified number of images (MIN_IMAGES_PER_IDENTITY).
+4. Assigns a unique integer `identity_label` to each dog and a `breed_label`.
+5. Splits the consolidated data into training and validation sets.
+6. Saves these sets as `identity_train.json` and `identity_val.json` in the `data/` directory.
+
+How to run it:
+- Ensure DogFaceNet and Stanford Dogs datasets are downloaded to the `data/` directory.
+- Run the script from the root of the project:
+  `python scripts/phase2/prepare_identity_dataset.py`
+
+How to interpret the results:
+The script will print its progress, including the number of identities and images found.
+Upon completion, two files are created:
+- `data/identity_train.json`: A list of JSON objects for the training samples.
+- `data/identity_val.json`: A list of JSON objects for the validation samples.
+Each object contains a `file_path`, an `identity_label`, and a `breed_label`.
+"""
 import os
 import json
 import random

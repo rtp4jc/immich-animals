@@ -1,3 +1,31 @@
+"""
+Visualizes the identity dataset to verify its integrity.
+
+What it's for:
+This script is a crucial debugging and verification tool. It allows you to visually inspect
+the dataset created by `prepare_identity_dataset.py` to ensure that the identity and
+breed labels are correctly assigned to the images.
+
+What it does:
+1. Reads the `data/identity_val.json` file.
+2. Groups the images by their assigned `identity_label`.
+3. Selects a few identities that have multiple images.
+4. Generates and displays a plot where each row corresponds to a single dog identity,
+   showing all of its images from the validation set.
+
+How to run it:
+- This script should be run after `prepare_identity_dataset.py`.
+- Run from the root of the project:
+  `python scripts/phase2/visualize_identity_dataset.py`
+
+How to interpret the results:
+The script will save a plot to `outputs/phase2_visualizations/identity_verification.png`
+and display it on screen.
+- Each row in the plot is a unique dog.
+- You should see that all images within a single row belong to the same dog.
+- The labels on the y-axis show the `identity_label` and `breed_label` for that row.
+- This confirms that the dataset construction was successful.
+"""
 import json
 import torch
 import torchvision.transforms as transforms

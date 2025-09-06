@@ -1,3 +1,35 @@
+"""
+Visualizes the performance of a trained embedding model qualitatively.
+
+What it's for:
+This script provides a visual, qualitative assessment of how well the embedding model
+is performing. Instead of just numbers (loss, accuracy), it helps you see *what*
+the model has learned by showing you which dogs it thinks are similar.
+
+What it does:
+1. Loads the best trained embedding model from `models/dog_embedding_best.pt`.
+2. Computes the embedding vectors for all images in the validation set.
+3. Randomly selects a few images to act as "queries".
+4. For each query image, it searches through all other embeddings to find the ones that
+   are most similar based on cosine similarity (the "nearest neighbors").
+5. Generates and saves a plot (`nearest_neighbors.png`) showing each query image
+   alongside its top nearest neighbors.
+
+How to run it:
+- This script should be run after `training/train_embedding.py` has produced a model.
+- Run from the root of the project:
+  `python scripts/phase2/visualize_embedding_results.py`
+- You can control the size of the plot with command-line arguments:
+  `python scripts/phase2/visualize_embedding_results.py --num-queries 3 --num-neighbors 4`
+
+How to interpret the results:
+The script saves a plot to `outputs/phase2_visualizations/nearest_neighbors.png`.
+- Each row shows a random query image on the left.
+- The images to the right are the closest matches found in the validation set.
+- The title of each neighbor image shows its identity label and the similarity score.
+- The title color is GREEN for a correct match (same identity as the query) and RED
+  for an incorrect match. This gives a quick visual cue of the model's accuracy.
+"""
 import torch
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
