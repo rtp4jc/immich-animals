@@ -40,8 +40,6 @@ def convert_split(split_name):
     with open(coco_json_path, 'r') as f:
         coco_data = json.load(f)
 
-    print(f"[DEBUG] Loaded {len(coco_data.get('images', []))} images and {len(coco_data.get('annotations', []))} annotations.")
-
     images_map = {img['id']: img for img in coco_data['images']}
     annotations_by_image = {}
     for ann in coco_data.get('annotations', []):
@@ -49,8 +47,6 @@ def convert_split(split_name):
         if img_id not in annotations_by_image:
             annotations_by_image[img_id] = []
         annotations_by_image[img_id].append(ann)
-    
-    print(f"[DEBUG] Grouped annotations for {len(annotations_by_image)} unique image IDs.")
 
     image_paths = []
     found_annotations_count = 0
@@ -75,10 +71,6 @@ def convert_split(split_name):
                 if len(annotations) > 0:
                     written_labels_count += 1
                 for ann in annotations:
-                    if "n02092002_2372" in relative_img_path:
-                        print(f"--- FINAL DEBUG for {relative_img_path} ---")
-                        print(f"--- Image Info from JSON: {image_info}")
-                        print(f"--- Annotation from JSON: {ann}")
                     bbox = ann['bbox']
                     x, y, w, h = bbox
 
@@ -90,7 +82,7 @@ def convert_split(split_name):
 
                     # Log if clamping was necessary
                     if x1 != x or y1 != y or x2 != (x + w) or y2 != (y + h):
-                        print(f"[WARN] Clamped bbox for {relative_img_path}. Original: {[x, y, w, h]}")
+                        print(f"[WARN] Clamped bbox for {relative_img_path}. Original: {[x, y, w, h]}, Clamped: {[x1, y1, x2 - x1, y2 - y1]}")
 
                     final_w = x2 - x1
                     final_h = y2 - y1
@@ -103,8 +95,6 @@ def convert_split(split_name):
                     height_norm = final_h / img_height
 
                     f_label.write(f"0 {x_center_norm:.6f} {y_center_norm:.6f} {width_norm:.6f} {height_norm:.6f}\n")
-
-    print(f"[DEBUG] For split '{split_name}', found annotations for {found_annotations_count} images and wrote {written_labels_count} non-empty label files.")
 
     return image_paths
 

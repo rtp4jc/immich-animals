@@ -27,49 +27,6 @@ class CocoDetectorDatasetConverter:
             shutil.rmtree(self.output_dir)
         self.output_dir.mkdir(parents=True)
 
-    def _load_stanford_extra(self, json_path, image_id_counter):
-        """Loads images and annotations from StanfordExtra JSON."""
-        if not os.path.exists(json_path):
-            return [], [], image_id_counter
-        with open(json_path, 'r') as f:
-            data = json.load(f)
-        
-        images, annotations = [], []
-        processed_files = set()
-        for entry in data:
-            if entry.get('is_multiple_dogs', False):
-                continue
-            
-            relative_path = f"stanford_dogs/images/{entry['img_path']}"
-            if relative_path in processed_files:
-                continue
-            processed_files.add(relative_path)
-
-            width, height = entry['img_width'], entry['img_height']
-            temp_id = image_id_counter
-            image_id_counter += 1
-            image_entry = {
-                'id': temp_id, 'file_name': relative_path,
-                'width': width, 'height': height
-            }
-            
-            x, y, w, h = [float(c) for c in entry['img_bbox']]
-            x1 = max(0.0, x)
-            y1 = max(0.0, y)
-            x2 = min(float(width), x + w)
-            y2 = min(float(height), y + h)
-
-            bbox = [round(x1, 2), round(y1, 2), round(x2 - x1, 2), round(y2 - y1, 2)]
-            if bbox[2] <= 0 or bbox[3] <= 0: continue
-
-            annotation = {
-                'id': -1, 'image_id': temp_id, 'category_id': 1, 'bbox': bbox,
-                'area': bbox[2] * bbox[3], 'iscrowd': 0
-            }
-            images.append(image_entry)
-            annotations.append(annotation)
-        return images, annotations, image_id_counter
-
     def _load_stanford_base_bboxes(self, base_dir, existing_files, image_id_counter):
         """Loads images and annotations from Stanford Dogs base XMLs."""
         annotation_dir = Path(base_dir) / 'annotation'
@@ -274,7 +231,6 @@ class CocoDetectorDatasetConverter:
 def main():
     """Main entry point."""
     config = {
-        'stanford_json': 'data/stanford_dogs/stanford_extra_keypoints.json',
         'stanford_base_dir': 'data/stanford_dogs',
         'coco_train_json': 'data/coco/annotations/instances_train2017.json',
         'coco_val_json': 'data/coco/annotations/instances_val2017.json',
