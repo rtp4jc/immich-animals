@@ -14,31 +14,39 @@ Clean, end-to-end plan that combines the design, dataset strategy, training & ev
 
 # 2 — High-level architecture (flow)
 
-1. **Detector stage** — body detector (dog present) + head/face sub-detector (if found, prefer head crop).
-2. **Crop & normalization** — crop with context padding; if head landmarks available, do light alignment; otherwise use learned robustness (no strict human-style alignment).
-3. **Embedding network** — metric-learning model that emits fixed-dim vector (128–256d).
-4. **Clustering / ID assignment** — DBSCAN/HDBSCAN or nearest-prototype matching with per-user thresholds.
-5. **UI loop** — suggested clusters offered to user for confirmation/merge/split (same UX pattern as people).
-6. **Personalization** — on-device fine-tuning or last-layer adapters using user-confirmed samples; update thresholds per household.
+The implemented prototype uses a three-stage pipeline, which refines the initial two-stage concept.
+
+1. **Stage 1: Full-Body Dog Detector** — A `yolo11n` detector first scans the image to find all instances of dogs, producing bounding boxes for each.
+2. **Stage 2: Face Keypoint Estimator** — For each detected dog, the cropped image is passed to a `yolo11n-pose` model. This model is specialized to find 4 keypoints (left eye, right eye, nose, and throat) that indicate the location and orientation of the dog's face.
+3. **Stage 3: Crop & Embedding** — The image is cropped for the embedding model based on the results of the previous stage:
+    *   **Primary path:** If face keypoints are confidently detected, a tight "face chip" is cropped based on the keypoints.
+    *   **Fallback path:** If keypoints are not found (e.g., the dog's face is obscured), the full-body bounding box from Stage 1 is used for the crop. This provides robustness, though may result in lower accuracy for that specific image.
+4. **Stage 4: Embedding Network** — An `EfficientNet-B0` based metric-learning model produces a 512-dimensional vector from the cropped image.
+5. **Stage 5: Clustering / ID assignment** — (Future) DBSCAN/HDBSCAN or nearest-prototype matching with per-user thresholds.
+6. **Stage 6: UI loop** — (Future) Suggested clusters offered to user for confirmation/merge/split (same UX pattern as people).
+7. **Stage 7: Personalization** — (Future) On-device fine-tuning or last-layer adapters using user-confirmed samples.
 
 ---
 
-# 3 — Models: recommendations & roles
+# 3 — Models: Implemented & Recommended
 
-Detector family (on-device friendly)
+This section describes the models that have been successfully trained and validated, followed by other candidates for future experiments.
 
-* **Body detector**: lightweight YOLOv8n / YOLOv5n / MobileNet-SSD or RT-DETR tiny. Trained on COCO/OpenImages/Stanford. Output: dog body boxes.
-* **Head detector**: smaller detector specialized for head/face/head-region boxes trained on DogFaceNet/StanfordExtra/Oxford masks derived boxes. If a head detector is unavailable, detect body → heuristic crop top 40–60%.
+### Implemented Models (Phases 1 & 2)
 
-Embedding (identity)
+*   **Dog Detector**: A `yolo11n` model trained on a combination of COCO, Stanford Dogs, and other datasets. It is responsible for the initial detection of a dog's full body.
+*   **Face Keypoint Estimator**: A custom `yolo11n-pose` model trained to identify 4 keypoints (eyes, nose, throat) on cropped images of dogs. This model provides a more reliable way to locate the face for cropping than a simple head detector.
+*   **Identity Embedding Model**:
+    *   **Backbone**: `EfficientNet-B0`.
+    *   **Loss**: `ArcFaceLoss`.
+    *   **Output**: 512-dimensional L2-normalized embedding vector.
+    *   **Performance**: Achieved a TAR of 83.97% at a FAR of 1.0% on the validation set.
 
-* Backbone: MobileNetV3-Large / EfficientNet-Lite / MobileFaceNet as on-device student.
-* Teacher (offline): ResNet50-ArcFace or larger ArcFace variant for distillation.
-* Loss: ArcFace (preferred) or CosFace + optional triplet loss auxiliary.
-* Output dims: **128 or 256** (tradeoff: 128 smaller on device, 256 better separability).
-* Inference format: TFLite (with NNAPI/Metal delegate) and ONNX for other acceleration stacks. Support int8 quantized models (QAT workflow).
+### Future Recommendations & Alternatives
 
-Optional: lightweight breed classifier branch (multi-task) trained from Stanford Dogs for optional breed tags.
+*   **Detector Family**: For different performance trade-offs, `YOLOv8n`, `YOLOv5n`, `MobileNet-SSD`, or `RT-DETR-tiny` remain good candidates.
+*   **Embedding Backbones**: For a lighter on-device model, `MobileNetV3-Large` or `EfficientNet-Lite` are strong options. For higher accuracy, larger `EfficientNet` variants (B1, B2) could be explored.
+*   **Inference Formats**: Models should be exported to **ONNX** for use in the Immich ML container and optionally **TFLite** (with int8 quantization) for direct on-device applications.
 
 ---
 
