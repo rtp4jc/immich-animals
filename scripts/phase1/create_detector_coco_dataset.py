@@ -161,7 +161,7 @@ class CocoDetectorDatasetConverter:
                 continue
         return count
 
-    def _load_coco_bbox_only(self, json_path, num_negatives=15000):
+    def _load_coco_bbox_only(self, json_path, split_name, num_negatives=15000):
         """Load COCO dataset, including dog images and an increased number of negative samples."""
         if not os.path.exists(json_path):
             return 0
@@ -178,19 +178,28 @@ class CocoDetectorDatasetConverter:
         dog_annotations = [ann for ann in original_annotations if ann['category_id'] == dog_category_id]
         
         annotations_by_image = {}
-        for ann in dog_annotations:
-            img_id = ann['image_id']
+        for original_ann in dog_annotations:
+            img_id = original_ann['image_id']
             if img_id not in annotations_by_image:
                 annotations_by_image[img_id] = []
-            ann.pop('keypoints', None)
-            ann.pop('num_keypoints', None)
-            ann['category_id'] = 1
-            annotations_by_image[img_id].append(ann)
+
+            # Explicitly create a new annotation dictionary, copying only needed keys
+            # and using placeholder IDs, exactly like the Stanford loader.
+            bbox = original_ann['bbox']
+            new_ann = {
+                'id': -1,
+                'image_id': -1,
+                'category_id': 1,
+                'bbox': bbox,
+                'area': original_ann['area'],
+                'iscrowd': original_ann['iscrowd'],
+            }
+            annotations_by_image[img_id].append(new_ann)
 
         for img_id, anns in annotations_by_image.items():
             img = original_images[img_id]
             image_entry = {
-                'id': -1, 'file_name': f"coco/train2017/{img['file_name']}",
+                'id': -1, 'file_name': f"coco/images/{split_name}/{img['file_name']}",
                 'width': img['width'], 'height': img['height'], 'source_dataset': 'coco'
             }
             if self._add_image_and_annotations(image_entry, anns):
@@ -201,7 +210,7 @@ class CocoDetectorDatasetConverter:
         sampled_negatives = negative_images[:num_negatives]
         for img in sampled_negatives:
             image_entry = {
-                'id': -1, 'file_name': f"coco/train2017/{img['file_name']}",
+                'id': -1, 'file_name': f"coco/images/train2017/{img['file_name']}",
                 'width': img['width'], 'height': img['height'], 'source_dataset': 'coco_negative'
             }
             if self._add_image_and_annotations(image_entry, []):
@@ -234,6 +243,11 @@ class CocoDetectorDatasetConverter:
 
     def convert(self):
         """Main conversion function."""
+        # --- Part 1: Build the Training Set ---
+        print("=" * 60)
+        print("Building TRAINING dataset...")
+        print("=" * 60)
+
         print("Loading StanfordExtra for bounding boxes...")
         count_extra = self._load_stanford_extra(self.config['stanford_json'])
         print(f"Loaded {count_extra} unique StanfordExtra images")
@@ -242,47 +256,63 @@ class CocoDetectorDatasetConverter:
         count_base = self._load_stanford_base_bboxes(self.config['stanford_base_dir'])
         print(f"Loaded {count_base} new images from Stanford Dogs base")
 
-        print("Loading COCO for bounding boxes and negative samples...")
-        count_coco = self._load_coco_bbox_only(self.config['coco_json'])
-        print(f"Loaded {count_coco} COCO images (positives and negatives)")
+        print("Loading COCO TRAIN for bounding boxes and negative samples...")
+        count_coco_train = self._load_coco_bbox_only(
+            json_path=self.config['coco_train_json'],
+            split_name='train2017',
+            num_negatives=15000
+        )
+        print(f"Loaded {count_coco_train} COCO TRAIN images (positives and negatives)")
 
         print("Loading Oxford Pets negative samples (non-dogs)...")
         count_oxford = self._load_oxford_pets_negatives(self.config['oxford_xml_dir'])
         print(f"Loaded {count_oxford} Oxford Pets negative samples.")
 
-        all_images = self.coco_template['images']
-        random.seed(42)
-        random.shuffle(all_images)
-        split_idx = int(len(all_images) * 0.9)
-
-        train_images = all_images[:split_idx]
-        val_images = all_images[split_idx:]
-
-        train_image_ids = {img['id'] for img in train_images}
-        val_image_ids = {img['id'] for img in val_images}
-
-        all_annotations = self.coco_template['annotations']
-        train_annotations = [ann for ann in all_annotations if ann['image_id'] in train_image_ids]
-        val_annotations = [ann for ann in all_annotations if ann['image_id'] in val_image_ids]
-
-        train_coco = {'images': train_images, 'annotations': train_annotations, 'categories': self.coco_template['categories']}
-        val_coco = {'images': val_images, 'annotations': val_annotations, 'categories': self.coco_template['categories']}
-
+        train_coco = {
+            'images': self.coco_template['images'],
+            'annotations': self.coco_template['annotations'],
+            'categories': self.coco_template['categories']
+        }
         train_path = self.output_dir / 'annotations_train.json'
-        val_path = self.output_dir / 'annotations_val.json'
-
         with open(train_path, 'w') as f: json.dump(train_coco, f, indent=2)
-        with open(val_path, 'w') as f: json.dump(val_coco, f, indent=2)
+        print(f"\nSaved train annotations to {train_path}")
 
-        print(f"Saved train annotations to {train_path}")
-        print(f"Saved val annotations to {val_path}")
+        # --- Part 2: Build the Validation Set ---
+        print("\n" + "=" * 60)
+        print("Building VALIDATION dataset...")
+        print("=" * 60)
+
+        # Reset state for the validation set
+        self.image_id = 0
+        self.annotation_id = 0
+        self.image_filenames = set()
+        self.coco_template['images'] = []
+        self.coco_template['annotations'] = []
+
+        print("Loading COCO VAL for bounding boxes and negative samples...")
+        count_coco_val = self._load_coco_bbox_only(
+            json_path=self.config['coco_val_json'],
+            split_name='val2017',
+            num_negatives=2000 # Use fewer negatives for validation
+        )
+        print(f"Loaded {count_coco_val} COCO VAL images (positives and negatives)")
+
+        val_coco = {
+            'images': self.coco_template['images'],
+            'annotations': self.coco_template['annotations'],
+            'categories': self.coco_template['categories']
+        }
+        val_path = self.output_dir / 'annotations_val.json'
+        with open(val_path, 'w') as f: json.dump(val_coco, f, indent=2)
+        print(f"\nSaved val annotations to {val_path}")
 
 def main():
     """Main entry point."""
     config = {
         'stanford_json': 'data/stanford_dogs/stanford_extra_keypoints.json',
         'stanford_base_dir': 'data/stanford_dogs',
-        'coco_json': 'data/coco/annotations/instances_train2017.json',
+        'coco_train_json': 'data/coco/annotations/instances_train2017.json',
+        'coco_val_json': 'data/coco/annotations/instances_val2017.json',
         'oxford_xml_dir': 'data/oxford_pets/annotations/xmls',
         'output_dir': 'data/detector/coco'
     }

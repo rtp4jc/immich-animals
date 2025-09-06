@@ -38,13 +38,14 @@ def main():
         'patience': 10,
         'save_period': 5,
         'cache': False,
+        'dropout': 0.1,
         # Augmentation settings
         'fliplr': 0.5,
-        'degrees': 10,
+        'degrees': 15.0,
         'translate': 0.1,
         'scale': 0.5,
-        'shear': 10.0,
-        'perspective': 0.0005,
+        'shear': 15.0,
+        'perspective': 0.001,
     }
 
     print(f"\nStarting detector training with config: {train_config}")
