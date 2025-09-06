@@ -45,20 +45,16 @@ def map_and_transform_keypoints(joints, x_offset, y_offset):
     }
     
     output_keypoints = []
-    # Iterate in our desired keypoint order
     for name in ['nose', 'chin', 'left_ear_base', 'right_ear_base']:
         idx = keypoint_map[name]
         
-        # Check if the keypoint exists and is visible in the source data
         if len(joints) > idx and joints[idx][2] > 0:
             kpt = joints[idx]
             x, y, v = kpt[0], kpt[1], kpt[2]
-            # Transform coordinates to be relative to the crop
             new_x = x - x_offset
             new_y = y - y_offset
             output_keypoints.extend([new_x, new_y, v])
         else:
-            # If keypoint is not present or not visible, add zeros
             output_keypoints.extend([0, 0, 0])
             
     return output_keypoints
@@ -72,7 +68,6 @@ def main():
         print(f"Error: Source keypoint JSON not found: {SOURCE_JSON}")
         return
 
-    # Setup output directories
     for dir_path in [CROPPED_IMAGE_DIR, OUTPUT_COCO_DIR]:
         if dir_path.exists():
             shutil.rmtree(dir_path)
@@ -81,7 +76,6 @@ def main():
     with open(SOURCE_JSON, 'r') as f:
         source_data = json.load(f)
 
-    # Initialize COCO structure
     coco_output = {
         'images': [],
         'annotations': [],
@@ -107,15 +101,26 @@ def main():
         if img is None:
             continue
 
-        # Calculate crop coordinates with padding
+        img_h, img_w, _ = img.shape
         x, y, w, h = [int(v) for v in entry['img_bbox']]
+
+        x = max(0, x)
+        y = max(0, y)
+        if x + w > img_w:
+            w = img_w - x
+        if y + h > img_h:
+            h = img_h - y
+        
+        if w <= 0 or h <= 0:
+            continue
+
         pad_w = int(w * PADDING_FACTOR)
         pad_h = int(h * PADDING_FACTOR)
 
         x1 = max(0, x - pad_w)
         y1 = max(0, y - pad_h)
-        x2 = min(img.shape[1], x + pad_w)
-        y2 = min(img.shape[0], y + pad_h)
+        x2 = min(img_w, x + w + pad_w)
+        y2 = min(img_h, y + h + pad_h)
 
         cropped_img = img[y1:y2, x1:x2]
         if cropped_img.size == 0:
@@ -135,9 +140,19 @@ def main():
         }
         coco_output['images'].append(image_entry)
 
-        # FIX: Use the new mapping function to get the correct 4 keypoints
         transformed_kpts = map_and_transform_keypoints(entry['joints'], x1, y1)
         
+        # FIX: Validate transformed keypoints to ensure they are within the cropped image bounds.
+        final_kpts = []
+        for i in range(0, len(transformed_kpts), 3):
+            kx, ky, v = transformed_kpts[i], transformed_kpts[i+1], transformed_kpts[i+2]
+            if v > 0:
+                if not (0 <= kx < new_width and 0 <= ky < new_height):
+                    v = 0  # Mark as not visible if outside crop
+                    kx = 0 # Set to 0,0 as per convention
+                    ky = 0
+            final_kpts.extend([kx, ky, v])
+
         new_bbox_x = x - x1
         new_bbox_y = y - y1
         new_bbox = [new_bbox_x, new_bbox_y, w, h]
@@ -147,8 +162,8 @@ def main():
             'image_id': image_id_counter,
             'category_id': 1,
             'bbox': new_bbox,
-            'keypoints': transformed_kpts,
-            'num_keypoints': sum(1 for i in range(2, len(transformed_kpts), 3) if transformed_kpts[i] > 0),
+            'keypoints': final_kpts, # Use the fully validated keypoints
+            'num_keypoints': sum(1 for i in range(2, len(final_kpts), 3) if final_kpts[i] > 0),
             'area': w * h,
             'iscrowd': 0
         }
