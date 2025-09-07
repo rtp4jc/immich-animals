@@ -42,4 +42,24 @@ def find_latest_run(project_dir: Path, run_name: str) -> Optional[Path]:
                 max_num = num
                 latest_run_dir = d
 
-    return latest_run_dir
+def find_latest_timestamped_run(runs_dir: Path = Path('runs')) -> Optional[Path]:
+    """
+    Finds the latest timestamped training run directory.
+
+    Args:
+        runs_dir: The directory where training runs are stored (default: 'runs').
+
+    Returns:
+        The path to the latest run directory (e.g., 'runs/20250907_155408_resnet50'),
+        or None if no run directories are found.
+    """
+    if not runs_dir.exists():
+        return None
+
+    run_dirs = [d for d in runs_dir.iterdir() if d.is_dir()]
+    if not run_dirs:
+        return None
+
+    # Find the most recent run directory by modification time
+    latest_run = max(run_dirs, key=lambda x: x.stat().st_mtime)
+    return latest_run

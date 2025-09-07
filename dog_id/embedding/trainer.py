@@ -1,151 +1,210 @@
 """
-Generic trainer for the embedding model.
+Trainer class for the embedding model.
 """
+import json
+import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
-import os
+from pathlib import Path
 from tqdm import tqdm
 
-class Trainer:
-    """
-    A class to encapsulate the training and validation loop for the embedding model.
-    """
-    def __init__(self, model, arcface_loss, config):
+class EmbeddingTrainer:
+    def __init__(self, model, train_loader, val_loader, device, run_dir):
         self.model = model
-        self.arcface_loss = arcface_loss
-        self.config = config
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.to(self.device)
-        self.arcface_loss.to(self.device)
-        self.ce_loss = nn.CrossEntropyLoss()
-
-    def train(self, train_loader, val_loader, skip_warmup=False):
-        """
-        Executes the full two-stage training process.
-        """
-        print(f"Using device: {self.device}")
-        os.makedirs(os.path.dirname(self.config['MODEL_OUTPUT_PATH']), exist_ok=True)
-        overall_best_val_loss = np.inf
-
-        # --- Stage 1: Warm-up (Train Head Only) ---
-        if not skip_warmup:
-            overall_best_val_loss = self._warmup_phase(train_loader, val_loader)
-
-        # --- Stage 2: Full Fine-Tuning ---
-        self._finetune_phase(train_loader, val_loader, overall_best_val_loss)
-
-        print("\nTraining finished.")
-        print(f"Best overall validation loss: {overall_best_val_loss:.4f}")
-        print(f"Best model saved at: {self.config['MODEL_OUTPUT_PATH']}")
-
-    def _warmup_phase(self, train_loader, val_loader):
-        print("\n--- Stage 1: Warming up classification head ---")
-        for param in self.model.feature_extractor.parameters():
-            param.requires_grad = False
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.device = device
+        self.run_dir = Path(run_dir)
         
-        head_params = list(self.model.projection_head.parameters()) + list(self.arcface_loss.parameters())
-        optimizer = optim.Adam(head_params, lr=self.config['HEAD_LR'])
+        self.criterion = nn.CrossEntropyLoss()
         
-        stage_best_val_loss = np.inf
-        epochs_no_improve = 0
-        overall_best_val_loss = np.inf
-
-        for epoch in range(self.config['WARMUP_EPOCHS']):
-            self._train_one_epoch(optimizer, train_loader, epoch, self.config['WARMUP_EPOCHS'], "Warm-up")
-            val_loss, _ = self._validate(val_loader)
-
-            if val_loss < overall_best_val_loss:
-                overall_best_val_loss = val_loss
-                torch.save(self.model.state_dict(), self.config['MODEL_OUTPUT_PATH'])
-                print(f"New overall best val loss. Saved model to {self.config['MODEL_OUTPUT_PATH']}")
-
-            if val_loss < stage_best_val_loss:
-                stage_best_val_loss = val_loss
-                epochs_no_improve = 0
-            else:
-                epochs_no_improve += 1
-
-            if epochs_no_improve >= self.config['EARLY_STOPPING_PATIENCE']:
-                print(f"\nEarly stopping triggered for warm-up after {self.config['EARLY_STOPPING_PATIENCE']} epochs.")
-                break
-        return overall_best_val_loss
-
-    def _finetune_phase(self, train_loader, val_loader, overall_best_val_loss):
-        print("\n--- Stage 2: Full model fine-tuning ---")
-        if os.path.exists(self.config['MODEL_OUTPUT_PATH']):
-            print(f"Loading best model from warm-up phase (Overall Best Val Loss: {overall_best_val_loss:.4f})")
-            self.model.load_state_dict(torch.load(self.config['MODEL_OUTPUT_PATH']))
+        # Global best model tracking (across all phases)
+        self.best_val_loss = float('inf')
         
-        for param in self.model.feature_extractor.parameters():
-            param.requires_grad = True
+        # Per-phase early stopping tracking
+        self.phase_best_val_loss = float('inf')
+        self.patience_counter = 0
+        
+        # Metrics tracking
+        self.epoch_metrics = []
 
-        optimizer = optim.Adam([
-            {'params': self.model.feature_extractor.parameters(), 'lr': self.config['BACKBONE_LR']},
-            {'params': self.model.projection_head.parameters(), 'lr': self.config['FULL_TRAIN_LR']},
-            {'params': self.arcface_loss.parameters(), 'lr': self.config['FULL_TRAIN_LR']}
-        ])
-        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
-
-        stage_best_val_loss = np.inf
-        epochs_no_improve = 0
-
-        for epoch in range(self.config['FULL_TRAIN_EPOCHS']):
-            self._train_one_epoch(optimizer, train_loader, epoch, self.config['FULL_TRAIN_EPOCHS'], "Fine-Tune")
-            val_loss, _ = self._validate(val_loader)
-            scheduler.step()
-
-            if val_loss < overall_best_val_loss:
-                overall_best_val_loss = val_loss
-                torch.save(self.model.state_dict(), self.config['MODEL_OUTPUT_PATH'])
-                print(f"New overall best val loss. Saved model to {self.config['MODEL_OUTPUT_PATH']}")
-
-            if val_loss < stage_best_val_loss:
-                stage_best_val_loss = val_loss
-                epochs_no_improve = 0
-            else:
-                epochs_no_improve += 1
-
-            if epochs_no_improve >= self.config['EARLY_STOPPING_PATIENCE']:
-                print(f"\nEarly stopping triggered after {self.config['EARLY_STOPPING_PATIENCE']} epochs.")
-                break
-
-    def _train_one_epoch(self, optimizer, data_loader, epoch, total_epochs, stage_name):
+    def train_epoch(self, optimizer):
+        """Train for one epoch."""
         self.model.train()
-        running_loss = 0.0
-        pbar = tqdm(enumerate(data_loader), total=len(data_loader), desc=f"Epoch {epoch+1}/{total_epochs} [{stage_name}]")
-
-        for i, (images, labels) in pbar:
+        total_loss = 0.0
+        num_batches = 0
+        
+        pbar = tqdm(self.train_loader, desc="Training", leave=False)
+        for images, labels in pbar:
             images, labels = images.to(self.device), labels.to(self.device)
+            
             optimizer.zero_grad()
-            embeddings = self.model(images)
-            arcface_logits = self.arcface_loss(embeddings, labels)
-            loss = self.ce_loss(arcface_logits, labels)
+            logits = self.model(images, labels)
+            loss = self.criterion(logits, labels)
             loss.backward()
             optimizer.step()
-            running_loss += loss.item()
-            pbar.set_postfix({'Loss': f'{running_loss / (i + 1):.4f}'})
-    
-    def _validate(self, data_loader):
+            
+            total_loss += loss.item()
+            num_batches += 1
+            
+            # Update progress bar
+            pbar.set_postfix({'Loss': f'{loss.item():.4f}'})
+        
+        return total_loss / num_batches
+
+    def validate(self):
+        """Validate the model."""
         self.model.eval()
-        running_loss = 0.0
-        correct_predictions = 0
-        total_samples = 0
-        pbar = tqdm(data_loader, total=len(data_loader), desc="Validating")
+        total_loss = 0.0
+        correct = 0
+        total = 0
+        
+        pbar = tqdm(self.val_loader, desc="Validation", leave=False)
         with torch.no_grad():
             for images, labels in pbar:
                 images, labels = images.to(self.device), labels.to(self.device)
-                embeddings = self.model(images)
-                arcface_logits = self.arcface_loss(embeddings, labels)
-                loss = self.ce_loss(arcface_logits, labels)
-                running_loss += loss.item()
-                _, predicted = torch.max(arcface_logits.data, 1)
-                total_samples += labels.size(0)
-                correct_predictions += (predicted == labels).sum().item()
-                val_acc = 100 * correct_predictions / total_samples
-                pbar.set_postfix({'Val Acc': f'{val_acc:.2f}%'})
-        avg_loss = running_loss / len(data_loader)
-        accuracy = 100 * correct_predictions / total_samples
-        print(f"Validation Loss: {avg_loss:.4f}, Validation Acc: {accuracy:.2f}%")
+                
+                logits = self.model(images, labels)
+                loss = self.criterion(logits, labels)
+                
+                total_loss += loss.item()
+                
+                # Calculate accuracy
+                _, predicted = torch.max(logits.data, 1)
+                total += labels.size(0)
+                correct += (predicted == labels).sum().item()
+                
+                # Update progress bar
+                current_acc = correct / total
+                pbar.set_postfix({'Loss': f'{loss.item():.4f}', 'Acc': f'{current_acc:.4f}'})
+        
+        avg_loss = total_loss / len(self.val_loader)
+        accuracy = correct / total
+        
         return avg_loss, accuracy
+
+    def save_checkpoint(self, epoch, val_loss, val_acc, is_best=False):
+        """Save model checkpoint."""
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': self.model.state_dict(),
+            'val_loss': val_loss,
+            'val_accuracy': val_acc,
+        }
+        
+        # Save latest checkpoint
+        checkpoint_path = self.run_dir / "latest_checkpoint.pt"
+        torch.save(checkpoint, checkpoint_path)
+        
+        # Save best model
+        if is_best:
+            best_path = self.run_dir / "best_model.pt"
+            torch.save(self.model.state_dict(), best_path)
+            return best_path
+        
+        return None
+
+    def _train_and_validate_epoch(self, optimizer, epoch, total_epochs, phase, patience):
+        """Helper method to train and validate one epoch with timing and logging."""
+        epoch_start = time.time()
+        
+        train_loss = self.train_epoch(optimizer)
+        val_loss, val_acc = self.validate()
+        
+        epoch_time = time.time() - epoch_start
+        
+        # Track metrics
+        epoch_data = {
+            'epoch': epoch + 1,
+            'phase': phase,
+            'train_loss': train_loss,
+            'val_loss': val_loss,
+            'val_accuracy': val_acc,
+            'epoch_time': epoch_time
+        }
+        self.epoch_metrics.append(epoch_data)
+        
+        # Check if this is the best model globally (across all phases)
+        is_global_best = val_loss < self.best_val_loss
+        if is_global_best:
+            self.best_val_loss = val_loss
+            self.save_checkpoint(epoch, val_loss, val_acc, is_best=True)
+        
+        # Check if this is the best model in this phase (for early stopping)
+        is_phase_best = val_loss < self.phase_best_val_loss
+        if is_phase_best:
+            self.phase_best_val_loss = val_loss
+            self.patience_counter = 0
+        else:
+            self.patience_counter += 1
+        
+        # Always save latest checkpoint
+        if not is_global_best:
+            self.save_checkpoint(epoch, val_loss, val_acc, is_best=False)
+        
+        best_indicator = " [BEST]" if is_global_best else ""
+        
+        print(f"Epoch {(epoch % total_epochs) + 1}/{total_epochs}: "
+              f"Train Loss: {train_loss:.4f}, "
+              f"Val Loss: {val_loss:.4f}, "
+              f"Val Acc: {val_acc:.4f}, "
+              f"Time: {epoch_time:.1f}s{best_indicator}")
+        
+        # Early stopping check (based on phase performance)
+        if self.patience_counter >= patience:
+            print(f"Early stopping triggered in {phase} phase after {self.patience_counter} epochs without improvement")
+            return True  # Signal to stop training
+        
+        return False  # Continue training
+
+    def train(self, warmup_epochs, full_epochs, head_lr, backbone_lr, full_lr, patience):
+        """Full training loop with warmup and fine-tuning phases."""
+        print(f"Starting training in run directory: {self.run_dir}")
+        
+        # Phase 1: Warmup (freeze backbone)
+        print(f"\n=== Phase 1: Warmup ({warmup_epochs} epochs) ===")
+        self.model.freeze_backbone()
+        optimizer = optim.Adam(self.model.parameters(), lr=head_lr)
+        
+        for epoch in range(warmup_epochs):
+            should_stop = self._train_and_validate_epoch(optimizer, epoch, warmup_epochs, 'warmup', patience)
+            if should_stop:
+                break
+        
+        # Phase 2: Full training (unfreeze backbone)
+        print(f"\n=== Phase 2: Full Training ({full_epochs} epochs) ===")
+        
+        # Load the best model from Phase 1 before starting Phase 2
+        best_phase1_path = self.run_dir / "best_model.pt"
+        if best_phase1_path.exists():
+            print(f"Loading best Phase 1 model: {best_phase1_path}")
+            self.model.load_state_dict(torch.load(best_phase1_path, map_location=self.device))
+        
+        self.model.unfreeze_backbone()
+        
+        # Reset phase tracking for new phase
+        self.phase_best_val_loss = float('inf')
+        self.patience_counter = 0
+        
+        # Different learning rates for backbone and head
+        optimizer = optim.Adam([
+            {'params': self.model.backbone.parameters(), 'lr': backbone_lr},
+            {'params': self.model.head.parameters(), 'lr': full_lr}
+        ])
+        
+        # Add learning rate scheduler for Phase 2
+        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+        
+        for epoch in range(full_epochs):
+            should_stop = self._train_and_validate_epoch(optimizer, warmup_epochs + epoch, full_epochs, 'full_training', patience)
+            scheduler.step()  # Step learning rate scheduler
+            if should_stop:
+                break
+        
+        # Save training metrics
+        with open(self.run_dir / "training_metrics.json", "w") as f:
+            json.dump(self.epoch_metrics, f, indent=2)
+        
+        print(f"Training completed. Best validation loss: {self.best_val_loss:.4f}")
+        return self.run_dir / "best_model.pt"

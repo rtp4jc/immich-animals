@@ -1,17 +1,25 @@
 """
 Backbone factory for creating feature extractors for the embedding model.
 """
+from enum import Enum
+import torch.nn as nn
 from torchvision.models import (
     efficientnet_b0, EfficientNet_B0_Weights,
-    mobilenet_v3_small, MobileNet_V3_Small_Weights
+    mobilenet_v3_small, MobileNet_V3_Small_Weights,
+    resnet50, ResNet50_Weights
 )
 
-def get_backbone(name: str, pretrained: bool = True):
+class BackboneType(Enum):
+    EFFICIENTNET_B0 = "efficientnet_b0"
+    MOBILENET_V3_SMALL = "mobilenet_v3_small"
+    RESNET50 = "resnet50"
+
+def get_backbone(backbone_type: BackboneType, pretrained: bool = True):
     """
     Selects and instantiates a pre-trained backbone model.
 
     Args:
-        name (str): The name of the backbone (e.g., 'efficientnet_b0').
+        backbone_type (BackboneType): The backbone type to use.
         pretrained (bool): Whether to use pre-trained ImageNet weights.
 
     Returns:
@@ -19,21 +27,27 @@ def get_backbone(name: str, pretrained: bool = True):
         - model: The instantiated backbone model's feature extractor.
         - num_features: The number of output features from the model's feature extractor.
     """
-    if name == 'efficientnet_b0':
+    if backbone_type == BackboneType.EFFICIENTNET_B0:
         weights = EfficientNet_B0_Weights.IMAGENET1K_V1 if pretrained else None
         model = efficientnet_b0(weights=weights)
         num_features = model.classifier[1].in_features
-        # Return just the feature extractor part of the model
         feature_extractor = model.features
         return feature_extractor, num_features
     
-    elif name == 'mobilenet_v3_small':
+    elif backbone_type == BackboneType.MOBILENET_V3_SMALL:
         weights = MobileNet_V3_Small_Weights.IMAGENET1K_V1 if pretrained else None
         model = mobilenet_v3_small(weights=weights)
         num_features = model.classifier[0].in_features
-        # Return just the feature extractor part of the model
         feature_extractor = model.features
         return feature_extractor, num_features
 
+    elif backbone_type == BackboneType.RESNET50:
+        weights = ResNet50_Weights.IMAGENET1K_V2 if pretrained else None
+        model = resnet50(weights=weights)
+        num_features = model.fc.in_features  # 2048 for ResNet-50
+        # Remove final classification layer and global average pooling
+        feature_extractor = nn.Sequential(*list(model.children())[:-2])
+        return feature_extractor, num_features
+
     else:
-        raise ValueError(f"Backbone '{name}' not recognized.")
+        raise ValueError(f"Backbone '{backbone_type}' not recognized.")

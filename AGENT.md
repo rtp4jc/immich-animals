@@ -14,7 +14,12 @@ Dog identification system for Immich that mirrors the people detection pipeline.
 
 ### ✅ Completed (Phases 1-3)
 - **Models Trained**: All three models trained and validated
-- **Performance**: 83.97% TAR at 1.0% FAR on validation set
+- **Performance**: 69.24% TAR at 10.0% FAR on validation set (no data leakage)
+  - TAR @ FAR=10.000%: 69.24% (Threshold: 0.4179)
+  - TAR @ FAR=1.000%: 39.68% (Threshold: 0.5571)  
+  - TAR @ FAR=0.100%: 24.15% (Threshold: 0.6437)
+  - TAR @ FAR=0.010%: 15.53% (Threshold: 0.6981)
+- **Data Integrity**: Fixed data leakage - validation uses completely separate dog identities
 - **ONNX Export**: All models exported to `/models/onnx/`
   - `detector.onnx` (10.6MB)
   - `keypoint.onnx` (11.0MB)

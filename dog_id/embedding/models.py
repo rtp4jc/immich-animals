@@ -24,23 +24,24 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dog_id.embedding.backbones import get_backbone
+from dog_id.embedding.backbones import get_backbone, BackboneType
+from dog_id.embedding.losses import ArcFaceLoss
 
 class EmbeddingNet(nn.Module):
     """
     A generic embedding network that uses a backbone from the factory.
     """
-    def __init__(self, backbone_name: str, embedding_dim: int = 512, pretrained: bool = True, dropout_prob: float = 0.5):
+    def __init__(self, backbone_type: BackboneType, embedding_dim: int = 512, pretrained: bool = True, dropout_prob: float = 0.5):
         """
         Args:
-            backbone_name (str): Name of the backbone to use (e.g., 'efficientnet_b0').
+            backbone_type (BackboneType): Type of backbone to use.
             embedding_dim (int): The dimensionality of the output embedding vector.
             pretrained (bool): Whether to use weights pre-trained on ImageNet for the backbone.
             dropout_prob (float): Probability for the dropout layer.
         """
         super(EmbeddingNet, self).__init__()
 
-        self.feature_extractor, num_features = get_backbone(backbone_name, pretrained)
+        self.feature_extractor, num_features = get_backbone(backbone_type, pretrained)
 
         # Define the new projection head with Dropout
         self.projection_head = nn.Sequential(
@@ -71,29 +72,36 @@ class EmbeddingNet(nn.Module):
         
         return normalized_embeddings
 
-# --- Test script to verify model architecture ---
-if __name__ == '__main__':
-    # Create a dummy input tensor
-    batch_size = 4
-    img_size = 224
-    dummy_input = torch.randn(batch_size, 3, img_size, img_size)
-
-    # Test with EfficientNet
-    print("--- Testing with EfficientNet-B0 ---")
-    model_eff = EmbeddingNet(backbone_name='efficientnet_b0')
-    model_eff.eval()
-    output_eff = model_eff(dummy_input)
-    print(f"Output shape (EfficientNet-B0): {output_eff.shape}")
-    assert output_eff.shape == (batch_size, 512)
-    print("EfficientNet-B0 test passed!")
-
-    # Test with MobileNet
-    print("\n--- Testing with MobileNetV3-Small ---")
-    model_mob = EmbeddingNet(backbone_name='mobilenet_v3_small')
-    model_mob.eval()
-    output_mob = model_mob(dummy_input)
-    print(f"Output shape (MobileNetV3-Small): {output_mob.shape}")
-    assert output_mob.shape == (batch_size, 512)
-    print("MobileNetV3-Small test passed!")
-
-    print("\nModel architecture tests passed!")
+class DogEmbeddingModel(nn.Module):
+    """
+    Complete dog embedding model with ArcFace loss.
+    """
+    def __init__(self, backbone_type: BackboneType, num_classes: int, embedding_dim: int = 512):
+        super(DogEmbeddingModel, self).__init__()
+        
+        self.backbone = EmbeddingNet(backbone_type, embedding_dim)
+        self.head = ArcFaceLoss(embedding_dim, num_classes)
+        
+    def forward(self, x, labels=None):
+        """Forward pass for training."""
+        embeddings = self.backbone(x)
+        if labels is not None:
+            # Training mode - return logits for loss calculation
+            return self.head(embeddings, labels)
+        else:
+            # Inference mode - return embeddings
+            return embeddings
+    
+    def get_embeddings(self, x):
+        """Get embeddings without ArcFace head."""
+        return self.backbone(x)
+    
+    def freeze_backbone(self):
+        """Freeze backbone parameters."""
+        for param in self.backbone.parameters():
+            param.requires_grad = False
+    
+    def unfreeze_backbone(self):
+        """Unfreeze backbone parameters."""
+        for param in self.backbone.parameters():
+            param.requires_grad = True

@@ -9,6 +9,8 @@ import sys
 import torch
 from ultralytics import YOLO
 
+from dog_id.common.constants import DETECTOR_PROJECT_DIR, DETECTOR_RUN_NAME
+
 def main():
     """Main training function."""
 
@@ -32,8 +34,8 @@ def main():
         'epochs': 100,
         'imgsz': 640,
         'batch': 16,
-        'project': 'models/phase1',
-        'name': 'detector_run',
+        'project': str(DETECTOR_PROJECT_DIR),
+        'name': DETECTOR_RUN_NAME,
         'device': 0,
         'patience': 10,
         'save_period': 5,

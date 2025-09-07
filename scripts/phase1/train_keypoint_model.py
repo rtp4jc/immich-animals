@@ -10,6 +10,8 @@ import sys
 import torch
 from ultralytics import YOLO
 
+from dog_id.common.constants import KEYPOINT_PROJECT_DIR, KEYPOINT_RUN_NAME
+
 def main():
     """Main training function."""
 
@@ -34,8 +36,8 @@ def main():
         'epochs': 100,
         'imgsz': 640,
         'batch': 16,
-        'project': 'models/phase1',
-        'name': 'keypoint_run', # New name for this run
+        'project': str(KEYPOINT_PROJECT_DIR),
+        'name': KEYPOINT_RUN_NAME, # New name for this run
         'device': 0,
         'patience': 10,
         'save_period': 5,

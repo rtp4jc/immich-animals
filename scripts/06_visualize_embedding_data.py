@@ -39,7 +39,6 @@ import os
 
 # Adjust path to import from our new package
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from dog_id.common.datasets import IdentityDataset
 from dog_id.embedding.config import DATA_CONFIG
 
 # --- Configuration ---

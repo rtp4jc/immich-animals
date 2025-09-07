@@ -41,9 +41,11 @@ from PIL import Image
 
 # Adjust path to import from our new package
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from dog_id.common.datasets import IdentityDataset
-from dog_id.embedding.models import EmbeddingNet
+from dog_id.common.utils import find_latest_timestamped_run
+from dog_id.common.datasets import DogIdentityDataset
+from dog_id.embedding.models import DogEmbeddingModel
 from dog_id.embedding.config import TRAINING_CONFIG, DATA_CONFIG, DEFAULT_BACKBONE
+from dog_id.embedding.backbones import BackboneType
 
 # --- Configuration ---
 FAR_TARGETS = [1e-1, 1e-2, 1e-3, 1e-4]
@@ -139,18 +141,40 @@ def visualize_neighbors(all_embeddings, all_labels, all_paths, num_queries=5, nu
     plt.show()
 
 def main(args):
-    model_path = TRAINING_CONFIG['MODEL_OUTPUT_PATH']
-    if not os.path.exists(model_path):
-        print(f"Error: Model not found at {model_path}. Please run training first.")
-        return
+    # Try to find model in latest run directory first
+    latest_run = find_latest_timestamped_run()
+    model_path = None
+    
+    if latest_run:
+        model_path = latest_run / "best_model.pt"
+        if not model_path.exists():
+            model_path = None
+    
+    # Fall back to old location if not found
+    if model_path is None:
+        model_path = TRAINING_CONFIG['MODEL_OUTPUT_PATH']
+        if not os.path.exists(model_path):
+            print(f"Error: No trained model found.")
+            print(f"Checked: runs/*/best_model.pt and {TRAINING_CONFIG['MODEL_OUTPUT_PATH']}")
+            print("Please run training first.")
+            return
+    
+    print(f"Using model: {model_path}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = EmbeddingNet(backbone_name=args.backbone, embedding_dim=TRAINING_CONFIG['EMBEDDING_DIM'])
+    model = DogEmbeddingModel(
+        backbone_type=args.backbone, 
+        num_classes=1001,  # This doesn't matter for inference
+        embedding_dim=TRAINING_CONFIG['EMBEDDING_DIM']
+    )
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
 
-    transform = transforms.Compose([transforms.Resize((DATA_CONFIG['IMG_SIZE'], DATA_CONFIG['IMG_SIZE'])), transforms.ToTensor(), transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])])
-    val_dataset = IdentityDataset(json_path=DATA_CONFIG['VAL_JSON_PATH'], transform=transform)
+    val_dataset = DogIdentityDataset(
+        json_path=DATA_CONFIG['VAL_JSON_PATH'], 
+        img_size=DATA_CONFIG['IMG_SIZE'],
+        is_training=False
+    )
     val_loader = DataLoader(val_dataset, batch_size=DATA_CONFIG['BATCH_SIZE'], shuffle=False, num_workers=2)
 
     all_embeddings, all_labels, all_paths = get_all_embeddings(model, val_loader, device)
@@ -163,7 +187,8 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Validate a trained embedding model.")
-    parser.add_argument('--backbone', type=str, default=DEFAULT_BACKBONE, help=f"Backbone of the trained model. Default: {DEFAULT_BACKBONE}")
+    parser.add_argument('--backbone', type=BackboneType, default=DEFAULT_BACKBONE, 
+                       choices=list(BackboneType), help=f"Backbone of the trained model. Default: {DEFAULT_BACKBONE}")
     parser.add_argument('--show-neighbors', action='store_true', help="Visualize nearest neighbor search results.")
     parser.add_argument('--calculate-metrics', action='store_true', help="Calculate TAR@FAR verification metrics.")
     parser.add_argument('--num-queries', type=int, default=5, help="Number of query images for neighbor visualization.")
