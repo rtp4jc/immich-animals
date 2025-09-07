@@ -17,7 +17,7 @@ class EmbeddingTrainer:
         self.device = device
         self.run_dir = Path(run_dir)
         
-        self.criterion = nn.CrossEntropyLoss()
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
         
         # Global best model tracking (across all phases)
         self.best_val_loss = float('inf')
@@ -43,6 +43,10 @@ class EmbeddingTrainer:
             logits = self.model(images, labels)
             loss = self.criterion(logits, labels)
             loss.backward()
+            
+            # Gradient clipping for stability
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
+            
             optimizer.step()
             
             total_loss += loss.item()
@@ -193,12 +197,19 @@ class EmbeddingTrainer:
             {'params': self.model.head.parameters(), 'lr': full_lr}
         ])
         
-        # Add learning rate scheduler for Phase 2
-        scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=7, gamma=0.1)
+        # Sequential scheduler: Linear warmup → Cosine annealing
+        warmup_epochs_phase2 = 20  # Very long warmup for ultra-gentle learning rate increase
+        linear_scheduler = optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs_phase2)  # Start even lower
+        cosine_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=full_epochs - warmup_epochs_phase2)
+        scheduler = optim.lr_scheduler.SequentialLR(
+            optimizer, 
+            schedulers=[linear_scheduler, cosine_scheduler], 
+            milestones=[warmup_epochs_phase2]
+        )
         
         for epoch in range(full_epochs):
             should_stop = self._train_and_validate_epoch(optimizer, warmup_epochs + epoch, full_epochs, 'full_training', patience)
-            scheduler.step()  # Step learning rate scheduler
+            scheduler.step()  # Fixed: removed deprecated epoch parameter
             if should_stop:
                 break
         

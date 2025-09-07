@@ -42,19 +42,21 @@ class ArcFaceLoss(nn.Module):
     This loss function is designed to increase the discriminative power of embeddings.
     Reference: https://arxiv.org/abs/1801.07698
     """
-    def __init__(self, in_features, out_features, s=30.0, m=0.50):
+    def __init__(self, in_features, out_features, s=30.0, m=0.50, label_smoothing=0.1):
         """
         Args:
             in_features (int): Size of the input embedding vectors.
             out_features (int): Number of classes (identities).
             s (float): Feature scaling factor.
             m (float): Additive angular margin.
+            label_smoothing (float): Label smoothing factor for cross entropy loss.
         """
         super(ArcFaceLoss, self).__init__()
         self.in_features = in_features
         self.out_features = out_features
         self.s = s
         self.m = m
+        self.label_smoothing = label_smoothing
 
         # The weight matrix of this layer represents the class prototypes.
         # Each column is a prototype for a class.

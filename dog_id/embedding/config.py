@@ -15,9 +15,9 @@ TRAINING_CONFIG = {
     'WARMUP_EPOCHS': 25,
     'FULL_TRAIN_EPOCHS': 45,
     'EARLY_STOPPING_PATIENCE': 5,
-    'HEAD_LR': 1e-8,  # Reduced from 1e-3
-    'BACKBONE_LR': 1e-9,  # Reduced from 1e-5
-    'FULL_TRAIN_LR': 1e-10,  # Reduced from 1e-4
+    'HEAD_LR': 1e-8,      # Back to very conservative (Phase 1 already gets close to optimal)
+    'BACKBONE_LR': 1e-9,  # Extremely small for fine-tuning
+    'FULL_TRAIN_LR': 1e-9, # Match backbone LR
 }
 
 # --- Data Configuration ---

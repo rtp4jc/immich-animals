@@ -11,6 +11,7 @@ sys.path.append(str(PROJECT_ROOT))
 from dog_id.common.constants import MODELS_DIR, ONNX_EMBEDDING_PATH
 from dog_id.embedding.config import DATA_CONFIG, DEFAULT_BACKBONE, TRAINING_CONFIG
 from dog_id.embedding.models import EmbeddingNet
+from dog_id.embedding.backbones import BackboneType
 
 def main(args):
     """
@@ -25,10 +26,9 @@ def main(args):
         sys.exit(1)
 
     # Instantiate the model with the same architecture used for training
-    backbone_name = args.backbone
-    print(f"Instantiating model with backbone: {backbone_name}")
+    print(f"Instantiating model with backbone: {args.backbone.value}")
     model = EmbeddingNet(
-        backbone_name=backbone_name,
+        backbone_type=args.backbone,
         embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
         pretrained=False,  # Weights are loaded next, no need to download
     )
@@ -84,9 +84,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Export a trained embedding model to ONNX.")
     parser.add_argument(
         "--backbone",
-        type=str,
+        type=BackboneType,
         default=DEFAULT_BACKBONE,
-        help=f"Backbone of the trained model to export. Default: {DEFAULT_BACKBONE}",
+        choices=list(BackboneType),
+        help=f"Backbone of the trained model to export. Default: {DEFAULT_BACKBONE.value}",
     )
     args = parser.parse_args()
     main(args)
