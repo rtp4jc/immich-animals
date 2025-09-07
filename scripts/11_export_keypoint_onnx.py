@@ -60,7 +60,7 @@ def main():
     # --- Export to ONNX ---
     print(f"\nExporting model to ONNX format...")
     try:
-        exported_path_str = model.export(format="onnx", opset=12)
+        exported_path_str = model.export(format="onnx", opset=12, nms=True)
         exported_path = Path(exported_path_str)
         print("\nExport successful!")
     except Exception as e:

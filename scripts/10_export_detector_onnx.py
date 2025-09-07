@@ -61,7 +61,7 @@ def main():
     print(f"\nExporting model to ONNX format...")
     # This version of ultralytics saves the export in the same directory as the model
     try:
-        exported_path_str = model.export(format="onnx", opset=12)
+        exported_path_str = model.export(format="onnx", opset=12, nms=True)
         exported_path = Path(exported_path_str)
         print("\nExport successful!")
     except Exception as e:
