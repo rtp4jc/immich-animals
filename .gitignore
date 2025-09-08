@@ -4,3 +4,5 @@ models
 outputs
 runs
 *.pt
+# Temporary nested repo for development
+immich-clone/
