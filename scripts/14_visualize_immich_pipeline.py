@@ -20,6 +20,7 @@ def get_embedding(image_path, host="localhost", port=3003):
     entries = {
         "dog-identification": {
             "detection": {"modelName": "dog_detector"},
+            "keypoint": {"modelName": "dog_keypoint"},
             "recognition": {"modelName": "dog_embedder"},
         }
     }
