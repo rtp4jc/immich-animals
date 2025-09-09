@@ -268,12 +268,12 @@ scripts/
 - Include progress logging and error handling
 
 **Explicit Acceptance Criteria**:
-- [ ] Run `python scripts/01_prepare_detection_data.py` - must complete successfully
-- [ ] Verify COCO dataset files created in `data/detector/coco/`
-- [ ] Verify YOLO dataset files created in `data/detector/`
-- [ ] Verify YOLO config file `dogs_detection.yaml` is created
-- [ ] Script must complete in under 10 minutes on standard hardware
-- [ ] No visualization files should be created by this script
+- [✅] Run `python scripts/01_prepare_detection_data.py` - must complete successfully
+- [✅] Verify COCO dataset files created in `data/detector/coco/`
+- [✅] Verify YOLO dataset files created in `data/detector/`
+- [✅] Verify YOLO config file `dogs_detection.yaml` is created
+- [✅] Script must complete in under 10 minutes on standard hardware
+- [✅] No visualization files should be created by this script
 
 ---
 
@@ -291,13 +291,13 @@ scripts/
 - Include dataset statistics and sample visualizations
 
 **Explicit Acceptance Criteria**:
-- [ ] Run `python scripts/02_inspect_datasets.py data/detector/coco` - must complete successfully
-- [ ] Run `python scripts/02_inspect_datasets.py data/keypoints/coco` - must complete successfully  
-- [ ] Verify visualization files saved to `outputs/02_dataset_inspection/`
-- [ ] Check that dataset statistics are displayed/saved (image count, class distribution, etc.)
-- [ ] Verify sample images with annotations are properly visualized
-- [ ] Script must handle missing datasets gracefully with clear error messages
-- [ ] Must support both COCO and YOLO format inspection
+- [✅] Run `python scripts/02_inspect_datasets.py data/detector/coco` - must complete successfully
+- [✅] Run `python scripts/02_inspect_datasets.py data/keypoints/coco` - must complete successfully  
+- [✅] Verify visualization files saved to `outputs/02_dataset_inspection/`
+- [✅] Check that dataset statistics are displayed/saved (image count, class distribution, etc.)
+- [✅] Verify sample images with annotations are properly visualized
+- [✅] Script must handle missing datasets gracefully with clear error messages
+- [✅] Must support both COCO and YOLO format inspection
 
 ---
 
@@ -315,13 +315,13 @@ scripts/
 - Follow same patterns as existing training scripts
 
 **Explicit Acceptance Criteria**:
-- [ ] Run `python scripts/03_train_detector.py` - user must verify training starts successfully (don't wait for completion)
-- [ ] Verify training configuration is loaded correctly
-- [ ] Verify CUDA/GPU detection works if available
-- [ ] Verify training logs are created in expected directory
-- [ ] Verify visualization setup saves sample plots to `outputs/03_detector_training/`
-- [ ] Script must handle missing GPU gracefully with clear error message
-- [ ] Training must use the YOLO config created by script 01
+- [✅] Run `python scripts/03_train_detector.py` - user must verify training starts successfully (don't wait for completion)
+- [✅] Verify training configuration is loaded correctly
+- [✅] Verify CUDA/GPU detection works if available
+- [✅] Verify training logs are created in expected directory
+- [✅] Verify visualization setup saves sample plots to `outputs/03_detector_training/`
+- [✅] Script must handle missing GPU gracefully with clear error message
+- [✅] Training must use the YOLO config created by script 01
 
 ---
 
@@ -338,12 +338,12 @@ scripts/
 - Include progress logging and error handling
 
 **Explicit Acceptance Criteria**:
-- [ ] Run `python scripts/04_prepare_keypoint_data.py` - must complete successfully
-- [ ] Verify COCO keypoint dataset files created in `data/keypoints/coco/`
-- [ ] Verify YOLO keypoint dataset files created in `data/keypoints/`
-- [ ] Verify YOLO config file `dogs_keypoints_only.yaml` is created
-- [ ] Script must complete in under 10 minutes on standard hardware
-- [ ] No visualization files should be created by this script
+- [✅] Run `python scripts/04_prepare_keypoint_data.py` - must complete successfully
+- [✅] Verify COCO keypoint dataset files created in `data/keypoints/coco/`
+- [✅] Verify YOLO keypoint dataset files created in `data/keypoints/`
+- [✅] Verify YOLO config file `dogs_keypoints_only.yaml` is created
+- [✅] Script must complete in under 10 minutes on standard hardware
+- [✅] No visualization files should be created by this script
 
 ---
 
@@ -360,13 +360,13 @@ scripts/
 - Follow same patterns as script 03
 
 **Explicit Acceptance Criteria**:
-- [ ] Run `python scripts/05_train_keypoint_model.py` - user must verify training starts successfully (don't wait for completion)
-- [ ] Verify training configuration is loaded correctly
-- [ ] Verify CUDA/GPU detection works if available
-- [ ] Verify training logs are created in expected directory
-- [ ] Verify visualization setup saves sample plots to `outputs/05_keypoint_training/`
-- [ ] Script must handle missing GPU gracefully with clear error message
-- [ ] Training must use the YOLO config created by script 04
+- [✅] Run `python scripts/05_train_keypoint_model.py` - user must verify training starts successfully (don't wait for completion)
+- [✅] Verify training configuration is loaded correctly
+- [✅] Verify CUDA/GPU detection works if available
+- [✅] Verify training logs are created in expected directory
+- [✅] Verify visualization setup saves sample plots to `outputs/05_keypoint_training/`
+- [✅] Script must handle missing GPU gracefully with clear error message
+- [✅] Training must use the YOLO config created by script 04
 
 ---
 
