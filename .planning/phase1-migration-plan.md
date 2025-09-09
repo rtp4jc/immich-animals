@@ -255,7 +255,7 @@ scripts/
 
 ---
 
-### Prompt 5: Create Script 01 - Prepare Detection Data
+### Prompt 5: Create Script 01 - Prepare Detection Data ✅ COMPLETED
 **Background**: Review `.planning/long-term-folder-structure.md` and the extracted `dog_id.detection` modules from previous prompts.
 
 **Task**: Create `01_prepare_detection_data.py` that creates and converts detection dataset without visualization.
@@ -277,7 +277,7 @@ scripts/
 
 ---
 
-### Prompt 6: Create Script 02 - Inspect Datasets
+### Prompt 6: Create Script 02 - Inspect Datasets ✅ COMPLETED
 **Background**: Review `scripts/phase1/visualize_generic_dataset.py` and the centralized `dog_id.common.visualization` module.
 
 **Task**: Create `02_inspect_datasets.py` that provides generic dataset inspection capabilities.
@@ -301,7 +301,7 @@ scripts/
 
 ---
 
-### Prompt 7: Create Script 03 - Train Detector
+### Prompt 7: Create Script 03 - Train Detector ✅ COMPLETED
 **Background**: Review `.planning/long-term-folder-structure.md` and the extracted `dog_id.detection` modules from previous prompts.
 
 **Task**: Create `03_train_detector.py` that trains the detector and includes validation/visualization.
@@ -325,7 +325,7 @@ scripts/
 
 ---
 
-### Prompt 8: Create Script 04 - Prepare Keypoint Data
+### Prompt 8: Create Script 04 - Prepare Keypoint Data ✅ COMPLETED
 **Background**: Review `.planning/long-term-folder-structure.md` and the extracted `dog_id.keypoint` modules from previous prompts.
 
 **Task**: Create `04_prepare_keypoint_data.py` that creates and converts keypoint dataset without visualization.
@@ -347,7 +347,7 @@ scripts/
 
 ---
 
-### Prompt 9: Create Script 05 - Train Keypoint Model
+### Prompt 9: Create Script 05 - Train Keypoint Model ✅ COMPLETED
 **Background**: Review `.planning/long-term-folder-structure.md` and the extracted `dog_id.keypoint` modules from previous prompts.
 
 **Task**: Create `05_train_keypoint_model.py` that trains the keypoint model and includes validation/visualization.
