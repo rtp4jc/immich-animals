@@ -8,7 +8,12 @@ Use script 02 to inspect the created datasets.
 """
 
 import argparse
+import sys
 from pathlib import Path
+
+# Add project root to Python path
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.append(str(PROJECT_ROOT))
 
 from dog_id.detection.dataset_converter import CocoDetectorDatasetConverter, create_default_config
 from dog_id.detection.yolo_converter import CocoToYoloDetectionConverter, create_default_converter
