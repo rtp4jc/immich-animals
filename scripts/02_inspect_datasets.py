@@ -1,0 +1,136 @@
+#!/usr/bin/env python3
+"""
+Inspect Datasets
+
+Generic dataset inspection tool that can handle COCO and YOLO formats.
+Provides dataset statistics and sample visualizations.
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.append(str(PROJECT_ROOT))
+
+from dog_id.common.visualization import (
+    visualize_coco_annotations, 
+    visualize_yolo_annotations,
+    print_dataset_statistics,
+    setup_output_dir
+)
+
+
+def inspect_coco_dataset(dataset_path, output_dir, num_samples, display):
+    """Inspect COCO format dataset."""
+    dataset_path = Path(dataset_path)
+    
+    if not dataset_path.exists():
+        print(f"Error: Dataset path not found: {dataset_path}")
+        return
+    
+    # Look for COCO annotation files
+    if dataset_path.is_file() and dataset_path.suffix == '.json':
+        # Single JSON file provided
+        coco_files = [dataset_path]
+        data_root = dataset_path.parents[2]  # Assume structure: data/detector/coco/annotations_*.json
+    else:
+        # Directory provided, look for annotation files
+        coco_files = list(dataset_path.glob("annotations_*.json"))
+        data_root = dataset_path.parents[1] if 'coco' in str(dataset_path) else dataset_path.parent
+    
+    if not coco_files:
+        print(f"No COCO annotation files found in: {dataset_path}")
+        return
+    
+    print(f"Found {len(coco_files)} COCO annotation files")
+    
+    for coco_file in coco_files:
+        print(f"\nInspecting: {coco_file.name}")
+        
+        # Print statistics
+        stats = print_dataset_statistics(coco_file)
+        
+        # Create visualizations
+        split_name = coco_file.stem.replace('annotations_', '')
+        output_subdir = output_dir / f"coco_{split_name}"
+        
+        visualize_coco_annotations(
+            coco_json_path=coco_file,
+            data_root=data_root,
+            output_dir=output_subdir,
+            num_samples=num_samples,
+            display=display
+        )
+
+
+def inspect_yolo_dataset(yaml_path, output_dir, num_samples, display):
+    """Inspect YOLO format dataset."""
+    yaml_path = Path(yaml_path)
+    
+    if not yaml_path.exists():
+        print(f"Error: YOLO config file not found: {yaml_path}")
+        return
+    
+    print(f"Inspecting YOLO dataset: {yaml_path.name}")
+    
+    # Create visualizations
+    output_subdir = output_dir / f"yolo_{yaml_path.stem}"
+    
+    visualize_yolo_annotations(
+        data_yaml_path=yaml_path,
+        output_dir=output_subdir,
+        num_samples=num_samples,
+        display=display
+    )
+
+
+def main():
+    """Main execution function."""
+    parser = argparse.ArgumentParser(description="Inspect datasets (COCO or YOLO format)")
+    parser.add_argument("dataset_path", help="Path to dataset (COCO dir/file or YOLO yaml)")
+    parser.add_argument("--format", choices=['coco', 'yolo'], 
+                       help="Dataset format (auto-detected if not specified)")
+    parser.add_argument("--output-dir", default="outputs/02_dataset_inspection",
+                       help="Output directory for visualizations")
+    parser.add_argument("--num-samples", type=int, default=5,
+                       help="Number of sample images to visualize")
+    parser.add_argument("--display", action="store_true",
+                       help="Display plots in windows (default: save only)")
+    args = parser.parse_args()
+
+    # Setup output directory
+    output_dir = setup_output_dir(args.output_dir)
+    dataset_path = Path(args.dataset_path)
+    
+    # Auto-detect format if not specified
+    if args.format is None:
+        if dataset_path.suffix == '.yaml' or dataset_path.suffix == '.yml':
+            args.format = 'yolo'
+        elif dataset_path.suffix == '.json' or (dataset_path.is_dir() and list(dataset_path.glob("*.json"))):
+            args.format = 'coco'
+        else:
+            print("Error: Could not auto-detect format. Please specify --format")
+            return
+    
+    print("=" * 60)
+    print("Dataset Inspection")
+    print("=" * 60)
+    print(f"Dataset: {dataset_path}")
+    print(f"Format: {args.format.upper()}")
+    print(f"Output: {output_dir}")
+    print(f"Samples: {args.num_samples}")
+    print(f"Display: {args.display}")
+    
+    # Inspect based on format
+    if args.format == 'coco':
+        inspect_coco_dataset(dataset_path, output_dir, args.num_samples, args.display)
+    elif args.format == 'yolo':
+        inspect_yolo_dataset(dataset_path, output_dir, args.num_samples, args.display)
+    
+    print(f"\nInspection complete! Results saved to: {output_dir}")
+
+
+if __name__ == "__main__":
+    main()
