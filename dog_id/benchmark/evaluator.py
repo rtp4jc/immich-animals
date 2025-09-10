@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple, Optional, Any, Protocol
 from dataclasses import dataclass
 from collections import defaultdict
+from tqdm import tqdm
 
 from ..pipeline.models import AnimalClass
 
@@ -130,7 +131,7 @@ class BenchmarkEvaluator:
             if item.get('identity_label'):
                 identity_groups[item['identity_label']].append(item['image_path'])
         
-        for item in self.ground_truth:
+        for item in tqdm(self.ground_truth, desc="Evaluating images"):
             image_path = str(self.data_root / item['image_path'])
             has_animal_gt = item.get('identity_label') is not None
             identity_gt = item.get('identity_label')
