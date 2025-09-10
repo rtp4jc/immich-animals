@@ -132,15 +132,29 @@ def visualize_yolo_annotations(data_yaml_path: Union[str, Path],
     with open(val_txt, 'r') as f:
         image_paths = [line.strip() for line in f.readlines()]
     
-    # Sample images
-    sample_paths = random.sample(image_paths, min(num_samples, len(image_paths)))
+    # Filter for images with annotations (non-empty label files)
+    images_with_labels = []
+    for img_path_str in image_paths:
+        img_path = Path(img_path_str)
+        # Convert image path to label path: images/val2017/xxx.jpg -> labels/val2017/xxx.txt
+        label_path_str = img_path_str.replace('/images/', '/labels/').replace('.jpg', '.txt')
+        label_path = Path(label_path_str)
+        
+        if label_path.exists() and label_path.stat().st_size > 0:
+            images_with_labels.append(img_path)
+    
+    if not images_with_labels:
+        print("No images with annotations found")
+        return
+    
+    # Sample from images with labels
+    sample_paths = random.sample(images_with_labels, min(num_samples, len(images_with_labels)))
     
     fig, axes = plt.subplots(1, len(sample_paths), figsize=(4*len(sample_paths), 4))
     if len(sample_paths) == 1:
         axes = [axes]
     
     for i, img_path in enumerate(sample_paths):
-        img_path = Path(img_path)
         if not img_path.exists():
             continue
             
@@ -153,8 +167,8 @@ def visualize_yolo_annotations(data_yaml_path: Union[str, Path],
         axes[i].axis('off')
         
         # Load corresponding label file
-        label_path = img_path.with_suffix('.txt')
-        label_path = label_path.parent.parent / 'labels' / label_path.name
+        label_path_str = str(img_path).replace('/images/', '/labels/').replace('.jpg', '.txt')
+        label_path = Path(label_path_str)
         
         if label_path.exists():
             with open(label_path, 'r') as f:
