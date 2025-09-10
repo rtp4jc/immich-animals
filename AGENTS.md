@@ -118,3 +118,39 @@ tail -20 outputs/scripts/validation_output.txt
 - `dog_id/pipeline/ambidextrous_axolotl.py` - First pipeline implementation
 - `dog_id/common/constants.py` - Project configuration
 - `.planning/overarching.md` - Complete project plan
+
+## Phase 1 Migration - Production Validation Results
+
+### **End-to-End Tested Scripts:**
+- **Script 01**: ✅ Processed 38,414 training + 4,292 validation images in ~3 minutes
+- **Script 02**: ✅ Successfully visualized both COCO and YOLO formats for detection and keypoints
+- **Script 04**: ✅ Processed 11,283 training + 1,254 validation keypoint samples
+
+### **Critical Bug Fixed:**
+- **YOLO Visualization Issue**: Fixed missing bounding boxes caused by:
+  - Incorrect label path construction (`images/` → `labels/` mapping)
+  - Random sampling including negative samples (empty label files)
+  - Solution: Filter for non-empty label files and fix path mapping
+
+### **Production Readiness:**
+- **Scripts 01, 02, 04**: Fully production-tested with real data
+- **Scripts 03, 05**: Ready for training (GPU auto-detection implemented)
+- **All visualizations**: Verified working with proper annotations displayed
+
+## Lessons Learned
+
+### **Testing Philosophy:**
+- **"Help flags aren't enough"** - Always test end-to-end with real data
+- **Validate visualizations** - Check that annotations actually appear correctly
+- **Test edge cases** - Negative samples, empty files, missing data
+- **Commit only verified functionality** - Don't assume untested code works
+
+### **Dataset Handling:**
+- **Negative samples are normal** - YOLO datasets include images without annotations
+- **Path mapping is critical** - `images/` ↔ `labels/` conversion must be exact
+- **Filter for meaningful visualization** - Show only samples with actual annotations
+
+### **Code Architecture Validation:**
+- **Module extraction successful** - Clean separation of concerns achieved
+- **Centralized utilities work** - Visualization functions properly shared
+- **Import patterns consistent** - PROJECT_ROOT + sys.path.append pattern works reliably
