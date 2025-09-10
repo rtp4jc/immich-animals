@@ -70,6 +70,7 @@ immich-dogs/
 - **Graceful Degradation**: Handle missing files, failed model inference, etc.
 - **Preserve Original Features**: When refactoring, maintain existing functionality (progress bars, visualizations, etc.)
 - **Field Name Consistency**: Update all related code when changing data structures
+- **Progress Indicators**: Use `tqdm` progress bars for any process that could take more than 1 second
 
 ### Testing & Validation
 - **Benchmark-Driven**: Use quantitative metrics to validate design decisions
@@ -80,6 +81,7 @@ immich-dogs/
 - **Refactor for Reuse**: Extract common visualization/utility code to shared modules
 - **Backward Compatibility**: Maintain existing script interfaces while adding new capabilities
 - **Clean Abstractions**: Separate model implementations from pipeline logic
+- **One-line Commits**: Use concise single-line commit messages for small changes
 
 ## Environment
 - **Platform**: WSL (Linux) - most scripts compatible

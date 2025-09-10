@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import requests
 from typing import List, Tuple
+from tqdm import tqdm
 
 # Add project root to Python path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -41,7 +42,7 @@ class ImmichAnimalSystem(AnimalIdentificationSystem):
         embeddings = []
         valid_paths = []
         
-        for image_path in image_paths:
+        for image_path in tqdm(image_paths, desc="Building gallery"):
             embedding = self._get_embedding(image_path)
             if embedding is not None:
                 embeddings.append(embedding)
