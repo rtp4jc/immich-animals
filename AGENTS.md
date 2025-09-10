@@ -26,14 +26,18 @@ Dog identification system for Immich that mirrors the people detection pipeline.
   - `embedding.onnx` (18.7MB)
 - **Pipeline Verification**: End-to-end pipeline working, embeddings grouping dogs correctly
 - **Benchmark Framework**: Comprehensive evaluation system with metrics and visualization
-- **AmbidextrousAxolotl Pipeline**: First iteration showing keypoints degrade performance
+- **AmbidextrousAxolotl Pipeline**: First iteration showing keypoints degrade performance (50 images)
   - Top-1 accuracy: 27.8% (with keypoints) vs 44.4% (without keypoints)
   - Top-3 accuracy: 50.0% (with keypoints) vs 77.8% (without keypoints)
+- **Immich Integration**: Complete with both keypoint and direct approaches (100 images)
+  - Immich API with keypoints: 65.0% top-1 accuracy
+  - Immich API without keypoints: 75.0% top-1 accuracy
+  - Validates local benchmark findings in production environment
 
 ### 🔄 In Progress (Phase 4)
-- **Immich Integration**: Need to implement model classes in `immich-clone/machine-learning`
-- **Docker Container**: Custom container build pending
-- **API Testing**: HTTP endpoint testing not yet complete
+- **Docker Container**: Custom container build complete and tested
+- **API Testing**: HTTP endpoint testing complete - both approaches working
+- **Production Deployment**: Ready for deployment with keypoint-free approach recommended
 
 ## Code Structure
 ```
@@ -86,12 +90,34 @@ immich-dogs/
 ### Running Scripts
 ```bash
 # Pipeline verification and benchmarking
-conda run -n python312 python scripts/12_run_full_pipeline.py --num-images 50 --num-queries 5
+conda run -n python312 python scripts/13_run_full_pipeline.py --num-images 50 --num-queries 5
 
 # Export models to ONNX
-conda run -n python312 python scripts/10_export_detector_onnx.py
-conda run -n python312 python scripts/11_export_keypoint_onnx.py
-conda run -n python312 python scripts/09_export_embedding_model.py
+conda run -n python312 python scripts/10_export_embedding_model.py
+conda run -n python312 python scripts/11_export_detector_onnx.py
+conda run -n python312 python scripts/12_export_keypoint_onnx.py
+
+# Benchmark Immich API integration
+python scripts/16_visualize_immich_pipeline.py --num-images 100 --num-queries 5
+python scripts/16_visualize_immich_pipeline.py --num-images 100 --num-queries 5 --skip-keypoints
+```
+
+### Immich Container Management
+```bash
+# Build and run the custom Immich ML container
+cd immich-clone/machine-learning
+docker build -f Dockerfile.dogs -t immich-ml-dogs .
+docker run -d --name immich-ml-dogs -p 3003:3003 immich-ml-dogs
+
+# Container operations
+docker stop immich-ml-dogs
+docker start immich-ml-dogs
+docker logs immich-ml-dogs --tail 20
+
+# Test API endpoint
+curl -X POST http://localhost:3003/predict \
+  -F "image=@/path/to/dog/image.jpg" \
+  -F 'entries={"dog-identification":{"detection":{"modelName":"dog_detector"},"recognition":{"modelName":"dog_embedder_direct"}}}'
 ```
 
 ### Script Output Handling
@@ -106,14 +132,14 @@ tail -20 outputs/scripts/validation_output.txt
 ```
 
 ## Next Steps
-1. Implement `DogDetector`, `DogKeypoint`, `DogEmbedder` classes in Immich ML container
-2. Build custom Docker container with dog models
-3. Test integration via HTTP API calls
-4. Consider removing keypoint stage based on benchmark results
-5. Deploy for production use
+1. Deploy keypoint-free approach for production use
+2. Consider implementing BrilliantBadger pipeline iteration
+3. Evaluate performance on larger datasets
+4. Optimize model inference speed
 
 ## Key Files
-- `scripts/12_run_full_pipeline.py` - Full pipeline verification and benchmarking
+- `scripts/13_run_full_pipeline.py` - Full pipeline verification and benchmarking
+- `scripts/16_visualize_immich_pipeline.py` - Immich API benchmarking
 - `dog_id/benchmark/evaluator.py` - Comprehensive evaluation framework
 - `dog_id/pipeline/ambidextrous_axolotl.py` - First pipeline implementation
 - `dog_id/common/constants.py` - Project configuration
