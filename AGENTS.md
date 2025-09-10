@@ -12,7 +12,7 @@ Dog identification system for Immich that mirrors the people detection pipeline.
 
 ## Current Status
 
-### ✅ Completed (Phases 1-3)
+### ✅ Completed (Phases 1-4)
 - **Models Trained**: All three models trained and validated
 - **Performance**: 69.24% TAR at 10.0% FAR on validation set (no data leakage)
   - TAR @ FAR=10.000%: 69.24% (Threshold: 0.4179)
@@ -25,6 +25,10 @@ Dog identification system for Immich that mirrors the people detection pipeline.
   - `keypoint.onnx` (11.0MB)
   - `embedding.onnx` (18.7MB)
 - **Pipeline Verification**: End-to-end pipeline working, embeddings grouping dogs correctly
+- **Benchmark Framework**: Comprehensive evaluation system with metrics and visualization
+- **AmbidextrousAxolotl Pipeline**: First iteration showing keypoints degrade performance
+  - Top-1 accuracy: 27.8% (with keypoints) vs 44.4% (without keypoints)
+  - Top-3 accuracy: 50.0% (with keypoints) vs 77.8% (without keypoints)
 
 ### 🔄 In Progress (Phase 4)
 - **Immich Integration**: Need to implement model classes in `immich-clone/machine-learning`
@@ -36,11 +40,42 @@ Dog identification system for Immich that mirrors the people detection pipeline.
 immich-dogs/
 ├── .planning/           # Project phases and documentation
 ├── dog_id/             # Core Python package
+│   ├── benchmark/      # Evaluation framework
+│   ├── pipeline/       # Pipeline implementations (AmbidextrousAxolotl, etc.)
+│   └── common/         # Shared utilities
 ├── scripts/            # Workflow scripts (05-13)
 ├── models/onnx/        # Exported models
 ├── immich-clone/       # Forked Immich ML container
 └── outputs/            # Results and visualizations
 ```
+
+## Coding Guidelines
+
+### Code Style & Architecture
+- **Minimal Implementation**: Write only the absolute minimal code needed - avoid verbose implementations
+- **Protocol-Based Design**: Use Python protocols for dependency injection and modularity
+- **Generic Architecture**: Design for extensibility (animals, not just dogs; multiple model types)
+- **Elegant Naming**: Use fun, memorable names with clear progression (AmbidextrousAxolotl → BrilliantBadger)
+
+### Documentation & Comments
+- **Brief Docstrings**: Concise function/class descriptions, no verbose explanations
+- **No Inline Comments**: Code should be self-explanatory through good naming
+- **Focus on Why**: Document design decisions and trade-offs, not implementation details
+
+### Error Handling & Robustness
+- **Graceful Degradation**: Handle missing files, failed model inference, etc.
+- **Preserve Original Features**: When refactoring, maintain existing functionality (progress bars, visualizations, etc.)
+- **Field Name Consistency**: Update all related code when changing data structures
+
+### Testing & Validation
+- **Benchmark-Driven**: Use quantitative metrics to validate design decisions
+- **Comparative Analysis**: Test multiple approaches (with/without keypoints) side-by-side
+- **Visual Validation**: Provide visualization tools for understanding system behavior
+
+### Integration Patterns
+- **Refactor for Reuse**: Extract common visualization/utility code to shared modules
+- **Backward Compatibility**: Maintain existing script interfaces while adding new capabilities
+- **Clean Abstractions**: Separate model implementations from pipeline logic
 
 ## Environment
 - **Platform**: WSL (Linux) - most scripts compatible
@@ -50,8 +85,8 @@ immich-dogs/
 
 ### Running Scripts
 ```bash
-# Pipeline verification
-conda run -n python312 python scripts/12_run_full_pipeline.py
+# Pipeline verification and benchmarking
+conda run -n python312 python scripts/12_run_full_pipeline.py --num-images 50 --num-queries 5
 
 # Export models to ONNX
 conda run -n python312 python scripts/10_export_detector_onnx.py
@@ -74,9 +109,12 @@ tail -20 outputs/scripts/validation_output.txt
 1. Implement `DogDetector`, `DogKeypoint`, `DogEmbedder` classes in Immich ML container
 2. Build custom Docker container with dog models
 3. Test integration via HTTP API calls
-4. Deploy for production use
+4. Consider removing keypoint stage based on benchmark results
+5. Deploy for production use
 
 ## Key Files
-- `scripts/12_run_full_pipeline.py` - Full pipeline verification
+- `scripts/12_run_full_pipeline.py` - Full pipeline verification and benchmarking
+- `dog_id/benchmark/evaluator.py` - Comprehensive evaluation framework
+- `dog_id/pipeline/ambidextrous_axolotl.py` - First pipeline implementation
 - `dog_id/common/constants.py` - Project configuration
 - `.planning/overarching.md` - Complete project plan
