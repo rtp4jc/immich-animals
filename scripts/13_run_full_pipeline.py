@@ -18,6 +18,7 @@ from dog_id.benchmark.visualizer import BenchmarkVisualizer
 from dog_id.pipeline.ambidextrous_axolotl import AmbidextrousAxolotl
 from dog_id.pipeline.models import AnimalClass
 from dog_id.common.constants import DATA_DIR, ONNX_DETECTOR_PATH, ONNX_KEYPOINT_PATH, ONNX_EMBEDDING_PATH
+from dog_id.common.identity_loader import IdentityLoader
 
 
 class ONNXDetector:
@@ -154,23 +155,14 @@ def main(args):
         use_keypoints=False
     )
     
-    # Load and prepare ground truth data
-    with open(val_json_path, "r") as f:
-        val_data = json.load(f)
+    # Load validation data using IdentityLoader
+    loader = IdentityLoader()
+    ground_truth = loader.load_validation_data(
+        num_images=args.num_images,
+        include_additional=args.include_additional
+    )
     
-    # Shuffle and limit dataset
-    random.shuffle(val_data)
-    val_data = val_data[:args.num_images]
-    
-    print(f"Found {len(val_data)} validation images. Processing {len(val_data)}.")
-    
-    # Convert to expected format
-    ground_truth = []
-    for item in val_data:
-        ground_truth.append({
-            'image_path': item['file_path'],
-            'identity_label': item['identity_label']
-        })
+    print(f"Found {len(ground_truth)} validation images. Processing {len(ground_truth)}.")
     
     # Save temporary ground truth file
     temp_gt_path = PROJECT_ROOT / "outputs/temp_ground_truth.json"
@@ -231,5 +223,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark AmbidextrousAxolotl pipeline with and without keypoints.")
     parser.add_argument("--num-images", type=int, default=100, help="Number of images to process from the validation set.")
     parser.add_argument("--num-queries", type=int, default=10, help="Number of query images to show in visualization.")
+    parser.add_argument("--include-additional", action="store_true", help="Include additional identities from data/additional_identities")
     args = parser.parse_args()
     main(args)

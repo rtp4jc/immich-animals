@@ -19,6 +19,7 @@ sys.path.append(str(PROJECT_ROOT))
 from dog_id.benchmark.evaluator import BenchmarkEvaluator, AnimalIdentificationSystem
 from dog_id.benchmark.visualizer import BenchmarkVisualizer
 from dog_id.common.constants import DATA_DIR
+from dog_id.common.identity_loader import IdentityLoader
 
 
 class ImmichAnimalSystem(AnimalIdentificationSystem):
@@ -107,28 +108,17 @@ def main():
     parser.add_argument("--num-images", type=int, default=50, help="Number of images to evaluate")
     parser.add_argument("--num-queries", type=int, default=5, help="Number of query images for visualization")
     parser.add_argument("--skip-keypoints", action="store_true", help="Skip keypoint stage in pipeline")
+    parser.add_argument("--include-additional", action="store_true", help="Include additional identities from data/additional_identities")
     args = parser.parse_args()
 
-    # Load validation data
-    val_json_path = DATA_DIR / "identity_val.json"
-    if not val_json_path.exists():
-        print(f"[ERROR] Validation JSON not found: {val_json_path}")
-        sys.exit(1)
+    # Load validation data using IdentityLoader
+    loader = IdentityLoader()
+    ground_truth = loader.load_validation_data(
+        num_images=args.num_images,
+        include_additional=args.include_additional
+    )
     
-    with open(val_json_path) as f:
-        val_data = json.load(f)
-    
-    # Limit dataset
-    val_data = val_data[:args.num_images]
-    print(f"Evaluating {len(val_data)} images via Immich API...")
-
-    # Convert to expected format
-    ground_truth = []
-    for item in val_data:
-        ground_truth.append({
-            'image_path': item['file_path'],
-            'identity_label': item['identity_label']
-        })
+    print(f"Evaluating {len(ground_truth)} images via Immich API...")
     
     # Save temporary ground truth file
     temp_gt_path = PROJECT_ROOT / "outputs/temp_ground_truth.json"

@@ -39,6 +39,7 @@ class BenchmarkMetrics:
     detection_recall: float
     mean_reciprocal_rank: float
     top_k_accuracy: Dict[int, float]
+    tar_at_far: Dict[float, Tuple[float, float]]  # FAR -> (TAR, threshold)
     total_images: int
     animal_images: int
     non_animal_images: int
@@ -53,8 +54,15 @@ class BenchmarkMetrics:
             f"Top-1 Accuracy:         {self.top_k_accuracy[1]:.3f} ({self.top_k_accuracy[1]*100:.1f}%)",
             f"Top-3 Accuracy:         {self.top_k_accuracy[3]:.3f} ({self.top_k_accuracy[3]*100:.1f}%)",
             f"Top-5 Accuracy:         {self.top_k_accuracy[5]:.3f} ({self.top_k_accuracy[5]*100:.1f}%)",
-            f"Dataset: {self.animal_images} animals, {self.non_animal_images} non-animals ({self.total_images} total)"
         ]
+        
+        # Add TAR @ FAR metrics
+        if self.tar_at_far:
+            lines.append("TAR @ FAR:")
+            for far, (tar, threshold) in sorted(self.tar_at_far.items()):
+                lines.append(f"  FAR={far*100:5.1f}%: TAR={tar:.3f} ({tar*100:.1f}%) @ threshold={threshold:.4f}")
+        
+        lines.append(f"Dataset: {self.animal_images} animals, {self.non_animal_images} non-animals ({self.total_images} total)")
         return "\n".join(lines)
 
 
@@ -192,12 +200,16 @@ class BenchmarkEvaluator:
             correct_at_k = sum(1 for rank in valid_ranks if rank <= k)
             top_k_accuracy[k] = correct_at_k / len(valid_ranks) if valid_ranks else 0.0
         
+        # Compute TAR @ FAR metrics
+        tar_at_far = self._compute_tar_at_far()
+        
         return BenchmarkMetrics(
             detection_accuracy=detection_accuracy,
             detection_precision=detection_precision,
             detection_recall=detection_recall,
             mean_reciprocal_rank=mean_reciprocal_rank,
             top_k_accuracy=top_k_accuracy,
+            tar_at_far=tar_at_far,
             total_images=total_images,
             animal_images=animal_images,
             non_animal_images=non_animal_images
@@ -207,6 +219,77 @@ class BenchmarkEvaluator:
         """Get detailed evaluation results."""
         return self.results
     
+    def _compute_tar_at_far(self) -> Dict[float, Tuple[float, float]]:
+        """Compute TAR @ FAR metrics for identity verification using binary search."""
+        same_identity_scores = []
+        different_identity_scores = []
+        
+        # Get all detected images with identities
+        detected_results = [r for r in self.results if r.has_animal_gt and r.has_animal_pred and r.identity_gt]
+        
+        if len(detected_results) < 2:
+            return {}
+        
+        # Create identity mapping using absolute paths for consistent matching
+        path_to_identity = {}
+        for r in detected_results:
+            abs_path = str(Path(r.image_path).resolve())
+            path_to_identity[abs_path] = r.identity_gt
+        
+        # Collect similarity pairs
+        for query_result in detected_results:
+            query_identity = query_result.identity_gt
+            
+            for similar_path, similarity in query_result.similar_images:
+                abs_similar_path = str(Path(similar_path).resolve())
+                similar_identity = path_to_identity.get(abs_similar_path)
+                
+                if similar_identity is not None:
+                    if similar_identity == query_identity:
+                        same_identity_scores.append(similarity)
+                    else:
+                        different_identity_scores.append(similarity)
+        
+        if not same_identity_scores or not different_identity_scores:
+            return {}
+        
+        # Convert to numpy arrays and sort for binary search
+        same_scores = np.array(same_identity_scores)
+        diff_scores = np.sort(np.array(different_identity_scores))
+        
+        # Compute TAR @ FAR for standard FAR values
+        far_values = [0.001, 0.01, 0.1]
+        tar_at_far = {}
+        
+        for target_far in far_values:
+            threshold = self._binary_search_threshold(diff_scores, target_far)
+            tar = np.mean(same_scores >= threshold)
+            tar_at_far[target_far] = (tar, threshold)
+        
+        return tar_at_far
+    
+    def _binary_search_threshold(self, sorted_diff_scores: np.ndarray, target_far: float) -> float:
+        """Binary search for threshold that achieves target FAR."""
+        left, right = 0.0, 1.0
+        tolerance = 1e-6
+        
+        for _ in range(50):  # Max iterations
+            threshold = (left + right) / 2
+            
+            # Compute FAR at this threshold using binary search on sorted scores
+            num_above = len(sorted_diff_scores) - np.searchsorted(sorted_diff_scores, threshold, side='left')
+            far = num_above / len(sorted_diff_scores)
+            
+            if abs(far - target_far) < tolerance:
+                break
+                
+            if far > target_far:
+                left = threshold
+            else:
+                right = threshold
+        
+        return threshold
+
     def save_results(self, output_path: str) -> None:
         """Save evaluation results to JSON file."""
         results_data = {
