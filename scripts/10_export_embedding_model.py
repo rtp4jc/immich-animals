@@ -8,11 +8,12 @@ import torch
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
 
-from dog_id.common.constants import MODELS_DIR, ONNX_EMBEDDING_PATH
-from dog_id.common.utils import find_latest_timestamped_run
-from dog_id.embedding.config import DATA_CONFIG, DEFAULT_BACKBONE, TRAINING_CONFIG
-from dog_id.embedding.models import DogEmbeddingModel
-from dog_id.embedding.backbones import BackboneType
+from animal_id.common.constants import MODELS_DIR, ONNX_EMBEDDING_PATH
+from animal_id.common.utils import find_latest_timestamped_run
+from animal_id.embedding.config import DATA_CONFIG, DEFAULT_BACKBONE, TRAINING_CONFIG
+from animal_id.embedding.models import DogEmbeddingModel
+from animal_id.embedding.backbones import BackboneType
+
 
 def main(args):
     """
@@ -24,18 +25,20 @@ def main(args):
     # Try to find model in latest run directory first
     latest_run = find_latest_timestamped_run()
     model_path = None
-    
+
     if latest_run:
         model_path = latest_run / "best_model.pt"
         if not model_path.exists():
             model_path = None
-    
+
     # Fall back to old location if not found
     if model_path is None:
         model_path = MODELS_DIR / "dog_embedding_best.pt"
         if not model_path.exists():
             print(f"[ERROR] No trained model found.")
-            print(f"Checked: runs/*/best_model.pt and {MODELS_DIR / 'dog_embedding_best.pt'}")
+            print(
+                f"Checked: runs/*/best_model.pt and {MODELS_DIR / 'dog_embedding_best.pt'}"
+            )
             print("Please run training first.")
             sys.exit(1)
 
@@ -46,7 +49,7 @@ def main(args):
     model = DogEmbeddingModel(
         backbone_type=args.backbone,
         num_classes=1001,  # This doesn't matter for ONNX export (only embeddings)
-        embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"]
+        embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
     )
 
     try:
@@ -63,16 +66,16 @@ def main(args):
         def __init__(self, model):
             super().__init__()
             self.model = model
-        
+
         def forward(self, x):
             return self.model.get_embeddings(x)
-    
+
     export_model = EmbeddingWrapper(model)
 
     dummy_input = torch.randn(
         1, 3, DATA_CONFIG["IMG_SIZE"], DATA_CONFIG["IMG_SIZE"], device=device
     )
-    
+
     # Ensure output directory exists
     ONNX_EMBEDDING_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -107,8 +110,11 @@ def main(args):
 
     print("\n--- Exporter finished ---")
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Export a trained embedding model to ONNX.")
+    parser = argparse.ArgumentParser(
+        description="Export a trained embedding model to ONNX."
+    )
     parser.add_argument(
         "--backbone",
         type=BackboneType,

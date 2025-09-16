@@ -4,7 +4,7 @@
 
 The goal of this phase is to take our exported ONNX models and integrate them into a custom build of the `immich-machine-learning` service. This involves writing new model classes that conform to Immich's internal `InferenceModel` API and testing them via direct network requests.
 
-This phase focuses *only* on the machine learning container. We will not be running a full Immich instance, nor will we be dealing with the main backend server or database. The process is as follows:
+This phase focuses _only_ on the machine learning container. We will not be running a full Immich instance, nor will we be dealing with the main backend server or database. The process is as follows:
 
 1.  **The `immich-machine-learning` Container:** This is a FastAPI web service that exposes a `/predict` endpoint. It accepts an image and a JSON payload describing a pipeline of models to run.
 2.  **Stateless Operation:** The container is stateless. It receives a request, runs the models, and immediately returns the result (e.g., an embedding vector) in the HTTP response. It does not store any data.
@@ -28,22 +28,25 @@ This phase will be considered complete when:
 ### Prompt 4.1: Create Integration Scaffolding
 
 **Action:** First, prepare the Immich source code for our new models.
-1.  In our local `immich-clone/machine-learning/immich_ml/schemas.py` file, add a new `ModelTask` enum member called `DOG_IDENTIFICATION`. We will place our models under the `facial_recognition` task umbrella to align with the existing structure and potentially reuse logic.
+
+1.  In our local `immich-clone/machine-learning/immich_ml/schemas.py` file, add a new `ModelTask` enum member called `animal_idENTIFICATION`. We will place our models under the `facial_recognition` task umbrella to align with the existing structure and potentially reuse logic.
 2.  Create three new empty files inside the `immich-clone/machine-learning/immich_ml/models/facial_recognition/` directory:
-    *   `dog_detector.py`
-    *   `dog_keypoint.py`
-    *   `dog_embedder.py`
+    - `dog_detector.py`
+    - `dog_keypoint.py`
+    - `dog_embedder.py`
 
 ### Prompt 4.2: Implement the `DogDetector` Model Class
 
 **Action:** In `facial_recognition/dog_detector.py`, create the `DogDetector` class.
+
 1.  It must inherit from `immich_ml.models.base.InferenceModel`.
-2.  The class should be initialized with `ModelTask.DOG_IDENTIFICATION` and `ModelType.DETECTION`.
+2.  The class should be initialized with `ModelTask.animal_idENTIFICATION` and `ModelType.DETECTION`.
 3.  The `predict` method will take an image, run inference with the `detector.onnx` model, and return a list of bounding boxes.
 
 ### Prompt 4.3: Implement the `DogKeypoint` Model Class
 
 **Action:** In `facial_recognition/dog_keypoint.py`, create the `DogKeypoint` class.
+
 1.  It must inherit from `InferenceModel`.
 2.  It will have a dependency on the output of the `DogDetector` model.
 3.  The `predict` method will take the original image and the bounding boxes from the detector, crop the image for each box, run inference with the `keypoint.onnx` model, and return keypoints for each detected dog.
@@ -51,6 +54,7 @@ This phase will be considered complete when:
 ### Prompt 4.4: Implement the `DogEmbedder` Model Class
 
 **Action:** In `facial_recognition/dog_embedder.py`, create the `DogEmbedder` class.
+
 1.  It must inherit from `InferenceModel`.
 2.  It will have dependencies on the outputs of both the detector and keypoint models.
 3.  The `predict` method will implement our core cropping logic (use keypoints if present, fallback to bbox if not), run the `embedding.onnx` model on the resulting crop, and return the final 512-d embedding vector.
@@ -58,9 +62,10 @@ This phase will be considered complete when:
 ### Prompt 4.5: Build and Test the Custom Container
 
 **Action:** Create a `Dockerfile.dogs` and a test script.
+
 1.  Create a `Dockerfile.dogs` in the `immich-clone/machine-learning` directory. This will be a copy of the original `Dockerfile` but modified to copy our new model files and the `.onnx` artifacts into the container.
 2.  Write a script `scripts/13_test_immich_integration.py` that uses the `requests` library to:
-    *   POST a test image to `http://localhost:3003/predict`.
-    *   Include the JSON `entries` payload required to trigger our `DOG_IDENTIFICATION` pipeline.
-    *   Receive the response, validate that it contains an embedding, and print it.
+    - POST a test image to `http://localhost:3003/predict`.
+    - Include the JSON `entries` payload required to trigger our `animal_idENTIFICATION` pipeline.
+    - Receive the response, validate that it contains an embedding, and print it.
 3.  Provide the `docker build` and `docker run` commands needed to execute this test.

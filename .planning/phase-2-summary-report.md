@@ -17,8 +17,9 @@ Through iterative development and experimentation, we arrived at a robust traini
 - **Loss Function:** `ArcFaceLoss` was used as the primary metric learning loss function, which encourages high angular separation between identities in the embedding space.
 
 - **Training Strategy:** A two-stage fine-tuning process was implemented:
-    1.  **Warm-up:** The model's head was trained for several epochs with the backbone frozen to allow the new layers to adapt.
-    2.  **Fine-tuning:** The entire model was then unfrozen and trained with a lower learning rate for the backbone, allowing the whole network to specialize for the task.
+
+  1.  **Warm-up:** The model's head was trained for several epochs with the backbone frozen to allow the new layers to adapt.
+  2.  **Fine-tuning:** The entire model was then unfrozen and trained with a lower learning rate for the backbone, allowing the whole network to specialize for the task.
 
 - **Regularization & Augmentation:** To improve generalization, we used strong data augmentation, including `RandomErasing`, and `Dropout` in the model head.
 
@@ -36,7 +37,7 @@ While the top-1 classification accuracy on the 1001-class validation set remaine
 
 A major refactoring effort was completed to make the codebase more modular, reusable, and scalable for future work on all project models (detection, keypoint, and embedding).
 
-- A central `dog_id` source package was created.
+- A central `animal_id` source package was created.
 - Logic was separated by task (`detection`, `embedding`, etc.).
 - Reusable components like a `backbone_factory` and a generic `Trainer` class were created.
 - A centralized configuration file was added to ensure consistency.

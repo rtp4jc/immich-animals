@@ -7,15 +7,15 @@ This document outlines the standardized folder structure for the project, design
 - `/data`: Raw and processed datasets.
 - `/models`: Trained model output files (`.pt`, `.onnx`, etc.).
 - `/outputs`: Visualizations, reports, and other script outputs.
-- `/dog_id`: Core Python source code, structured as a package.
+- `/animal_id`: Core Python source code, structured as a package.
 - `/scripts`: Top-level, numbered executable scripts that define the end-to-end workflow.
 
-## `dog_id` Source Package Structure
+## `animal_id` Source Package Structure
 
-The `dog_id` package is organized by machine learning task.
+The `animal_id` package is organized by machine learning task.
 
 ```
-dog_id/
+animal_id/
 ├── __init__.py
 ├── common/                  <-- Code shared across all tasks
 │   ├── __init__.py
@@ -36,7 +36,7 @@ dog_id/
 
 ## `scripts` Workflow Structure
 
-The `scripts` folder contains simple, numbered Python files that import logic from the `dog_id` package and execute it. This shows the clear, step-by-step workflow for the entire project.
+The `scripts` folder contains simple, numbered Python files that import logic from the `animal_id` package and execute it. This shows the clear, step-by-step workflow for the entire project.
 
 ```
 scripts/

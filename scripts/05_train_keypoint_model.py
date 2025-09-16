@@ -3,7 +3,7 @@
 Train Keypoint Model
 
 Trains YOLO keypoint model using the prepared dataset.
-Uses extracted dog_id.keypoint.trainer module.
+Uses extracted animal_id.keypoint.trainer module.
 """
 
 import argparse
@@ -14,22 +14,27 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
 
-from dog_id.keypoint.trainer import KeypointTrainer
+from animal_id.keypoint.trainer import KeypointTrainer
 
 
 def main():
     """Main execution function."""
     parser = argparse.ArgumentParser(description="Train keypoint model")
-    parser.add_argument("--model", default="yolo11n-dog-pose.yaml", 
-                       help="Model architecture file (default: yolo11n-dog-pose.yaml)")
-    parser.add_argument("--data", default="data/keypoints/dogs_keypoints_only.yaml",
-                       help="Dataset YAML file")
-    parser.add_argument("--epochs", type=int, default=100,
-                       help="Number of training epochs")
-    parser.add_argument("--batch", type=int, default=16,
-                       help="Batch size")
-    parser.add_argument("--imgsz", type=int, default=640,
-                       help="Image size")
+    parser.add_argument(
+        "--model",
+        default="yolo11n-dog-pose.yaml",
+        help="Model architecture file (default: yolo11n-dog-pose.yaml)",
+    )
+    parser.add_argument(
+        "--data",
+        default="data/keypoints/dogs_keypoints_only.yaml",
+        help="Dataset YAML file",
+    )
+    parser.add_argument(
+        "--epochs", type=int, default=100, help="Number of training epochs"
+    )
+    parser.add_argument("--batch", type=int, default=16, help="Batch size")
+    parser.add_argument("--imgsz", type=int, default=640, help="Image size")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -44,10 +49,7 @@ def main():
     # Create trainer with custom config
     trainer = KeypointTrainer(args.model)
     trainer.update_config(
-        data=args.data,
-        epochs=args.epochs,
-        batch=args.batch,
-        imgsz=args.imgsz
+        data=args.data, epochs=args.epochs, batch=args.batch, imgsz=args.imgsz
     )
 
     # Train the model

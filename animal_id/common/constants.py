@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Shared constants for the dog_id project.
+Shared constants for the animal_id project.
 
 This file contains common paths and configuration values that are used across
 different scripts (training, export, inference) to ensure consistency.

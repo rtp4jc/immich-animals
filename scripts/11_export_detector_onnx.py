@@ -17,12 +17,13 @@ sys.path.append(str(PROJECT_ROOT))
 import torch
 from ultralytics import YOLO
 
-from dog_id.common.constants import (
+from animal_id.common.constants import (
     DETECTOR_PROJECT_DIR,
     DETECTOR_RUN_NAME,
     ONNX_DETECTOR_PATH,
 )
-from dog_id.common.utils import find_latest_run
+from animal_id.common.utils import find_latest_run
+
 
 def main():
     """Main export function."""
@@ -32,9 +33,11 @@ def main():
     print(f"Searching for latest run in: {DETECTOR_PROJECT_DIR}")
     latest_run_dir = find_latest_run(DETECTOR_PROJECT_DIR, DETECTOR_RUN_NAME)
     if not latest_run_dir:
-        print(f"[ERROR] No training runs found for '{DETECTOR_RUN_NAME}' in '{DETECTOR_PROJECT_DIR}'.")
+        print(
+            f"[ERROR] No training runs found for '{DETECTOR_RUN_NAME}' in '{DETECTOR_PROJECT_DIR}'."
+        )
         sys.exit(1)
-    
+
     model_checkpoint = latest_run_dir / "weights/best.pt"
     print(f"Found latest run: {latest_run_dir.name}")
 
@@ -45,7 +48,9 @@ def main():
 
     if not model_checkpoint.exists():
         print(f"\n[ERROR] Model checkpoint not found at: {model_checkpoint}")
-        print("Please ensure that the detector model has been trained and the path is correct.")
+        print(
+            "Please ensure that the detector model has been trained and the path is correct."
+        )
         sys.exit(1)
 
     print(f"\nLoading model from: {model_checkpoint}")
@@ -70,9 +75,11 @@ def main():
 
     # --- Move and Verify ---
     if not exported_path.exists():
-        print(f"\n[ERROR] Export process completed, but the intermediate file was not found at {exported_path}.")
+        print(
+            f"\n[ERROR] Export process completed, but the intermediate file was not found at {exported_path}."
+        )
         sys.exit(1)
-    
+
     # Ensure the final directory exists
     ONNX_DETECTOR_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -91,7 +98,6 @@ def main():
         sys.exit(1)
 
     print("\n--- Exporter finished ---")
-
 
 
 if __name__ == "__main__":

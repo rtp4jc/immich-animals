@@ -1,11 +1,12 @@
 #!/usr/bin/env python
 """
-Utility functions for the dog_id project.
+Utility functions for the animal_id project.
 """
 
 import re
 from pathlib import Path
 from typing import Optional
+
 
 def find_latest_run(project_dir: Path, run_name: str) -> Optional[Path]:
     """
@@ -22,7 +23,9 @@ def find_latest_run(project_dir: Path, run_name: str) -> Optional[Path]:
     if not project_dir.is_dir():
         return None
 
-    run_dirs = [d for d in project_dir.iterdir() if d.is_dir() and d.name.startswith(run_name)]
+    run_dirs = [
+        d for d in project_dir.iterdir() if d.is_dir() and d.name.startswith(run_name)
+    ]
 
     if not run_dirs:
         return None
@@ -42,7 +45,8 @@ def find_latest_run(project_dir: Path, run_name: str) -> Optional[Path]:
                 max_num = num
                 latest_run_dir = d
 
-def find_latest_timestamped_run(runs_dir: Path = Path('runs')) -> Optional[Path]:
+
+def find_latest_timestamped_run(runs_dir: Path = Path("runs")) -> Optional[Path]:
     """
     Finds the latest timestamped training run directory.
 

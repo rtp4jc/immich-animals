@@ -3,7 +3,7 @@
 Train Detection Model
 
 Trains YOLO detection model using the prepared dataset.
-Uses extracted dog_id.detection.trainer module.
+Uses extracted animal_id.detection.trainer module.
 """
 
 import argparse
@@ -14,22 +14,23 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.append(str(PROJECT_ROOT))
 
-from dog_id.detection.trainer import DetectionTrainer
+from animal_id.detection.trainer import DetectionTrainer
 
 
 def main():
     """Main execution function."""
     parser = argparse.ArgumentParser(description="Train detection model")
-    parser.add_argument("--model", default="yolo11n.pt", 
-                       help="Base model to use (default: yolo11n.pt)")
-    parser.add_argument("--data", default="data/detector/dogs_detection.yaml",
-                       help="Dataset YAML file")
-    parser.add_argument("--epochs", type=int, default=100,
-                       help="Number of training epochs")
-    parser.add_argument("--batch", type=int, default=16,
-                       help="Batch size")
-    parser.add_argument("--imgsz", type=int, default=640,
-                       help="Image size")
+    parser.add_argument(
+        "--model", default="yolo11n.pt", help="Base model to use (default: yolo11n.pt)"
+    )
+    parser.add_argument(
+        "--data", default="data/detector/dogs_detection.yaml", help="Dataset YAML file"
+    )
+    parser.add_argument(
+        "--epochs", type=int, default=100, help="Number of training epochs"
+    )
+    parser.add_argument("--batch", type=int, default=16, help="Batch size")
+    parser.add_argument("--imgsz", type=int, default=640, help="Image size")
     args = parser.parse_args()
 
     print("=" * 60)
@@ -44,10 +45,7 @@ def main():
     # Create trainer with custom config
     trainer = DetectionTrainer(args.model)
     trainer.update_config(
-        data=args.data,
-        epochs=args.epochs,
-        batch=args.batch,
-        imgsz=args.imgsz
+        data=args.data, epochs=args.epochs, batch=args.batch, imgsz=args.imgsz
     )
 
     # Train the model

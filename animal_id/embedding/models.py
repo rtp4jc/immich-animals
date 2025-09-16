@@ -18,20 +18,29 @@ What it does:
 How to run it:
 - This script is not typically run directly. It is imported by other scripts.
 - To run the self-test, run from the project root:
-  `python -m dog_id.embedding.models`
+  `python -m animal_id.embedding.models`
 """
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from dog_id.embedding.backbones import get_backbone, BackboneType
-from dog_id.embedding.losses import ArcFaceLoss
+from animal_id.embedding.backbones import get_backbone, BackboneType
+from animal_id.embedding.losses import ArcFaceLoss
+
 
 class EmbeddingNet(nn.Module):
     """
     A generic embedding network that uses a backbone from the factory.
     """
-    def __init__(self, backbone_type: BackboneType, embedding_dim: int = 512, pretrained: bool = True, dropout_prob: float = 0.5):
+
+    def __init__(
+        self,
+        backbone_type: BackboneType,
+        embedding_dim: int = 512,
+        pretrained: bool = True,
+        dropout_prob: float = 0.5,
+    ):
         """
         Args:
             backbone_type (BackboneType): Type of backbone to use.
@@ -66,22 +75,26 @@ class EmbeddingNet(nn.Module):
         """
         features = self.feature_extractor(x)
         embeddings = self.projection_head(features)
-        
+
         # L2 normalize the embeddings
         normalized_embeddings = F.normalize(embeddings, p=2, dim=1)
-        
+
         return normalized_embeddings
+
 
 class DogEmbeddingModel(nn.Module):
     """
     Complete dog embedding model with ArcFace loss.
     """
-    def __init__(self, backbone_type: BackboneType, num_classes: int, embedding_dim: int = 512):
+
+    def __init__(
+        self, backbone_type: BackboneType, num_classes: int, embedding_dim: int = 512
+    ):
         super(DogEmbeddingModel, self).__init__()
-        
+
         self.backbone = EmbeddingNet(backbone_type, embedding_dim)
         self.head = ArcFaceLoss(embedding_dim, num_classes)
-        
+
     def forward(self, x, labels=None):
         """Forward pass for training."""
         embeddings = self.backbone(x)
@@ -91,16 +104,16 @@ class DogEmbeddingModel(nn.Module):
         else:
             # Inference mode - return embeddings
             return embeddings
-    
+
     def get_embeddings(self, x):
         """Get embeddings without ArcFace head."""
         return self.backbone(x)
-    
+
     def freeze_backbone(self):
         """Freeze backbone parameters."""
         for param in self.backbone.parameters():
             param.requires_grad = False
-    
+
     def unfreeze_backbone(self):
         """Unfreeze backbone parameters."""
         for param in self.backbone.parameters():
