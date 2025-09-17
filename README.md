@@ -61,7 +61,7 @@ python scripts/12_export_keypoint_onnx.py
 ## Project Structure
 
 ```
-immich-dogs/
+immich-animals/
 ├── animal_id/             # Core Python package
 │   ├── benchmark/      # Evaluation framework
 │   ├── pipeline/       # Pipeline implementations
