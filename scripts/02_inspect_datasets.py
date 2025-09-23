@@ -7,7 +7,9 @@ Provides dataset statistics and sample visualizations.
 """
 
 import argparse
+import json
 import sys
+from collections import Counter
 from pathlib import Path
 
 # Add project root to Python path
@@ -20,6 +22,72 @@ from animal_id.common.visualization import (
     print_dataset_statistics,
     setup_output_dir,
 )
+from animal_id.common.constants import DATA_DIR
+
+
+def analyze_data_distributions():
+    """Analyze data distributions across source datasets."""
+    print("\n" + "=" * 60)
+    print("DATA DISTRIBUTION ANALYSIS")
+    print("=" * 60)
+    
+    # Analyze identity datasets
+    for split in ["train", "val"]:
+        json_path = DATA_DIR / f"identity_{split}.json"
+        if json_path.exists():
+            print(f"\n{split.upper()} SET:")
+            with open(json_path) as f:
+                data = json.load(f)
+            
+            # Count by source dataset (extract from file path)
+            source_counts = Counter()
+            for item in data:
+                path = item["file_path"]
+                if "dogfacenet" in path:
+                    source_counts["DogFaceNet"] += 1
+                elif "stanford_dogs" in path:
+                    source_counts["Stanford Dogs"] += 1
+                elif "oxford_pets" in path:
+                    source_counts["Oxford Pets"] += 1
+                elif "additional_identities" in path:
+                    source_counts["Additional Identities"] += 1
+                else:
+                    source_counts["Other"] += 1
+            
+            total = len(data)
+            print(f"  Total samples: {total}")
+            for source, count in source_counts.most_common():
+                percentage = (count / total) * 100
+                print(f"  {source}: {count} ({percentage:.1f}%)")
+    
+    # Analyze COCO detection datasets
+    coco_dir = DATA_DIR / "detector" / "coco"
+    if coco_dir.exists():
+        print(f"\nDETECTION DATASETS:")
+        for json_file in coco_dir.glob("annotations_*.json"):
+            split_name = json_file.stem.replace("annotations_", "")
+            with open(json_file) as f:
+                coco_data = json.load(f)
+            
+            # Count images by source (extract from file path)
+            source_counts = Counter()
+            for img in coco_data["images"]:
+                path = img["file_name"]
+                if "coco" in path:
+                    source_counts["COCO"] += 1
+                elif "stanford_dogs" in path:
+                    source_counts["Stanford Dogs"] += 1
+                elif "oxford_pets" in path:
+                    source_counts["Oxford Pets"] += 1
+                else:
+                    source_counts["Other"] += 1
+            
+            total = len(coco_data["images"])
+            print(f"\n  {split_name.upper()} SET:")
+            print(f"    Total images: {total}")
+            for source, count in source_counts.most_common():
+                percentage = (count / total) * 100
+                print(f"    {source}: {count} ({percentage:.1f}%)")
 
 
 def inspect_coco_dataset(dataset_path, output_dir, num_samples, display):
@@ -98,7 +166,9 @@ def main():
         description="Inspect datasets (COCO or YOLO format)"
     )
     parser.add_argument(
-        "dataset_path", help="Path to dataset (COCO dir/file or YOLO yaml)"
+        "dataset_path", 
+        nargs="?",
+        help="Path to dataset (COCO dir/file or YOLO yaml). If not provided, shows data distributions only."
     )
     parser.add_argument(
         "--format",
@@ -121,7 +191,23 @@ def main():
         action="store_true",
         help="Display plots in windows (default: save only)",
     )
+    parser.add_argument(
+        "--distributions-only",
+        action="store_true",
+        help="Only show data distributions, skip visualizations",
+    )
     args = parser.parse_args()
+
+    print("=" * 60)
+    print("Dataset Inspection")
+    print("=" * 60)
+
+    # Always show data distributions
+    analyze_data_distributions()
+
+    # If only distributions requested or no dataset path provided, exit here
+    if args.distributions_only or args.dataset_path is None:
+        return
 
     # Setup output directory
     output_dir = setup_output_dir(args.output_dir)
@@ -139,10 +225,7 @@ def main():
             print("Error: Could not auto-detect format. Please specify --format")
             return
 
-    print("=" * 60)
-    print("Dataset Inspection")
-    print("=" * 60)
-    print(f"Dataset: {dataset_path}")
+    print(f"\nDataset: {dataset_path}")
     print(f"Format: {args.format.upper()}")
     print(f"Output: {output_dir}")
     print(f"Samples: {args.num_samples}")

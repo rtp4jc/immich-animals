@@ -1,140 +1,113 @@
 """
-Visualizes the identity dataset to verify its integrity.
+Visualizes the validation identity dataset and shows statistics for both train and val sets.
 
 What it's for:
-This script is a crucial debugging and verification tool. It allows you to visually inspect
-the dataset created by `05_prepare_embedding_data.py` to ensure that the identity and
-breed labels are correctly assigned to the images.
+This script is a crucial debugging and verification tool. It allows you to inspect the
+dataset statistics for both training and validation sets, and visually inspect the
+validation dataset to ensure label integrity.
 
 What it does:
-1. Reads the `data/identity_val.json` file.
-2. Groups the images by their assigned `identity_label`.
-3. Selects a few identities that have multiple images.
-4. Generates and displays a plot where each row corresponds to a single dog identity,
-   showing all of its images from the validation set.
+1. For both `identity_train.json` and `identity_val.json`, it calculates and prints:
+   - Total number of unique identities.
+   - Distribution of samples per identity.
+   - Min, max, average, and median samples per identity.
+2. For the validation set, it calls the centralized `visualize_identity_dataset` 
+   function to generate a non-interactive plot, saving it to the `outputs` directory.
 
 How to run it:
-- This script should be run after `05_prepare_embedding_data.py`.
+- This script should be run after `06_prepare_embedding_data.py`.
 - Run from the root of the project:
-  `python scripts/06_visualize_embedding_data.py`
+  `python scripts/07_visualize_embedding_data.py`
 
 How to interpret the results:
-The script will save a plot to `outputs/phase2_visualizations/identity_verification.png`
-and display it on screen.
-- Each row in the plot is a unique dog.
-- You should see that all images within a single row belong to the same dog.
-- The labels on the y-axis show the `identity_label` and `breed_label` for that row.
-- This confirms that the dataset construction was successful.
+- The script will print statistics to the console for both datasets.
+- It will save a plot for the validation set to `outputs/phase2_visualizations/identity_verification.png`.
+- Each row in the plot is a unique dog, confirming dataset integrity.
 """
 
 import json
-import torch
-import torchvision.transforms as transforms
-import matplotlib.pyplot as plt
-import numpy as np
-import math
-from collections import defaultdict
-from PIL import Image
-import sys
 import os
+import sys
+from collections import defaultdict, Counter
+import numpy as np
 
 # Adjust path to import from our new package
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from animal_id.embedding.config import DATA_CONFIG
+from animal_id.common.visualization import visualize_identity_dataset
 
 # --- Configuration ---
 NUM_IDENTITIES_TO_SHOW = 4
 MIN_IMAGES_PER_ID = 3
 
 
-def visualize_dataset_by_id():
-    """
-    Loads the validation dataset, groups images by identity,
-    and displays a gallery to verify identity groupings.
-    """
-    val_json_path = DATA_CONFIG["VAL_JSON_PATH"]
-    img_size = DATA_CONFIG["IMG_SIZE"]
-
-    if not os.path.exists(val_json_path):
-        print(f"Error: Validation JSON not found at {val_json_path}")
-        print("Please run `scripts/05_prepare_embedding_data.py` first.")
+def print_dataset_stats(json_path: str, dataset_name: str):
+    """Loads a dataset JSON and prints statistics about its identities."""
+    print(f"--- {dataset_name} Dataset Statistics ---")
+    if not os.path.exists(json_path):
+        print(f"Error: {dataset_name} JSON not found at {json_path}")
+        print("Please run `scripts/06_prepare_embedding_data.py` first.")
+        print("-------------------------------------\n")
         return
 
-    transform = transforms.Compose(
-        [
-            transforms.Resize((img_size, img_size)),
-            transforms.CenterCrop(img_size),
-            transforms.ToTensor(),
-        ]
-    )
-
-    with open(val_json_path, "r") as f:
+    print(f"Loading {dataset_name.lower()} dataset from {json_path}...")
+    with open(json_path, "r") as f:
         annotations = json.load(f)
+    print("Loading complete.")
 
     ids_to_images = defaultdict(list)
     for anno in annotations:
         ids_to_images[anno["identity_label"]].append(anno)
 
-    valid_ids = [
-        id for id, annos in ids_to_images.items() if len(annos) >= MIN_IMAGES_PER_ID
-    ]
-    if not valid_ids:
-        print(
-            f"No identities found with at least {MIN_IMAGES_PER_ID} images. Cannot create verification plot."
-        )
-        return
+    num_identities = len(ids_to_images)
+    print(f"Total unique identities: {num_identities}")
 
-    ids_to_show = valid_ids[:NUM_IDENTITIES_TO_SHOW]
+    sample_counts = [len(annos) for annos in ids_to_images.values()]
 
-    max_cols = max(len(ids_to_images[id_val]) for id_val in ids_to_show)
+    if not sample_counts:
+        print("No samples found to calculate stats.")
+    else:
+        count_distribution = Counter(sample_counts)
+        print("\nDistribution of samples per identity:")
+        for num_samples, count in sorted(count_distribution.items()):
+            print(f"  - {count} identities have {num_samples} sample(s)")
 
-    fig, axes = plt.subplots(
-        len(ids_to_show), max_cols, figsize=(max_cols * 3, len(ids_to_show) * 3)
+        min_samples = min(sample_counts)
+        max_samples = max(sample_counts)
+        avg_samples = np.mean(sample_counts)
+        median_samples = np.median(sample_counts)
+
+        print(f"\nMin samples per identity: {min_samples}")
+        print(f"Max samples per identity: {max_samples}")
+        print(f"Average samples per identity: {avg_samples:.2f}")
+        print(f"Median samples per identity: {median_samples}")
+    print("-------------------------------------\n")
+
+
+def main():
+    """Main function to run the statistics and visualization."""
+    train_json_path = DATA_CONFIG["TRAIN_JSON_PATH"]
+    val_json_path = DATA_CONFIG["VAL_JSON_PATH"]
+
+    # Process training set (stats only)
+    print_dataset_stats(train_json_path, "Training")
+
+    # Process validation set (stats and visualization)
+    print_dataset_stats(val_json_path, "Validation")
+
+    print("Generating identity verification plot for validation set...")
+    # data_root is set to "." because file paths in the JSON are expected to be
+    # absolute or relative to the project root.
+    visualize_identity_dataset(
+        identity_json_path=val_json_path,
+        data_root=".",
+        output_dir="outputs/phase2_visualizations",
+        num_identities=NUM_IDENTITIES_TO_SHOW,
+        min_images_per_id=MIN_IMAGES_PER_ID,
+        display=False,  # Make it non-interactive
     )
-    if len(ids_to_show) == 1:
-        axes = np.expand_dims(axes, axis=0)
-    fig.suptitle("Verification of Identity Grouping", fontsize=16, y=1.03)
-
-    for i, identity in enumerate(ids_to_show):
-        image_annos = ids_to_images[identity]
-        breed = image_annos[0]["breed_label"]
-
-        axes[i, 0].set_ylabel(
-            f"ID: {identity}\nBreed: {breed}",
-            rotation=0,
-            labelpad=60,
-            verticalalignment="center",
-            fontsize=10,
-        )
-
-        for j, anno in enumerate(image_annos):
-            img_path = anno["file_path"]
-            try:
-                image = Image.open(img_path).convert("RGB")
-                image_tensor = transform(image)
-            except FileNotFoundError:
-                print(f"Warning: File not found: {img_path}. Skipping.")
-                continue
-
-            ax = axes[i, j]
-            ax.imshow(image_tensor.permute(1, 2, 0).numpy())
-            ax.set_xticks([])
-            ax.set_yticks([])
-            if i == 0:
-                ax.set_title(f"Image {j+1}")
-
-        for j in range(len(image_annos), max_cols):
-            axes[i, j].axis("off")
-
-    plt.tight_layout(rect=[0.05, 0, 1, 0.95])
-
-    output_dir = "outputs/phase2_visualizations"
-    os.makedirs(output_dir, exist_ok=True)
-    save_path = os.path.join(output_dir, "identity_verification.png")
-    plt.savefig(save_path)
-    print(f"Saved verification plot to {save_path}")
-    plt.show()
+    print("Visualization complete.")
 
 
 if __name__ == "__main__":
-    visualize_dataset_by_id()
+    main()

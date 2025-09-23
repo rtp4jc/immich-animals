@@ -171,8 +171,9 @@ def main(args):
         num_images=args.num_images, include_additional=args.include_additional
     )
 
+    dataset_size = "full dataset" if args.num_images is None else f"{args.num_images} images"
     print(
-        f"Found {len(ground_truth)} validation images. Processing {len(ground_truth)}."
+        f"Found {len(ground_truth)} validation images. Processing {dataset_size} ({len(ground_truth)} images)."
     )
 
     # Save temporary ground truth file
@@ -253,8 +254,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--num-images",
         type=int,
-        default=100,
-        help="Number of images to process from the validation set.",
+        default=None,
+        help="Number of images to process from the validation set. If not specified, uses full dataset.",
     )
     parser.add_argument(
         "--num-queries",

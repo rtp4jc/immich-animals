@@ -339,11 +339,13 @@ def visualize_identity_dataset(identity_json_path: Union[str, Path],
         images = valid_identities[identity][:min_images_per_id]
         
         for j, img_data in enumerate(images):
-            img_path = data_root / img_data['image_path']
-            if img_path.exists():
-                img = cv2.imread(str(img_path))
-                img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                axes[i, j].imshow(img_rgb)
+            img_path_str = img_data.get('image_path', img_data.get('file_path'))
+            if img_path_str:
+                img_path = data_root / img_path_str
+                if img_path.exists():
+                    img = cv2.imread(str(img_path))
+                    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    axes[i, j].imshow(img_rgb)
             
             axes[i, j].set_title(f"ID: {identity}")
             axes[i, j].axis('off')

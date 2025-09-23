@@ -19,13 +19,21 @@ def main(args):
 
     # This JSON payload tells the Immich ML service which models to run in which order.
     # We use our custom "dog-identification" task to chain our three models.
-    entries = {
-        "dog-identification": {
-            "detection": {"modelName": "dog_detector"},
-            "visual": {"modelName": "dog_keypoint"}, # We use VISUAL as a stand-in for the keypoint stage
-            "recognition": {"modelName": "dog_embedder"}, # The final embedding stage
+    if args.skip_keypoints:
+        entries = {
+            "dog-identification": {
+                "detection": {"modelName": "dog_detector"},
+                "recognition": {"modelName": "dog_embedder_direct"},
+            }
         }
-    }
+    else:
+        entries = {
+            "dog-identification": {
+                "detection": {"modelName": "dog_detector"},
+                "keypoint": {"modelName": "dog_keypoint"},
+                "recognition": {"modelName": "dog_embedder"},
+            }
+        }
 
     url = f"http://{args.host}:{args.port}/predict"
     files = {
@@ -54,5 +62,6 @@ if __name__ == "__main__":
     parser.add_argument("image_path", type=str, help="Path to the input image.")
     parser.add_argument("--host", type=str, default="localhost", help="Hostname of the Immich ML container.")
     parser.add_argument("--port", type=int, default=3003, help="Port of the Immich ML container.")
+    parser.add_argument("--skip-keypoints", action="store_true", help="Skip keypoint stage in pipeline")
     args = parser.parse_args()
     main(args)
