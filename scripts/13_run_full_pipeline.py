@@ -199,14 +199,17 @@ def main(args):
         "include_additional": args.include_additional,
         "dataset_size": len(ground_truth)
     }
+    
+    # Prepare tags
+    user_tags = [args.tag] if args.tag else []
 
     # 1. WITH Keypoints
     print("\nEvaluating AmbidextrousAxolotl WITH keypoints...")
     wandb_kp = WandBLogger(
         project_name="animal-id-pipeline",
-        run_name="pipeline-with-keypoints",
+        group="pipeline-with-keypoints",
         config={**common_config, "use_keypoints": True},
-        tags=["pipeline", "keypoints"],
+        tags=["pipeline", "keypoints"] + user_tags,
         enabled=not args.no_wandb
     )
     wandb_kp.start()
@@ -221,9 +224,9 @@ def main(args):
     print("Evaluating AmbidextrousAxolotl WITHOUT keypoints...")
     wandb_no_kp = WandBLogger(
         project_name="animal-id-pipeline",
-        run_name="pipeline-no-keypoints",
+        group="pipeline-no-keypoints",
         config={**common_config, "use_keypoints": False},
-        tags=["pipeline", "baseline"],
+        tags=["pipeline", "baseline"] + user_tags,
         enabled=not args.no_wandb
     )
     wandb_no_kp.start()
@@ -313,6 +316,12 @@ if __name__ == "__main__":
         "--no-wandb",
         action="store_true",
         help="Disable Weights & Biases logging",
+    )
+    parser.add_argument(
+        "--tag",
+        type=str,
+        default=None,
+        help="Tag for the WandB run",
     )
     args = parser.parse_args()
     main(args)

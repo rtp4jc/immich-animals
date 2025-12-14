@@ -20,6 +20,7 @@ class WandBLogger:
         self,
         project_name: str = "animal-id-benchmark",
         run_name: Optional[str] = None,
+        group: Optional[str] = None,
         config: Optional[Dict[str, Any]] = None,
         tags: Optional[List[str]] = None,
         enabled: bool = True,
@@ -30,12 +31,14 @@ class WandBLogger:
         Args:
             project_name: Name of the WandB project
             run_name: Optional name for this specific run
+            group: Optional group name for the run
             config: Dictionary of configuration parameters to log
             tags: List of tags to organize runs (e.g., ["baseline", "experiment"])
             enabled: Whether logging is enabled (useful for dry runs)
         """
         self.project_name = project_name
         self.run_name = run_name
+        self.group = group
         self.config = config or {}
         self.tags = tags or []
         self.enabled = enabled
@@ -50,6 +53,7 @@ class WandBLogger:
             self.run = wandb.init(
                 project=self.project_name,
                 name=self.run_name,
+                group=self.group,
                 config=self.config,
                 tags=self.tags,
                 reinit=True,
@@ -82,14 +86,6 @@ class WandBLogger:
         
         # Log TAR @ FAR as a custom chart or table
         if metrics.tar_at_far:
-            # Create a table for TAR @ FAR
-            table_data = []
-            for far, (tar, threshold) in sorted(metrics.tar_at_far.items()):
-                table_data.append([far, tar, threshold])
-            
-            tar_table = wandb.Table(data=table_data, columns=["FAR", "TAR", "Threshold"])
-            log_data[f"{prefix}tar_at_far_table"] = tar_table
-            
             # Also log scalar values for quick comparison
             for far, (tar, _) in metrics.tar_at_far.items():
                 # Format FAR nicely (e.g. 0.001 -> "0_001")
