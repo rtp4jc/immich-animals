@@ -88,11 +88,15 @@ class DogEmbeddingModel(nn.Module):
     """
 
     def __init__(
-        self, backbone_type: BackboneType, num_classes: int, embedding_dim: int = 512
+        self,
+        backbone_type: BackboneType,
+        num_classes: int,
+        embedding_dim: int = 512,
+        pretrained: bool = True,
     ):
         super(DogEmbeddingModel, self).__init__()
 
-        self.backbone = EmbeddingNet(backbone_type, embedding_dim)
+        self.backbone = EmbeddingNet(backbone_type, embedding_dim, pretrained=pretrained)
         self.head = ArcFaceLoss(embedding_dim, num_classes)
 
     def forward(self, x, labels=None):

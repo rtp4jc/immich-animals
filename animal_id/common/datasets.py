@@ -19,7 +19,6 @@ How to run it:
   the training scripts.
 """
 import json
-import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms

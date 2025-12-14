@@ -108,6 +108,33 @@ immich-animals/
 
 **Note**: Scripts 16-17 (Immich integration) require a local fork of Immich and are not currently functional for external users.
 
+## Testing
+
+We use `pytest` for testing. The test suite includes:
+- **Unit Tests**: Verify core logic (data loading, modeling, converters).
+- **Integration Tests**: Verify end-to-end training pipelines (Detection, Keypoint, Embedding).
+
+### Running Tests
+
+```bash
+# Run all tests
+python -m pytest tests/
+
+# Run specific test file
+python -m pytest tests/unit/test_datasets.py
+
+# Run with verbose output
+python -m pytest -v tests/
+```
+
+### Coverage Report
+
+To see code coverage statistics (ensure dependencies are installed):
+
+```bash
+python -m pytest --cov=animal_id tests/
+```
+
 ## Models
 
 Exported models in `/models/onnx/`:

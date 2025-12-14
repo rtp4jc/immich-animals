@@ -54,6 +54,10 @@ class DetectionTrainer:
         print(f"PyTorch version: {torch.__version__}")
         print(f"CUDA available: {torch.cuda.is_available()}")
 
+        if self.config.get("device") == "cpu":
+            print("Warning: Training on CPU as requested.")
+            return True
+
         if not torch.cuda.is_available():
             print("Error: CUDA not available. Training requires GPU.")
             return False
@@ -72,7 +76,7 @@ class DetectionTrainer:
     def train(self) -> Any:
         """Train the detection model."""
         if not self.verify_prerequisites():
-            sys.exit("Prerequisites not met.")
+            raise RuntimeError("Prerequisites not met.")
 
         if self.model is None:
             self.load_model()
