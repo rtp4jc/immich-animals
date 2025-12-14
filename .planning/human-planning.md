@@ -4,6 +4,7 @@ Below are the top priorities for the project from my perspective:
 
 1. Improve baseline and tracking: the current model doesn't have terrible metrics, but they're also not great. I need to do a full re-run of the training to ensure I have models with the best training results. I need to be dilligent and output these metrics to W&B so I have a baseline. Once I have this, I need to create a master script to do the full training run without any internvention from me so I can see the effect of any fixes I might make in data preparation with a single command (even if it has to run for several hours).
 2. I think I got all the ONNX models working in the Immich backend but the frontend portion is still not complete. I need to re-evaluate the effort for that and take another swing at the frontent implementation. phase-5.md should be correct, but I'm not 100% sure.
+3. Need to get all my local immich changes on a remote branch since it's only on my local device right now
 
 ## Other thoughts
 
