@@ -6,4 +6,4 @@ dependencies:
   - python=3.12
   - pip
   - pip:
-    - -r requirements.txt
+    - -e .  # This installs the project in editable mode, pulling deps from pyproject.toml

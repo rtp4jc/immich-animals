@@ -27,6 +27,11 @@ jobs:
         # mamba-version: "*"
         # use-mamba: true 
 
+    - name: Install package
+      shell: bash -l {0}
+      run: |
+        pip install -e .
+
     - name: Lint with flake8
       shell: bash -l {0}
       run: |
