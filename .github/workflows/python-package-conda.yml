@@ -30,7 +30,7 @@ jobs:
     - name: Install package
       shell: bash -l {0}
       run: |
-        pip install -e .
+        pip install -e .[dev]
 
     - name: Lint with flake8
       shell: bash -l {0}
