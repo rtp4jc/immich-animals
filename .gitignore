@@ -6,3 +6,4 @@ runs
 *.pt
 # Temporary nested repo for development
 immich-clone/
+wandb/

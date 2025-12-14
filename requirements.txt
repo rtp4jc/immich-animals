@@ -14,10 +14,12 @@ scipy>=1.10.0
 matplotlib>=3.7.0
 tqdm>=4.65.0
 Pillow>=10.0.0
+transformers>=4.30.0
 
 # Utilities
 requests>=2.31.0
 pathlib2>=2.3.7
+wandb>=0.23.1
 
 # Development and Testing (optional)
 pytest>=7.4.0

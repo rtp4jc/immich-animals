@@ -15,6 +15,7 @@ sys.path.append(str(PROJECT_ROOT))
 
 from animal_id.benchmark.evaluator import BenchmarkEvaluator
 from animal_id.benchmark.visualizer import BenchmarkVisualizer
+from animal_id.tracking.wandb_logger import WandBLogger
 from animal_id.pipeline.ambidextrous_axolotl import AmbidextrousAxolotl
 from animal_id.pipeline.models import AnimalClass
 from animal_id.common.constants import (
@@ -34,7 +35,7 @@ class ONNXDetector:
         self.input_size = self.session.get_inputs()[0].shape[2:]
 
     def predict(self, image: np.ndarray):
-        """Detect dogs in image."""
+        """Detect animals in image."""
         detector_input, original_shape = self._preprocess(image)
         detections = self.session.run(
             None, {self.session.get_inputs()[0].name: detector_input}
@@ -170,6 +171,13 @@ def main(args):
     ground_truth = loader.load_validation_data(
         num_images=args.num_images, include_additional=args.include_additional
     )
+    
+    # Create identity map for logging (path -> identity)
+    identity_map = {
+        item['image_path']: item['identity_label'] 
+        for item in ground_truth 
+        if item.get('identity_label')
+    }
 
     dataset_size = "full dataset" if args.num_images is None else f"{args.num_images} images"
     print(
@@ -184,12 +192,47 @@ def main(args):
 
     # Evaluate both systems
     evaluator = BenchmarkEvaluator(str(temp_gt_path), str(PROJECT_ROOT))
+    
+    # Common config for logging
+    common_config = {
+        "num_images": args.num_images,
+        "include_additional": args.include_additional,
+        "dataset_size": len(ground_truth)
+    }
 
+    # 1. WITH Keypoints
     print("\nEvaluating AmbidextrousAxolotl WITH keypoints...")
+    wandb_kp = WandBLogger(
+        project_name="animal-id-pipeline",
+        run_name="pipeline-with-keypoints",
+        config={**common_config, "use_keypoints": True},
+        tags=["pipeline", "keypoints"],
+        enabled=not args.no_wandb
+    )
+    wandb_kp.start()
+    
     metrics_with_kp = evaluator.evaluate(axolotl_with_keypoints)
+    
+    wandb_kp.log_metrics(metrics_with_kp)
+    wandb_kp.log_failures(evaluator.get_results(), data_root=PROJECT_ROOT, identity_map=identity_map)
+    wandb_kp.finish()
 
+    # 2. WITHOUT Keypoints
     print("Evaluating AmbidextrousAxolotl WITHOUT keypoints...")
+    wandb_no_kp = WandBLogger(
+        project_name="animal-id-pipeline",
+        run_name="pipeline-no-keypoints",
+        config={**common_config, "use_keypoints": False},
+        tags=["pipeline", "baseline"],
+        enabled=not args.no_wandb
+    )
+    wandb_no_kp.start()
+    
     metrics_without_kp = evaluator.evaluate(axolotl_without_keypoints)
+    
+    wandb_no_kp.log_metrics(metrics_without_kp)
+    wandb_no_kp.log_failures(evaluator.get_results(), data_root=PROJECT_ROOT, identity_map=identity_map)
+    wandb_no_kp.finish()
 
     # Print results
     print(f"\n{'='*60}")
@@ -205,9 +248,7 @@ def main(args):
         1 for r in evaluator.get_results() if r.has_animal_gt and not r.has_animal_pred
     )
     if missed_with_kp > 0:
-        print(
-            f"\n--- {missed_with_kp} images with no dogs detected (with keypoints) ---"
-        )
+        print(f"\n--- {missed_with_kp} images with no animals detected (with keypoints) ---")
         missed_examples = [
             r
             for r in evaluator.get_results()
@@ -267,6 +308,11 @@ if __name__ == "__main__":
         "--include-additional",
         action="store_true",
         help="Include additional identities from data/additional_identities",
+    )
+    parser.add_argument(
+        "--no-wandb",
+        action="store_true",
+        help="Disable Weights & Biases logging",
     )
     args = parser.parse_args()
     main(args)

@@ -1,16 +1,4 @@
-# Immich Dogs - Project Status
-
-## Overview
-
-Dog identification system for Immich that mirrors the people detection pipeline. Implements a 3-stage pipeline to detect and identify individual dogs in photos.
-
-## Architecture
-
-### 3-Stage Pipeline
-
-1. **Dog Detector** - YOLO11n finds dog bounding boxes
-2. **Keypoint Estimator** - YOLO11n-pose finds 4 face keypoints (eyes, nose, throat)
-3. **Identity Embedder** - EfficientNet-B0 + ArcFace loss → 512D embeddings
+# Immich Animals - Project Status
 
 ## Current Status
 
@@ -42,21 +30,6 @@ Dog identification system for Immich that mirrors the people detection pipeline.
 - **Docker Container**: Custom container build complete and tested
 - **API Testing**: HTTP endpoint testing complete - both approaches working
 - **Production Deployment**: Ready for deployment with keypoint-free approach recommended
-
-## Code Structure
-
-```
-immich-dogs/
-├── .planning/           # Project phases and documentation
-├── animal_id/             # Core Python package
-│   ├── benchmark/      # Evaluation framework
-│   ├── pipeline/       # Pipeline implementations (AmbidextrousAxolotl, etc.)
-│   └── common/         # Shared utilities
-├── scripts/            # Workflow scripts (05-13)
-├── models/onnx/        # Exported models
-├── immich-clone/       # Forked Immich ML container
-└── outputs/            # Results and visualizations
-```
 
 ## Coding Guidelines
 
@@ -100,22 +73,6 @@ immich-dogs/
 - **Note**: Some scripts may have Windows-specific paths/issues - originally developed for native Windows
 - **Data Files**: Do not directly read files in `/data` directory (too large). Use head/tail or jq for parsing
 
-### Running Scripts
-
-```bash
-# Pipeline verification and benchmarking
-conda run -n python312 python scripts/13_run_full_pipeline.py --num-images 50 --num-queries 5
-
-# Export models to ONNX
-conda run -n python312 python scripts/10_export_embedding_model.py
-conda run -n python312 python scripts/11_export_detector_onnx.py
-conda run -n python312 python scripts/12_export_keypoint_onnx.py
-
-# Benchmark Immich API integration
-python scripts/16_visualize_immich_pipeline.py --num-images 100 --num-queries 5
-python scripts/16_visualize_immich_pipeline.py --num-images 100 --num-queries 5 --skip-keypoints
-```
-
 ### Immich Container Management
 
 ```bash
@@ -154,15 +111,6 @@ tail -20 outputs/scripts/validation_output.txt
 2. Consider implementing BrilliantBadger pipeline iteration
 3. Evaluate performance on larger datasets
 4. Optimize model inference speed
-
-## Key Files
-
-- `scripts/13_run_full_pipeline.py` - Full pipeline verification and benchmarking
-- `scripts/16_visualize_immich_pipeline.py` - Immich API benchmarking
-- `animal_id/benchmark/evaluator.py` - Comprehensive evaluation framework
-- `animal_id/pipeline/ambidextrous_axolotl.py` - First pipeline implementation
-- `animal_id/common/constants.py` - Project configuration
-- `.planning/overarching.md` - Complete project plan
 
 ## Phase 1 Migration - COMPLETE! 🎉
 
