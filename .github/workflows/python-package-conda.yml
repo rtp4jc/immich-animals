@@ -5,11 +5,6 @@ on:
     branches: [ "main", "master" ]
   pull_request:
     branches: [ "main", "master" ]
-on:
-  push:
-    branches: [ "main", "master" ]
-  pull_request:
-    branches: [ "main", "master" ]
 
 jobs:
   build-linux:
@@ -22,19 +17,7 @@ jobs:
     
     - name: Set up Conda
       uses: conda-incubator/setup-miniconda@v3
-    
-    - name: Set up Conda
-      uses: conda-incubator/setup-miniconda@v3
       with:
-        auto-update-conda: true
-        python-version: "3.12"
-        activate-environment: immich-animals
-        environment-file: environment.yml
-        auto-activate-base: false
-        # Use mamba for faster resolution (optional, but recommended)
-        # mamba-version: "*"
-        # use-mamba: true 
-
         auto-update-conda: true
         python-version: "3.12"
         activate-environment: immich-animals
