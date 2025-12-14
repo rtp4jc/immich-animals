@@ -38,7 +38,31 @@ For GPU acceleration, install PyTorch with CUDA support and replace `onnxruntime
 python scripts/13_run_full_pipeline.py --num-images 50 --num-queries 5
 ```
 
-### Data Preparation and Training
+### Tracking & Benchmarking
+
+We use **Weights & Biases (W&B)** to track experiments and visualize performance metrics over time.
+
+### Usage
+
+The pipeline script automatically logs metrics to W&B. Use tags to organize your experiments:
+
+```bash
+# Run with a custom tag
+python scripts/13_run_full_pipeline.py --num-images 50 --tag "baseline-v1"
+
+# Disable W&B logging
+python scripts/13_run_full_pipeline.py --num-images 10 --no-wandb
+```
+
+### Dashboard Tips
+
+To compare results over time in the W&B dashboard:
+
+1.  **Create a Line Chart:** Set X-axis to "Wall Time" and Y-axis to your metric (e.g., `top_5_accuracy`, `tar_at_far_0_01`).
+2.  **Group by Variant:** Under "Grouping", select "Group by" and choose `use_keypoints`.
+3.  **Inspect Failures:** Check the "Media" section to see images of missed detections and incorrect identifications (including Rank and Predicted Identity).
+
+## Data Preparation and Training
 
 ```bash
 # Prepare detection dataset
