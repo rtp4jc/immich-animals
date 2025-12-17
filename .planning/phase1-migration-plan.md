@@ -123,7 +123,7 @@ animal_id/
 ```
 scripts/
 ├── 01_prepare_detection_data.py      # Create + convert detection dataset (no visualization)
-├── 02_inspect_datasets.py            # PRESERVE from phase1 - generic dataset inspection tool
+├── 02_inspect_detection_datasets.py            # PRESERVE from phase1 - generic dataset inspection tool
 ├── 03_train_detector.py              # Train + validate + visualize detector results
 ├── 04_prepare_keypoint_data.py       # Create + convert keypoint dataset (no visualization)
 ├── 05_train_keypoint_model.py        # Train + validate + visualize keypoint results
@@ -316,7 +316,7 @@ scripts/
 
 **Background**: Review `scripts/phase1/visualize_generic_dataset.py` and the centralized `animal_id.common.visualization` module.
 
-**Task**: Create `02_inspect_datasets.py` that provides generic dataset inspection capabilities.
+**Task**: Create `02_inspect_detection_datasets.py` that provides generic dataset inspection capabilities.
 
 **Requirements**:
 
@@ -329,8 +329,8 @@ scripts/
 
 **Explicit Acceptance Criteria**:
 
-- [✅] Run `python scripts/02_inspect_datasets.py data/detector/coco` - must complete successfully
-- [✅] Run `python scripts/02_inspect_datasets.py data/keypoints/coco` - must complete successfully
+- [✅] Run `python scripts/02_inspect_detection_datasets.py data/detector/coco` - must complete successfully
+- [✅] Run `python scripts/02_inspect_detection_datasets.py data/keypoints/coco` - must complete successfully
 - [✅] Verify visualization files saved to `outputs/02_dataset_inspection/`
 - [✅] Check that dataset statistics are displayed/saved (image count, class distribution, etc.)
 - [✅] Verify sample images with annotations are properly visualized

@@ -19,23 +19,25 @@ class AmbidextrousAxolotl(AnimalIdentificationSystem):
     
     def __init__(self, 
                  detector: DetectionModel,
-                 keypoint_model: KeypointModel,
                  embedding_model: EmbeddingModel,
+                 keypoint_model: Optional[KeypointModel] = None,
                  target_class: AnimalClass = AnimalClass.DOG,
                  detection_threshold: float = 0.5,
                  keypoint_threshold: float = 0.3,
-                 use_keypoints: bool = True):
+                 use_keypoints: bool = False):
         """
         Initialize AmbidextrousAxolotl pipeline.
         
         Args:
             detector: Detection model instance
-            keypoint_model: Keypoint model instance  
             embedding_model: Embedding model instance
+            keypoint_model: Keypoint model instance (optional)
             target_class: Animal class to identify
             detection_threshold: Minimum confidence for detections
             keypoint_threshold: Minimum confidence for keypoints
-            use_keypoints: Whether to use keypoint refinement
+            use_keypoints: Whether to use keypoint refinement. Currently defaulting to 
+                false because benchmarks show the keypoints reduce key metrics like top-5 
+                accuracy with current data quality
         """
         self.detector = detector
         self.keypoint_model = keypoint_model
@@ -140,7 +142,7 @@ class AmbidextrousAxolotl(AnimalIdentificationSystem):
         
         # Stage 2: Keypoint refinement (optional)
         final_crop = detector_crop
-        if self.use_keypoints:
+        if self.use_keypoints and self.keypoint_model:
             keypoint_detections = self.keypoint_model.predict(detector_crop)
             
             if keypoint_detections:

@@ -1,6 +1,7 @@
 import pytest
 import json
 from unittest.mock import patch
+from pathlib import Path
 from animal_id.common.identity_loader import IdentityLoader
 
 @pytest.fixture
@@ -77,7 +78,7 @@ def test_scan_additional_identities(mock_data_env):
         # Verify relative path storage
         # Should be something like 'data/additional_identities/id_C/extra1.jpg'
         path_str = identities["id_C"][0]
-        assert "data/additional_identities/id_C" in path_str
+        assert str(Path("data/additional_identities/id_C")) in str(Path(path_str))
 
 def test_create_augmented_dataset(mock_data_env):
     """Test combining base and additional data."""

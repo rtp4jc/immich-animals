@@ -69,7 +69,7 @@ To compare results over time in the W&B dashboard:
 python scripts/01_prepare_detection_data.py
 
 # Inspect datasets
-python scripts/02_inspect_datasets.py
+python scripts/02_inspect_detection_datasets.py
 
 # Train models (requires GPU for reasonable training time)
 python scripts/03_train_detection_model.py
@@ -77,7 +77,7 @@ python scripts/05_train_keypoint_model.py
 python scripts/08_train_embedding_model.py
 
 # Export to ONNX
-python scripts/10_export_embedding_model.py
+python scripts/10_export_embedding_onnx.py
 python scripts/11_export_detector_onnx.py
 python scripts/12_export_keypoint_onnx.py
 ```

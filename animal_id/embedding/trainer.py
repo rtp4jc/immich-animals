@@ -9,6 +9,8 @@ import torch.optim as optim
 from pathlib import Path
 from tqdm import tqdm
 
+from animal_id.benchmark.metrics import evaluate_embedding_model
+
 class EmbeddingTrainer:
     def __init__(self, model, train_loader, val_loader, device, run_dir):
         self.model = model
@@ -17,20 +19,24 @@ class EmbeddingTrainer:
         self.device = device
         self.run_dir = Path(run_dir)
         
+        # Label smoothing helps prevent overfitting on specific identities
         self.criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
         
-        # Global best model tracking (across all phases)
-        self.best_val_loss = float('inf')
+        # Global best model tracking
+        # We track mAP (Mean Average Precision) because this is an Open-Set problem.
+        # We cannot use classification accuracy for validation because validation 
+        # identities are not in the training set (Open-Set protocol).
+        self.best_val_metric = -1.0 
         
         # Per-phase early stopping tracking
-        self.phase_best_val_loss = float('inf')
+        self.phase_best_val_metric = -1.0
         self.patience_counter = 0
         
         # Metrics tracking
         self.epoch_metrics = []
 
     def train_epoch(self, optimizer):
-        """Train for one epoch."""
+        """Train for one epoch using ArcFace loss."""
         self.model.train()
         total_loss = 0.0
         num_batches = 0
@@ -40,6 +46,7 @@ class EmbeddingTrainer:
             images, labels = images.to(self.device), labels.to(self.device)
             
             optimizer.zero_grad()
+            # Forward pass through backbone AND ArcFace head
             logits = self.model(images, labels)
             loss = self.criterion(logits, labels)
             loss.backward()
@@ -58,43 +65,25 @@ class EmbeddingTrainer:
         return total_loss / num_batches
 
     def validate(self):
-        """Validate the model."""
-        self.model.eval()
-        total_loss = 0.0
-        correct = 0
-        total = 0
+        """
+        Validate the model using Embedding Metrics (mAP, TAR).
         
-        pbar = tqdm(self.val_loader, desc="Validation", leave=False)
-        with torch.no_grad():
-            for images, labels in pbar:
-                images, labels = images.to(self.device), labels.to(self.device)
-                
-                logits = self.model(images, labels)
-                loss = self.criterion(logits, labels)
-                
-                total_loss += loss.item()
-                
-                # Calculate accuracy
-                _, predicted = torch.max(logits.data, 1)
-                total += labels.size(0)
-                correct += (predicted == labels).sum().item()
-                
-                # Update progress bar
-                current_acc = correct / total
-                pbar.set_postfix({'Loss': f'{loss.item():.4f}', 'Acc': f'{current_acc:.4f}'})
+        CRITICAL: We cannot use CrossEntropyLoss for validation because the validation
+        set contains identities (classes) that the model has never seen (Open-Set).
+        The ArcFace head only knows about training identities.
         
-        avg_loss = total_loss / len(self.val_loader)
-        accuracy = correct / total
-        
-        return avg_loss, accuracy
+        Instead, we generate embeddings for all validation images and measure how well
+        they cluster by identity using cosine similarity.
+        """
+        metrics = evaluate_embedding_model(self.model, self.val_loader, self.device)
+        return metrics
 
-    def save_checkpoint(self, epoch, val_loss, val_acc, is_best=False):
+    def save_checkpoint(self, epoch, val_metric, is_best=False):
         """Save model checkpoint."""
         checkpoint = {
             'epoch': epoch,
             'model_state_dict': self.model.state_dict(),
-            'val_loss': val_loss,
-            'val_accuracy': val_acc,
+            'val_mAP': val_metric,
         }
         
         # Save latest checkpoint
@@ -114,7 +103,12 @@ class EmbeddingTrainer:
         epoch_start = time.time()
         
         train_loss = self.train_epoch(optimizer)
-        val_loss, val_acc = self.validate()
+        
+        # Validation Step
+        val_metrics = self.validate()
+        
+        # Use mAP as the primary metric for model selection
+        current_metric = val_metrics.get('mAP', 0.0)
         
         epoch_time = time.time() - epoch_start
         
@@ -123,36 +117,35 @@ class EmbeddingTrainer:
             'epoch': epoch + 1,
             'phase': phase,
             'train_loss': train_loss,
-            'val_loss': val_loss,
-            'val_accuracy': val_acc,
+            'val_metrics': val_metrics,
             'epoch_time': epoch_time
         }
         self.epoch_metrics.append(epoch_data)
         
         # Check if this is the best model globally (across all phases)
-        is_global_best = val_loss < self.best_val_loss
+        is_global_best = current_metric > self.best_val_metric
         if is_global_best:
-            self.best_val_loss = val_loss
-            self.save_checkpoint(epoch, val_loss, val_acc, is_best=True)
+            self.best_val_metric = current_metric
+            self.save_checkpoint(epoch, current_metric, is_best=True)
         
         # Check if this is the best model in this phase (for early stopping)
-        is_phase_best = val_loss < self.phase_best_val_loss
+        is_phase_best = current_metric > self.phase_best_val_metric
         if is_phase_best:
-            self.phase_best_val_loss = val_loss
+            self.phase_best_val_metric = current_metric
             self.patience_counter = 0
         else:
             self.patience_counter += 1
         
         # Always save latest checkpoint
         if not is_global_best:
-            self.save_checkpoint(epoch, val_loss, val_acc, is_best=False)
+            self.save_checkpoint(epoch, current_metric, is_best=False)
         
         best_indicator = " [BEST]" if is_global_best else ""
         
         print(f"Epoch {(epoch % total_epochs) + 1}/{total_epochs}: "
               f"Train Loss: {train_loss:.4f}, "
-              f"Val Loss: {val_loss:.4f}, "
-              f"Val Acc: {val_acc:.4f}, "
+              f"Val mAP: {current_metric:.4f}, "
+              f"TAR@1%: {val_metrics.get('TAR@FAR=1%', 0.0):.4f}, "
               f"Time: {epoch_time:.1f}s{best_indicator}")
         
         # Early stopping check (based on phase performance)
@@ -188,7 +181,7 @@ class EmbeddingTrainer:
         self.model.unfreeze_backbone()
         
         # Reset phase tracking for new phase
-        self.phase_best_val_loss = float('inf')
+        self.phase_best_val_metric = -1.0
         self.patience_counter = 0
         
         # Different learning rates for backbone and head
@@ -198,8 +191,8 @@ class EmbeddingTrainer:
         ])
         
         # Sequential scheduler: Linear warmup → Cosine annealing
-        warmup_epochs_phase2 = 20  # Very long warmup for ultra-gentle learning rate increase
-        linear_scheduler = optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs_phase2)  # Start even lower
+        warmup_epochs_phase2 = 20
+        linear_scheduler = optim.lr_scheduler.LinearLR(optimizer, start_factor=0.01, total_iters=warmup_epochs_phase2)
         cosine_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=full_epochs - warmup_epochs_phase2)
         scheduler = optim.lr_scheduler.SequentialLR(
             optimizer, 
@@ -209,13 +202,19 @@ class EmbeddingTrainer:
         
         for epoch in range(full_epochs):
             should_stop = self._train_and_validate_epoch(optimizer, warmup_epochs + epoch, full_epochs, 'full_training', patience)
-            scheduler.step()  # Fixed: removed deprecated epoch parameter
+            scheduler.step()
             if should_stop:
                 break
         
         # Save training metrics
         with open(self.run_dir / "training_metrics.json", "w") as f:
-            json.dump(self.epoch_metrics, f, indent=2)
+            # Helper to convert numpy/tensor values to float
+            def convert(o):
+                if hasattr(o, 'item'): return o.item()
+                if isinstance(o, dict): return {k: convert(v) for k, v in o.items()}
+                return o
+                
+            json.dump([convert(m) for m in self.epoch_metrics], f, indent=2)
         
-        print(f"Training completed. Best validation loss: {self.best_val_loss:.4f}")
+        print(f"Training completed. Best validation mAP: {self.best_val_metric:.4f}")
         return self.run_dir / "best_model.pt"

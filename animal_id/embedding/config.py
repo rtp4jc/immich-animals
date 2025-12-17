@@ -24,6 +24,7 @@ TRAINING_CONFIG = {
 DATA_CONFIG = {
     'TRAIN_JSON_PATH': 'data/identity_train.json',
     'VAL_JSON_PATH': 'data/identity_val.json',
+    'DOGFACENET_PATH': 'data/dogfacenet/DogFaceNet_224resized/after_4_bis',
     'IMG_SIZE': 224,
     'BATCH_SIZE': 32,
 }

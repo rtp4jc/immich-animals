@@ -48,85 +48,23 @@ from animal_id.embedding.models import DogEmbeddingModel
 from animal_id.embedding.config import TRAINING_CONFIG, DATA_CONFIG, DEFAULT_BACKBONE
 from animal_id.embedding.backbones import BackboneType
 
+import os
+import sys
+import argparse
+import matplotlib.pyplot as plt
+from PIL import Image
+
+# Adjust path to import from our new package
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from animal_id.common.utils import find_latest_timestamped_run
+from animal_id.common.datasets import DogIdentityDataset
+from animal_id.embedding.models import DogEmbeddingModel
+from animal_id.embedding.config import TRAINING_CONFIG, DATA_CONFIG, DEFAULT_BACKBONE
+from animal_id.embedding.backbones import BackboneType
+from animal_id.benchmark.metrics import evaluate_embedding_model
+
 # --- Configuration ---
 FAR_TARGETS = [1e-1, 1e-2, 1e-3, 1e-4]
-
-
-def get_all_embeddings(model, data_loader, device):
-    model.eval()
-    all_embeddings = []
-    all_labels = []
-    all_paths = []
-    with torch.no_grad():
-        for i, (images, labels) in enumerate(
-            tqdm(data_loader, desc="Generating Embeddings")
-        ):
-            images = images.to(device)
-            embeddings = model(images)
-            all_embeddings.append(embeddings.cpu())
-            all_labels.extend(labels.tolist())
-            start_idx = i * data_loader.batch_size
-            end_idx = start_idx + len(images)
-            all_paths.extend(
-                [
-                    data_loader.dataset.annotations[j]["file_path"]
-                    for j in range(start_idx, end_idx)
-                ]
-            )
-    return torch.cat(all_embeddings), all_labels, all_paths
-
-
-def calculate_metrics(all_embeddings, all_labels):
-    print("\n--- Calculating Verification Metrics (TAR@FAR) ---")
-    labels = np.array(all_labels)
-    positive_pairs = []
-    labels_to_indices = defaultdict(list)
-    for i, label in enumerate(labels):
-        labels_to_indices[label].append(i)
-    for _, idxs in tqdm(labels_to_indices.items(), desc="Generating Positive Pairs"):
-        if len(idxs) > 1:
-            positive_pairs.extend(list(combinations(idxs, 2)))
-
-    num_negative_pairs = len(positive_pairs) * 2
-    negative_pairs = []
-    all_indices = set(range(len(labels)))
-    pbar = tqdm(total=num_negative_pairs, desc="Generating Negative Pairs")
-    while len(negative_pairs) < num_negative_pairs:
-        idx1, idx2 = np.random.choice(list(all_indices), 2, replace=False)
-        if (
-            labels[idx1] != labels[idx2]
-            and (idx1, idx2) not in negative_pairs
-            and (idx2, idx1) not in negative_pairs
-        ):
-            negative_pairs.append((idx1, idx2))
-            pbar.update(1)
-    pbar.close()
-
-    print(
-        f"Generated {len(positive_pairs)} positive pairs and {len(negative_pairs)} negative pairs."
-    )
-    pos_scores = np.array(
-        [
-            F.cosine_similarity(
-                all_embeddings[i].unsqueeze(0), all_embeddings[j].unsqueeze(0)
-            ).item()
-            for i, j in tqdm(positive_pairs, desc="Calculating Positive Scores")
-        ]
-    )
-    neg_scores = np.array(
-        [
-            F.cosine_similarity(
-                all_embeddings[i].unsqueeze(0), all_embeddings[j].unsqueeze(0)
-            ).item()
-            for i, j in tqdm(negative_pairs, desc="Calculating Negative Scores")
-        ]
-    )
-
-    print("\n--- Verification Metrics ---")
-    for far in FAR_TARGETS:
-        threshold = np.quantile(neg_scores, 1 - far)
-        tar = np.sum(pos_scores > threshold) / len(pos_scores)
-        print(f"TAR @ FAR={far*100:.3f}%: {tar*100:.2f}%  (Threshold: {threshold:.4f})")
 
 
 def visualize_neighbors(
@@ -231,18 +169,43 @@ def main(args):
     val_loader = DataLoader(
         val_dataset, batch_size=DATA_CONFIG["BATCH_SIZE"], shuffle=False, num_workers=2
     )
+    
+    if args.calculate_metrics:
+        print("\n--- Calculating Verification Metrics (TAR@FAR) ---")
+        metrics = evaluate_embedding_model(model, val_loader, device)
+        print("\n--- Verification Metrics ---")
+        print(f"  mAP: {metrics.get('mAP', 0.0):.4f}")
+        print(f"  TAR@FAR=1.0%: {metrics.get('TAR@FAR=1%', 0.0):.4f}")
+        print(f"  TAR@FAR=0.1%: {metrics.get('TAR@FAR=0.1%', 0.0):.4f}")
 
-    all_embeddings, all_labels, all_paths = get_all_embeddings(
-        model, val_loader, device
-    )
 
     if args.show_neighbors:
+        # We need to manually get all embeddings and paths for visualization
+        model.eval()
+        all_embeddings = []
+        all_labels = []
+        all_paths = []
+        with torch.no_grad():
+            for i, (images, labels) in enumerate(
+                tqdm(val_loader, desc="Generating Embeddings for Visualization")
+            ):
+                images = images.to(device)
+                embeddings = model.get_embeddings(images)
+                all_embeddings.append(embeddings.cpu())
+                all_labels.extend(labels.tolist())
+                start_idx = i * val_loader.batch_size
+                end_idx = start_idx + len(images)
+                all_paths.extend(
+                    [
+                        val_loader.dataset.annotations[j]["file_path"]
+                        for j in range(start_idx, end_idx)
+                    ]
+                )
+        
+        all_embeddings = torch.cat(all_embeddings)
         visualize_neighbors(
             all_embeddings, all_labels, all_paths, args.num_queries, args.num_neighbors
         )
-
-    if args.calculate_metrics:
-        calculate_metrics(all_embeddings, all_labels)
 
 
 if __name__ == "__main__":

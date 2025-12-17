@@ -7,3 +7,5 @@ runs
 # Temporary nested repo for development
 immich-clone/
 wandb/
+/*.egg-info/**
+.coverage
