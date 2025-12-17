@@ -5,21 +5,19 @@ Benchmark animal identification pipeline using the Immich API as a black box.
 
 import argparse
 import json
-import sys
 from pathlib import Path
+from typing import List, Tuple
+
 import numpy as np
 import requests
-from typing import List, Tuple
 from tqdm import tqdm
 
-# Add project root to Python path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(PROJECT_ROOT))
-
-from animal_id.benchmark.evaluator import BenchmarkEvaluator, AnimalIdentificationSystem
+from animal_id.benchmark.evaluator import AnimalIdentificationSystem, BenchmarkEvaluator
 from animal_id.benchmark.visualizer import BenchmarkVisualizer
-from animal_id.common.constants import DATA_DIR
 from animal_id.common.identity_loader import IdentityLoader
+
+# Define project root
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 class ImmichAnimalSystem(AnimalIdentificationSystem):
@@ -175,9 +173,9 @@ def main():
     metrics = evaluator.evaluate(immich_system)
 
     # Print results
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"IMMICH ANIMAL IDENTIFICATION BENCHMARK RESULTS ({pipeline_type})")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(metrics)
 
     # Create visualizations

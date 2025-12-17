@@ -10,6 +10,7 @@ from pathlib import Path
 
 import requests
 
+
 def main(args):
     """Main test function."""
     image_path = Path(args.image_path)
@@ -36,18 +37,14 @@ def main(args):
         }
 
     url = f"http://{args.host}:{args.port}/predict"
-    files = {
-        "image": (image_path.name, open(image_path, "rb"), "image/jpeg")
-    }
-    data = {
-        "entries": json.dumps(entries)
-    }
+    files = {"image": (image_path.name, open(image_path, "rb"), "image/jpeg")}
+    data = {"entries": json.dumps(entries)}
 
     print(f"Sending request to {url} with image: {image_path.name}")
     try:
         response = requests.post(url, files=files, data=data)
-        response.raise_for_status() # Raise an exception for bad status codes
-        
+        response.raise_for_status()  # Raise an exception for bad status codes
+
         print("\n--- Response --- ")
         print(f"Status Code: {response.status_code}")
         # Pretty-print JSON response
@@ -57,11 +54,23 @@ def main(args):
         print(f"\n[ERROR] Request failed: {e}")
         sys.exit(1)
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Test the Immich dog identification pipeline.")
+    parser = argparse.ArgumentParser(
+        description="Test the Immich dog identification pipeline."
+    )
     parser.add_argument("image_path", type=str, help="Path to the input image.")
-    parser.add_argument("--host", type=str, default="localhost", help="Hostname of the Immich ML container.")
-    parser.add_argument("--port", type=int, default=3003, help="Port of the Immich ML container.")
-    parser.add_argument("--skip-keypoints", action="store_true", help="Skip keypoint stage in pipeline")
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="localhost",
+        help="Hostname of the Immich ML container.",
+    )
+    parser.add_argument(
+        "--port", type=int, default=3003, help="Port of the Immich ML container."
+    )
+    parser.add_argument(
+        "--skip-keypoints", action="store_true", help="Skip keypoint stage in pipeline"
+    )
     args = parser.parse_args()
     main(args)

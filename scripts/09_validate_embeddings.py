@@ -26,42 +26,25 @@ How to run it:
   `python scripts/07_validate_embeddings.py`
 """
 
-import torch
+import argparse
+import os
+
+import matplotlib.pyplot as plt
 import numpy as np
-from torch.utils.data import DataLoader
-import torchvision.transforms as transforms
-from tqdm import tqdm
-from collections import defaultdict
-from itertools import combinations
+import torch
 import torch.nn.functional as F
-import os
-import sys
-import argparse
-import matplotlib.pyplot as plt
 from PIL import Image
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
-# Adjust path to import from our new package
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from animal_id.common.utils import find_latest_timestamped_run
-from animal_id.common.datasets import DogIdentityDataset
-from animal_id.embedding.models import DogEmbeddingModel
-from animal_id.embedding.config import TRAINING_CONFIG, DATA_CONFIG, DEFAULT_BACKBONE
-from animal_id.embedding.backbones import BackboneType
-
-import os
-import sys
-import argparse
-import matplotlib.pyplot as plt
-from PIL import Image
-
-# Adjust path to import from our new package
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from animal_id.common.utils import find_latest_timestamped_run
-from animal_id.common.datasets import DogIdentityDataset
-from animal_id.embedding.models import DogEmbeddingModel
-from animal_id.embedding.config import TRAINING_CONFIG, DATA_CONFIG, DEFAULT_BACKBONE
-from animal_id.embedding.backbones import BackboneType
 from animal_id.benchmark.metrics import evaluate_embedding_model
+from animal_id.common.datasets import DogIdentityDataset
+
+# Adjust path to import from our new package
+from animal_id.common.utils import find_latest_timestamped_run
+from animal_id.embedding.backbones import BackboneType
+from animal_id.embedding.config import DATA_CONFIG, DEFAULT_BACKBONE, TRAINING_CONFIG
+from animal_id.embedding.models import DogEmbeddingModel
 
 # --- Configuration ---
 FAR_TARGETS = [1e-1, 1e-2, 1e-3, 1e-4]
@@ -143,7 +126,7 @@ def main(args):
     if model_path is None:
         model_path = TRAINING_CONFIG["MODEL_OUTPUT_PATH"]
         if not os.path.exists(model_path):
-            print(f"Error: No trained model found.")
+            print("Error: No trained model found.")
             print(
                 f"Checked: runs/*/best_model.pt and {TRAINING_CONFIG['MODEL_OUTPUT_PATH']}"
             )
@@ -169,7 +152,7 @@ def main(args):
     val_loader = DataLoader(
         val_dataset, batch_size=DATA_CONFIG["BATCH_SIZE"], shuffle=False, num_workers=2
     )
-    
+
     if args.calculate_metrics:
         print("\n--- Calculating Verification Metrics (TAR@FAR) ---")
         metrics = evaluate_embedding_model(model, val_loader, device)
@@ -177,7 +160,6 @@ def main(args):
         print(f"  mAP: {metrics.get('mAP', 0.0):.4f}")
         print(f"  TAR@FAR=1.0%: {metrics.get('TAR@FAR=1%', 0.0):.4f}")
         print(f"  TAR@FAR=0.1%: {metrics.get('TAR@FAR=0.1%', 0.0):.4f}")
-
 
     if args.show_neighbors:
         # We need to manually get all embeddings and paths for visualization
@@ -201,7 +183,7 @@ def main(args):
                         for j in range(start_idx, end_idx)
                     ]
                 )
-        
+
         all_embeddings = torch.cat(all_embeddings)
         visualize_neighbors(
             all_embeddings, all_labels, all_paths, args.num_queries, args.num_neighbors

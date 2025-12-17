@@ -5,16 +5,13 @@ Export Script for YOLOv11 Detector Model to ONNX
 This script finds the latest trained detector model and calls the centralized
 export function to convert it to ONNX format.
 """
-import sys
-from pathlib import Path
 
 # Add project root to Python path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(PROJECT_ROOT))
 
-from scripts.train_master import run_detector_export
 from animal_id.common.constants import DETECTOR_PROJECT_DIR, DETECTOR_RUN_NAME
 from animal_id.common.utils import find_latest_run
+from scripts.train_master import run_detector_export
+
 
 def main():
     """Main export function."""
@@ -39,4 +36,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

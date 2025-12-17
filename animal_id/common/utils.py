@@ -44,7 +44,7 @@ def find_latest_run(project_dir: Path, run_name: str) -> Optional[Path]:
             if num > max_num:
                 max_num = num
                 latest_run_dir = d
-    
+
     return latest_run_dir
 
 

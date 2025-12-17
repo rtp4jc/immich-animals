@@ -8,14 +8,12 @@ on correct information, not assumptions.
 """
 
 import argparse
-import sys
 from pathlib import Path
 
 import onnxruntime as ort
 
 # Add project root to Python path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(PROJECT_ROOT))
+
 
 def inspect_model(name: str, path: Path):
     """Loads a model and prints its input and output details."""
@@ -26,19 +24,24 @@ def inspect_model(name: str, path: Path):
 
     try:
         session = ort.InferenceSession(str(path))
-        
+
         print("Inputs:")
         for i, input_meta in enumerate(session.get_inputs()):
-            print(f"  [{i}] Name: {input_meta.name}, Shape: {input_meta.shape}, Type: {input_meta.type}")
-            
+            print(
+                f"  [{i}] Name: {input_meta.name}, Shape: {input_meta.shape}, Type: {input_meta.type}"
+            )
+
         print("\nOutputs:")
         for i, output_meta in enumerate(session.get_outputs()):
-            print(f"  [{i}] Name: {output_meta.name}, Shape: {output_meta.shape}, Type: {output_meta.type}")
+            print(
+                f"  [{i}] Name: {output_meta.name}, Shape: {output_meta.shape}, Type: {output_meta.type}"
+            )
 
     except Exception as e:
         print(f"[ERROR] Could not inspect model: {e}")
     print("-" * (len(name) + 16))
     print()
+
 
 def main(args):
     """Main function to inspect all provided models."""
@@ -49,8 +52,13 @@ def main(args):
             continue
         inspect_model(model_path.name, model_path)
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Inspect the input/output specs of ONNX models.")
-    parser.add_argument("model_paths", nargs='+', help="One or more paths to ONNX model files.")
+    parser = argparse.ArgumentParser(
+        description="Inspect the input/output specs of ONNX models."
+    )
+    parser.add_argument(
+        "model_paths", nargs="+", help="One or more paths to ONNX model files."
+    )
     args = parser.parse_args()
     main(args)

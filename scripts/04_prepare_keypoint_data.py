@@ -8,12 +8,6 @@ Use script 02 to inspect the created datasets.
 """
 
 import argparse
-import sys
-from pathlib import Path
-
-# Add project root to Python path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(PROJECT_ROOT))
 
 from animal_id.keypoint.dataset_converter import (
     CocoKeypointDatasetConverter,
@@ -21,8 +15,9 @@ from animal_id.keypoint.dataset_converter import (
 )
 from animal_id.keypoint.yolo_converter import (
     CocoToYoloKeypointConverter,
-    create_default_converter,
 )
+
+# Add project root to Python path
 
 
 def main():

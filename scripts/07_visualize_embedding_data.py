@@ -11,7 +11,7 @@ What it does:
    - Total number of unique identities.
    - Distribution of samples per identity.
    - Min, max, average, and median samples per identity.
-2. For the validation set, it calls the centralized `visualize_identity_dataset` 
+2. For the validation set, it calls the centralized `visualize_identity_dataset`
    function to generate a non-interactive plot, saving it to the `outputs` directory.
 
 How to run it:
@@ -27,14 +27,14 @@ How to interpret the results:
 
 import json
 import os
-import sys
-from collections import defaultdict, Counter
+from collections import Counter, defaultdict
+
 import numpy as np
 
-# Adjust path to import from our new package
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from animal_id.embedding.config import DATA_CONFIG
 from animal_id.common.visualization import visualize_identity_dataset
+
+# Adjust path to import from our new package
+from animal_id.embedding.config import DATA_CONFIG
 
 # --- Configuration ---
 NUM_IDENTITIES_TO_SHOW = 4

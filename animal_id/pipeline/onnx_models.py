@@ -1,9 +1,11 @@
+from typing import Any, Dict, List, Tuple
+
 import cv2
 import numpy as np
 import onnxruntime as ort
-from typing import List, Dict, Any, Tuple, Optional
 
-from .models import DetectionModel, KeypointModel, EmbeddingModel, AnimalClass
+from .models import AnimalClass, DetectionModel, EmbeddingModel, KeypointModel
+
 
 class ONNXDetector(DetectionModel):
     """ONNX detection model wrapper."""

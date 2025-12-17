@@ -14,18 +14,14 @@ Runs the full two-stage pipeline for dog detection and keypoint estimation.
 import argparse
 import glob
 import os
-import sys
 from pathlib import Path
 
-# Add project root to Python path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(PROJECT_ROOT))
-
 import cv2
-import torch
 from ultralytics import YOLO
 
 from animal_id.common.visualization import setup_output_dir
+
+# Add project root to Python path
 
 
 # Configuration
@@ -107,7 +103,7 @@ def visualize_results(image, detections, keypoint_results, crop_offsets, output_
         cv2.rectangle(vis_image, (x1, y1), (x2, y2), (0, 255, 0), 2)
         cv2.putText(
             vis_image,
-            f"Dog {i+1}",
+            f"Dog {i + 1}",
             (x1, y1 - 10),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,

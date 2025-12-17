@@ -21,11 +21,10 @@ How to run it:
   `python -m animal_id.embedding.models`
 """
 
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from animal_id.embedding.backbones import get_backbone, BackboneType
+from animal_id.embedding.backbones import BackboneType, get_backbone
 from animal_id.embedding.losses import ArcFaceLoss
 
 
@@ -96,7 +95,9 @@ class DogEmbeddingModel(nn.Module):
     ):
         super(DogEmbeddingModel, self).__init__()
 
-        self.backbone = EmbeddingNet(backbone_type, embedding_dim, pretrained=pretrained)
+        self.backbone = EmbeddingNet(
+            backbone_type, embedding_dim, pretrained=pretrained
+        )
         self.head = ArcFaceLoss(embedding_dim, num_classes)
 
     def forward(self, x, labels=None):

@@ -10,9 +10,8 @@ Below are the top priorities for the project from my perspective:
 
 
 Medium-low priority todo:
-1. Move to black formatter for consistency
-2. Move to centralized config (currently only one in animal_id/embedding/config.py)
-3. More deeply integrate with W&B for learning and the visibility it gives. It can track information about the database used, as well as track the model convergence (though this might be harder with the YOLO training)
+1. Move to centralized config (currently only one in animal_id/embedding/config.py)
+2. More deeply integrate with W&B for learning and the visibility it gives. It can track information about the database used, as well as track the model convergence (though this might be harder with the YOLO training)
 
 ## Other thoughts
 

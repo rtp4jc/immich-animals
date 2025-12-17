@@ -5,15 +5,13 @@ Runs the full pipeline benchmark.
 This script is a simple, focused entry point that calls the master benchmark
 function. All core logic is centralized in `train_master.py`.
 """
-import argparse
-import sys
-from pathlib import Path
 
-# Add project root to Python path to allow importing from `scripts`
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(PROJECT_ROOT))
+import argparse
 
 from scripts.train_master import run_full_pipeline_benchmark
+
+# Add project root to Python path to allow importing from `scripts`
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -50,5 +48,5 @@ if __name__ == "__main__":
         tag=args.tag,
         no_wandb=args.no_wandb,
     )
-    
+
     print("\nBenchmark completed successfully.")

@@ -7,14 +7,10 @@ Uses extracted animal_id.keypoint.trainer module.
 """
 
 import argparse
-import sys
-from pathlib import Path
-
-# Add project root to Python path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(PROJECT_ROOT))
 
 from animal_id.keypoint.trainer import KeypointTrainer
+
+# Add project root to Python path
 
 
 def main():

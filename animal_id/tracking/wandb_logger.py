@@ -4,14 +4,16 @@ WandB Logger for animal identification benchmarking.
 Encapsulates Weights & Biases logging logic for the pipeline.
 """
 
-import wandb
-from pathlib import Path
-from typing import Dict, Any, Optional, List
 import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import wandb
 
 from ..benchmark.evaluator import BenchmarkMetrics, EvaluationResult
 
 logger = logging.getLogger(__name__)
+
 
 class WandBLogger:
     """Handles logging of benchmark results to Weights & Biases."""
@@ -59,7 +61,9 @@ class WandBLogger:
                 reinit=True,
             )
         except Exception as e:
-            logger.warning(f"Failed to initialize WandB: {e}. Logging disabled for this run.")
+            logger.warning(
+                f"Failed to initialize WandB: {e}. Logging disabled for this run."
+            )
             self.enabled = False
 
     def log_metrics(self, metrics: BenchmarkMetrics, prefix: str = ""):
@@ -83,7 +87,7 @@ class WandBLogger:
             f"{prefix}top_5_accuracy": metrics.top_k_accuracy.get(5, 0.0),
             f"{prefix}total_images": metrics.total_images,
         }
-        
+
         # Log TAR @ FAR as a custom chart or table
         if metrics.tar_at_far:
             # Also log scalar values for quick comparison
@@ -94,10 +98,16 @@ class WandBLogger:
 
         wandb.log(log_data)
 
-    def log_failures(self, results: List[EvaluationResult], max_failures: int = 20, data_root: Optional[Path] = None, identity_map: Optional[Dict[str, str]] = None):
+    def log_failures(
+        self,
+        results: List[EvaluationResult],
+        max_failures: int = 20,
+        data_root: Optional[Path] = None,
+        identity_map: Optional[Dict[str, str]] = None,
+    ):
         """
         Log failure cases (missed detections or wrong identities) as images.
-        
+
         Args:
             results: List of evaluation results
             max_failures: Maximum number of failure images to log per category
@@ -108,40 +118,55 @@ class WandBLogger:
             return
 
         # 1. Missed Detections (False Negatives)
-        missed_detections = [r for r in results if r.has_animal_gt and not r.has_animal_pred]
+        missed_detections = [
+            r for r in results if r.has_animal_gt and not r.has_animal_pred
+        ]
         self._log_image_list(
-            missed_detections[:max_failures], 
-            "missed_detections", 
+            missed_detections[:max_failures],
+            "missed_detections",
             "Missed Detection",
             data_root,
-            identity_map
+            identity_map,
         )
 
         # 2. False Positives (Detected something where there was nothing)
-        false_positives = [r for r in results if not r.has_animal_gt and r.has_animal_pred]
+        false_positives = [
+            r for r in results if not r.has_animal_gt and r.has_animal_pred
+        ]
         self._log_image_list(
-            false_positives[:max_failures], 
-            "false_positives", 
+            false_positives[:max_failures],
+            "false_positives",
             "False Positive",
             data_root,
-            identity_map
+            identity_map,
         )
-        
+
         # 3. Incorrect Identifications (Detection correct, but identity wrong)
         # We consider it "wrong" if the correct identity wasn't in the top 1 result
         wrong_identities = [
-            r for r in results 
-            if r.has_animal_gt and r.has_animal_pred and r.identity_gt and r.identity_rank != 1
+            r
+            for r in results
+            if r.has_animal_gt
+            and r.has_animal_pred
+            and r.identity_gt
+            and r.identity_rank != 1
         ]
         self._log_image_list(
-            wrong_identities[:max_failures], 
-            "wrong_identities", 
+            wrong_identities[:max_failures],
+            "wrong_identities",
             "Wrong Identity (Rank != 1)",
             data_root,
-            identity_map
+            identity_map,
         )
 
-    def _log_image_list(self, results: List[EvaluationResult], key: str, caption_prefix: str, data_root: Optional[Path], identity_map: Optional[Dict[str, str]] = None):
+    def _log_image_list(
+        self,
+        results: List[EvaluationResult],
+        key: str,
+        caption_prefix: str,
+        data_root: Optional[Path],
+        identity_map: Optional[Dict[str, str]] = None,
+    ):
         """Helper to log a list of images to WandB."""
         if not results:
             return
@@ -153,17 +178,19 @@ class WandBLogger:
                 img_path = Path(r.image_path)
                 if not img_path.exists() and data_root:
                     img_path = data_root / r.image_path
-                
+
                 if img_path.exists():
                     # Build caption
                     caption = f"{caption_prefix}\nGT: {r.identity_gt}"
-                    
+
                     if r.identity_rank:
-                        rank_str = f"{r.identity_rank}" if r.identity_rank <= 5 else ">5"
+                        rank_str = (
+                            f"{r.identity_rank}" if r.identity_rank <= 5 else ">5"
+                        )
                         caption += f" | Rank: {rank_str}"
                     elif r.has_animal_pred and r.identity_gt:
                         caption += " | Rank: >5"  # Implied if rank is None but prediction existed
-                    
+
                     # Add top prediction info
                     if r.similar_images:
                         top_path, score = r.similar_images[0]
@@ -177,13 +204,17 @@ class WandBLogger:
                             else:
                                 # Try relative to data root if passed
                                 try:
-                                    rel = str(Path(top_path).relative_to(data_root)) if data_root else top_path
+                                    rel = (
+                                        str(Path(top_path).relative_to(data_root))
+                                        if data_root
+                                        else top_path
+                                    )
                                     pred_id = identity_map.get(rel, "?")
                                 except ValueError:
                                     pred_id = "?"
-                                    
+
                         caption += f"\nPred: {pred_id} ({score:.3f})"
-                        
+
                     img = wandb.Image(str(img_path), caption=caption)
                     images.append(img)
             except Exception as e:

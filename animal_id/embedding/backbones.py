@@ -1,18 +1,25 @@
 """
 Backbone factory for creating feature extractors for the embedding model.
 """
+
 from enum import Enum
+
 import torch.nn as nn
 from torchvision.models import (
-    efficientnet_b0, EfficientNet_B0_Weights,
-    mobilenet_v3_small, MobileNet_V3_Small_Weights,
-    resnet50, ResNet50_Weights
+    EfficientNet_B0_Weights,
+    MobileNet_V3_Small_Weights,
+    ResNet50_Weights,
+    efficientnet_b0,
+    mobilenet_v3_small,
+    resnet50,
 )
+
 
 class BackboneType(Enum):
     EFFICIENTNET_B0 = "efficientnet_b0"
     MOBILENET_V3_SMALL = "mobilenet_v3_small"
     RESNET50 = "resnet50"
+
 
 def get_backbone(backbone_type: BackboneType, pretrained: bool = True):
     """
@@ -33,7 +40,7 @@ def get_backbone(backbone_type: BackboneType, pretrained: bool = True):
         num_features = model.classifier[1].in_features
         feature_extractor = model.features
         return feature_extractor, num_features
-    
+
     elif backbone_type == BackboneType.MOBILENET_V3_SMALL:
         weights = MobileNet_V3_Small_Weights.IMAGENET1K_V1 if pretrained else None
         model = mobilenet_v3_small(weights=weights)

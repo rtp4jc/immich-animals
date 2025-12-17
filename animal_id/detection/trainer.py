@@ -5,10 +5,10 @@ Provides configuration and training functionality for dog detection models.
 """
 
 import sys
+from typing import Any, Dict, Optional
+
 import torch
 from ultralytics import YOLO
-from pathlib import Path
-from typing import Dict, Any, Optional
 
 from animal_id.common.constants import DETECTOR_PROJECT_DIR, DETECTOR_RUN_NAME
 
@@ -86,7 +86,7 @@ class DetectionTrainer:
         # Train the model
         results = self.model.train(**self.config)
 
-        print(f"\nTraining completed.")
+        print("\nTraining completed.")
         print(f"Results saved to {results.save_dir}")
 
         return results

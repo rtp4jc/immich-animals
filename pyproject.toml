@@ -7,7 +7,7 @@ name = "animal_id"
 version = "0.1.0"
 description = "Animal identification and tracking pipeline"
 authors = [
-  { name = "Ryan", email = "your.email@example.com" },
+  { name = "Ryan Peterson" },
 ]
 requires-python = ">=3.12"
 dependencies = [
@@ -33,9 +33,19 @@ dev = [
     "pytest>=7.4.0",
     "pytest-cov>=4.1.0",
     "jupyter>=1.0.0",
-    "flake8>=6.0.0",
+    "ruff>=0.1.0",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["animal_id*"]
+
+[tool.ruff]
+target-version = "py312"
+exclude = ["immich-clone", ".gemini"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+

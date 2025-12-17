@@ -8,21 +8,18 @@ Provides dataset statistics and sample visualizations.
 
 import argparse
 import json
-import sys
 from collections import Counter
 from pathlib import Path
 
-# Add project root to Python path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(PROJECT_ROOT))
-
+from animal_id.common.constants import DATA_DIR
 from animal_id.common.visualization import (
-    visualize_coco_annotations,
-    visualize_yolo_annotations,
     print_dataset_statistics,
     setup_output_dir,
+    visualize_coco_annotations,
+    visualize_yolo_annotations,
 )
-from animal_id.common.constants import DATA_DIR
+
+# Add project root to Python path
 
 
 def analyze_data_distributions():
@@ -30,7 +27,7 @@ def analyze_data_distributions():
     print("\n" + "=" * 60)
     print("DATA DISTRIBUTION ANALYSIS")
     print("=" * 60)
-    
+
     # Analyze identity datasets
     for split in ["train", "val"]:
         json_path = DATA_DIR / f"identity_{split}.json"
@@ -38,7 +35,7 @@ def analyze_data_distributions():
             print(f"\n{split.upper()} SET:")
             with open(json_path) as f:
                 data = json.load(f)
-            
+
             # Count by source dataset (extract from file path)
             source_counts = Counter()
             for item in data:
@@ -53,22 +50,22 @@ def analyze_data_distributions():
                     source_counts["Additional Identities"] += 1
                 else:
                     source_counts["Other"] += 1
-            
+
             total = len(data)
             print(f"  Total samples: {total}")
             for source, count in source_counts.most_common():
                 percentage = (count / total) * 100
                 print(f"  {source}: {count} ({percentage:.1f}%)")
-    
+
     # Analyze COCO detection datasets
     coco_dir = DATA_DIR / "detector" / "coco"
     if coco_dir.exists():
-        print(f"\nDETECTION DATASETS:")
+        print("\nDETECTION DATASETS:")
         for json_file in coco_dir.glob("annotations_*.json"):
             split_name = json_file.stem.replace("annotations_", "")
             with open(json_file) as f:
                 coco_data = json.load(f)
-            
+
             # Count images by source (extract from file path)
             source_counts = Counter()
             for img in coco_data["images"]:
@@ -81,7 +78,7 @@ def analyze_data_distributions():
                     source_counts["Oxford Pets"] += 1
                 else:
                     source_counts["Other"] += 1
-            
+
             total = len(coco_data["images"])
             print(f"\n  {split_name.upper()} SET:")
             print(f"    Total images: {total}")
@@ -124,7 +121,7 @@ def inspect_coco_dataset(dataset_path, output_dir, num_samples, display):
         print(f"\nInspecting: {coco_file.name}")
 
         # Print statistics
-        stats = print_dataset_statistics(coco_file)
+        print_dataset_statistics(coco_file)
 
         # Create visualizations
         split_name = coco_file.stem.replace("annotations_", "")
@@ -166,9 +163,9 @@ def main():
         description="Inspect datasets (COCO or YOLO format)"
     )
     parser.add_argument(
-        "dataset_path", 
+        "dataset_path",
         nargs="?",
-        help="Path to dataset (COCO dir/file or YOLO yaml). If not provided, shows data distributions only."
+        help="Path to dataset (COCO dir/file or YOLO yaml). If not provided, shows data distributions only.",
     )
     parser.add_argument(
         "--format",

@@ -26,54 +26,49 @@ import datetime
 import json
 import logging
 import os
-import sys
 from pathlib import Path
 
-# Add project root to Python path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(PROJECT_ROOT))
+# --- Imports for Embedding ---
+import torch
+from torch.utils.data import DataLoader
+
+from animal_id.benchmark.evaluator import BenchmarkEvaluator
+from animal_id.benchmark.metrics import evaluate_embedding_model
+from animal_id.common.constants import (
+    DATA_DIR,
+    ONNX_DETECTOR_PATH,
+    ONNX_EMBEDDING_PATH,
+    ONNX_KEYPOINT_PATH,
+)
+
+# --- Imports for Common/Utils ---
+from animal_id.common.datasets import DogIdentityDataset
+from animal_id.common.identity_loader import IdentityLoader
 
 # --- Imports for Detection ---
 from animal_id.detection.dataset_converter import (
     CocoDetectorDatasetConverter,
     create_default_config,
 )
+from animal_id.detection.trainer import DetectionTrainer
 from animal_id.detection.yolo_converter import (
     CocoToYoloDetectionConverter,
 )
-from animal_id.detection.trainer import DetectionTrainer
-from animal_id.common.constants import (
-    DETECTOR_PROJECT_DIR,
-    DETECTOR_RUN_NAME,
-    ONNX_DETECTOR_PATH,
+from animal_id.embedding.config import (
+    DATA_CONFIG,
+    DEFAULT_BACKBONE,
+    TRAINING_CONFIG,
 )
-
-# --- Imports for Embedding ---
-import torch
-from torch.utils.data import DataLoader
 from animal_id.embedding.dataset_converter import EmbeddingDatasetConverter
 from animal_id.embedding.models import DogEmbeddingModel
 from animal_id.embedding.trainer import EmbeddingTrainer
-from animal_id.embedding.config import (
-    DEFAULT_BACKBONE,
-    TRAINING_CONFIG,
-    DATA_CONFIG,
-)
-from animal_id.common.datasets import DogIdentityDataset
-from animal_id.common.constants import (
-    ONNX_EMBEDDING_PATH,
-    ONNX_KEYPOINT_PATH,
-    DATA_DIR,
-)
-from animal_id.benchmark.metrics import evaluate_embedding_model
-
-# --- Imports for Full Pipeline Benchmark ---
 from animal_id.pipeline.ambidextrous_axolotl import AmbidextrousAxolotl
-from animal_id.pipeline.onnx_models import ONNXDetector, ONNXKeypoint, ONNXEmbedding
 from animal_id.pipeline.models import AnimalClass
-from animal_id.benchmark.evaluator import BenchmarkEvaluator
+from animal_id.pipeline.onnx_models import ONNXDetector, ONNXEmbedding, ONNXKeypoint
 from animal_id.tracking.wandb_logger import WandBLogger
-from animal_id.common.identity_loader import IdentityLoader
+
+# Define project root
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 # --- Logging Setup ---
@@ -85,7 +80,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def run_full_pipeline_benchmark(num_images=None, include_additional=False, tag=None, no_wandb=False):
+def run_full_pipeline_benchmark(
+    num_images=None, include_additional=False, tag=None, no_wandb=False
+):
     """Runs the full AmbidextrousAxolotl pipeline benchmark."""
     logger.info("\n" + "=" * 60)
     logger.info("STARTING FULL PIPELINE BENCHMARK")
@@ -101,13 +98,15 @@ def run_full_pipeline_benchmark(num_images=None, include_additional=False, tag=N
     # Initialize models
     # Note: We use the just-exported ONNX models
     if not ONNX_DETECTOR_PATH.exists():
-         logger.error(f"Detector ONNX model not found at {ONNX_DETECTOR_PATH}")
-         return False
-    
+        logger.error(f"Detector ONNX model not found at {ONNX_DETECTOR_PATH}")
+        return False
+
     # We use existing keypoint model if available, or skip keypoint part if not
     has_keypoints = ONNX_KEYPOINT_PATH.exists()
     if not has_keypoints:
-        logger.warning(f"Keypoint ONNX model not found at {ONNX_KEYPOINT_PATH}. Skipping keypoint-enabled benchmark.")
+        logger.warning(
+            f"Keypoint ONNX model not found at {ONNX_KEYPOINT_PATH}. Skipping keypoint-enabled benchmark."
+        )
 
     if not ONNX_EMBEDDING_PATH.exists():
         logger.error(f"Embedding ONNX model not found at {ONNX_EMBEDDING_PATH}")
@@ -115,7 +114,7 @@ def run_full_pipeline_benchmark(num_images=None, include_additional=False, tag=N
 
     detector = ONNXDetector(str(ONNX_DETECTOR_PATH))
     embedding_model = ONNXEmbedding(str(ONNX_EMBEDDING_PATH))
-    
+
     # Placeholder for keypoint model - only loaded if file exists
     keypoint_model = None
     if has_keypoints:
@@ -126,15 +125,17 @@ def run_full_pipeline_benchmark(num_images=None, include_additional=False, tag=N
     ground_truth = loader.load_validation_data(
         num_images=num_images, include_additional=include_additional
     )
-    
+
     identity_map = {
-        item['image_path']: item['identity_label'] 
-        for item in ground_truth 
-        if item.get('identity_label')
+        item["image_path"]: item["identity_label"]
+        for item in ground_truth
+        if item.get("identity_label")
     }
 
     dataset_size = "full dataset" if num_images is None else f"{num_images} images"
-    logger.info(f"Found {len(ground_truth)} validation images. Processing {dataset_size}.")
+    logger.info(
+        f"Found {len(ground_truth)} validation images. Processing {dataset_size}."
+    )
 
     # Save temporary ground truth file for Evaluator
     temp_gt_path = PROJECT_ROOT / "outputs/temp_ground_truth.json"
@@ -143,12 +144,12 @@ def run_full_pipeline_benchmark(num_images=None, include_additional=False, tag=N
         json.dump(ground_truth, f, indent=2)
 
     evaluator = BenchmarkEvaluator(str(temp_gt_path), str(PROJECT_ROOT))
-    
+
     common_config = {
         "num_images": num_images,
         "include_additional": include_additional,
         "dataset_size": len(ground_truth),
-        "pipeline": "AmbidextrousAxolotl"
+        "pipeline": "AmbidextrousAxolotl",
     }
     user_tags = [tag] if tag else []
 
@@ -168,14 +169,16 @@ def run_full_pipeline_benchmark(num_images=None, include_additional=False, tag=N
         group="pipeline-no-keypoints",
         config={**common_config, "use_keypoints": False},
         tags=["pipeline", "baseline", "master-script"] + user_tags,
-        enabled=not no_wandb
+        enabled=not no_wandb,
     )
     wandb_no_kp.start()
-    
+
     metrics_without_kp = evaluator.evaluate(axolotl_without_keypoints)
-    
+
     wandb_no_kp.log_metrics(metrics_without_kp)
-    wandb_no_kp.log_failures(evaluator.get_results(), data_root=PROJECT_ROOT, identity_map=identity_map)
+    wandb_no_kp.log_failures(
+        evaluator.get_results(), data_root=PROJECT_ROOT, identity_map=identity_map
+    )
     wandb_no_kp.finish()
 
     logger.info("\nResults (No Keypoints):")
@@ -184,7 +187,7 @@ def run_full_pipeline_benchmark(num_images=None, include_additional=False, tag=N
     # --- Run 2: WITH Keypoints (Optional) ---
     if has_keypoints and keypoint_model:
         logger.info("\nEvaluating AmbidextrousAxolotl WITH keypoints...")
-        
+
         axolotl_with_keypoints = AmbidextrousAxolotl(
             detector=detector,
             embedding_model=embedding_model,
@@ -198,27 +201,31 @@ def run_full_pipeline_benchmark(num_images=None, include_additional=False, tag=N
             group="pipeline-with-keypoints",
             config={**common_config, "use_keypoints": True},
             tags=["pipeline", "keypoints", "master-script"] + user_tags,
-            enabled=not no_wandb
+            enabled=not no_wandb,
         )
         wandb_kp.start()
-        
+
         metrics_with_kp = evaluator.evaluate(axolotl_with_keypoints)
-        
+
         wandb_kp.log_metrics(metrics_with_kp)
-        wandb_kp.log_failures(evaluator.get_results(), data_root=PROJECT_ROOT, identity_map=identity_map)
+        wandb_kp.log_failures(
+            evaluator.get_results(), data_root=PROJECT_ROOT, identity_map=identity_map
+        )
         wandb_kp.finish()
-        
+
         logger.info("\nResults (With Keypoints):")
         logger.info(str(metrics_with_kp))
-    
+
     # Cleanup
     if temp_gt_path.exists():
         temp_gt_path.unlink()
-        
+
     return True
 
 
-def run_detection_data_prep(output_dir="data/detector/coco", yaml_path="data/detector/dogs_detection.yaml"):
+def run_detection_data_prep(
+    output_dir="data/detector/coco", yaml_path="data/detector/dogs_detection.yaml"
+):
     """Runs the data preparation and conversion for the detection model."""
     logger.info("\n" + "-" * 60)
     logger.info("STARTING DETECTION DATA PREPARATION")
@@ -240,7 +247,9 @@ def run_detection_data_prep(output_dir="data/detector/coco", yaml_path="data/det
     yolo_converter.convert()
 
 
-def run_detection_pipeline(output_dir="data/detector/coco", yaml_path="data/detector/dogs_detection.yaml"):
+def run_detection_pipeline(
+    output_dir="data/detector/coco", yaml_path="data/detector/dogs_detection.yaml"
+):
     """Runs the full detection pipeline."""
     logger.info("=" * 60)
     logger.info("STARTING DETECTION PIPELINE")
@@ -258,9 +267,7 @@ def run_detection_pipeline(output_dir="data/detector/coco", yaml_path="data/dete
     imgsz = 640
 
     trainer = DetectionTrainer(model_name)
-    trainer.update_config(
-        data=yaml_path, epochs=epochs, batch=batch_size, imgsz=imgsz
-    )
+    trainer.update_config(data=yaml_path, epochs=epochs, batch=batch_size, imgsz=imgsz)
     results = trainer.train()
     logger.info(f"Detection training complete. Results saved to: {results.save_dir}")
 
@@ -272,16 +279,17 @@ def run_detection_pipeline(output_dir="data/detector/coco", yaml_path="data/dete
 def run_detector_export(model_path: Path):
     """Exports a trained detector model to ONNX format."""
     logger.info("\nStep 3: Exporting Detector to ONNX")
-    
+
     if not model_path.exists():
         # Raise an exception instead of returning False
         raise FileNotFoundError(f"Best model not found at {model_path}")
 
     from ultralytics import YOLO
+
     model = YOLO(model_path)
     exported_path_str = model.export(format="onnx", opset=12, nms=True)
     exported_path = Path(exported_path_str)
-    
+
     ONNX_DETECTOR_PATH.parent.mkdir(parents=True, exist_ok=True)
     os.rename(exported_path, ONNX_DETECTOR_PATH)
     logger.info(f"Detector ONNX exported to: {ONNX_DETECTOR_PATH}")
@@ -292,13 +300,14 @@ def run_embedding_data_prep():
     logger.info("\n" + "-" * 60)
     logger.info("STARTING EMBEDDING DATA PREPARATION")
     logger.info("-" * 60)
-    
+
     dataset_converter = EmbeddingDatasetConverter(
         source_path=DATA_CONFIG["DOGFACENET_PATH"],
         output_train_json=DATA_CONFIG["TRAIN_JSON_PATH"],
-        output_val_json=DATA_CONFIG["VAL_JSON_PATH"]
+        output_val_json=DATA_CONFIG["VAL_JSON_PATH"],
     )
     dataset_converter.convert()
+
 
 def run_embedding_pipeline():
     """Runs the full embedding pipeline."""
@@ -312,7 +321,7 @@ def run_embedding_pipeline():
 
     # 2. Train Model
     logger.info("\nStep 2: Training Embedding Model")
-    
+
     # Setup Run Directory
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     backbone_name = DEFAULT_BACKBONE.value
@@ -391,7 +400,7 @@ def run_embedding_pipeline():
 
 def run_embedding_export(model_path, val_loader, device, num_classes):
     """Evaluates the best model and exports it to ONNX."""
-    
+
     # Re-instantiate model for evaluation and export
     model = DogEmbeddingModel(
         backbone_type=DEFAULT_BACKBONE,
@@ -404,14 +413,14 @@ def run_embedding_export(model_path, val_loader, device, num_classes):
     # Evaluate Best Model
     logger.info("\nStep 3: Evaluating Best Model")
     val_metrics = evaluate_embedding_model(model, val_loader, device)
-    
+
     logger.info("\nValidation Metrics:")
     for k, v in val_metrics.items():
         logger.info(f"  {k}: {v:.4f}")
 
     # Export to ONNX
     logger.info("\nStep 4: Exporting Embedding Model to ONNX")
-    
+
     # Re-instantiate model on CPU for export to ensure consistency
     export_device = torch.device("cpu")
     export_model = DogEmbeddingModel(
@@ -426,7 +435,7 @@ def run_embedding_export(model_path, val_loader, device, num_classes):
     dummy_input = torch.randn(
         1, 3, DATA_CONFIG["IMG_SIZE"], DATA_CONFIG["IMG_SIZE"], device=export_device
     )
-    
+
     ONNX_EMBEDDING_PATH.parent.mkdir(parents=True, exist_ok=True)
     torch.onnx.export(
         export_model,
@@ -446,20 +455,38 @@ def run_embedding_export(model_path, val_loader, device, num_classes):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Master Training Script for Animal ID Pipeline")
-    parser.add_argument("--skip-detection", action="store_true", help="Manually skip detection pipeline")
-    parser.add_argument("--skip-embedding", action="store_true", help="Manually skip embedding pipeline")
-    parser.add_argument("--skip-benchmark", action="store_true", help="Skip full pipeline benchmark")
-    parser.add_argument("--skip-trained", action="store_true", help="Automatically skip training a model if its ONNX file already exists.")
-    parser.add_argument("--no-wandb", action="store_true", help="Disable WandB logging during benchmark")
-    parser.add_argument("--tag", type=str, default=None, help="Tag for WandB benchmark run")
+    parser = argparse.ArgumentParser(
+        description="Master Training Script for Animal ID Pipeline"
+    )
+    parser.add_argument(
+        "--skip-detection", action="store_true", help="Manually skip detection pipeline"
+    )
+    parser.add_argument(
+        "--skip-embedding", action="store_true", help="Manually skip embedding pipeline"
+    )
+    parser.add_argument(
+        "--skip-benchmark", action="store_true", help="Skip full pipeline benchmark"
+    )
+    parser.add_argument(
+        "--skip-trained",
+        action="store_true",
+        help="Automatically skip training a model if its ONNX file already exists.",
+    )
+    parser.add_argument(
+        "--no-wandb", action="store_true", help="Disable WandB logging during benchmark"
+    )
+    parser.add_argument(
+        "--tag", type=str, default=None, help="Tag for WandB benchmark run"
+    )
     args = parser.parse_args()
 
     # --- Detection Pipeline Execution ---
     if args.skip_detection:
         logger.info("Manually skipping detection pipeline.")
     elif args.skip_trained and ONNX_DETECTOR_PATH.exists():
-        logger.info(f"Skipping detection pipeline as {ONNX_DETECTOR_PATH} exists (--skip-trained).")
+        logger.info(
+            f"Skipping detection pipeline as {ONNX_DETECTOR_PATH} exists (--skip-trained)."
+        )
     else:
         run_detection_pipeline()
 
@@ -467,22 +494,21 @@ def main():
     if args.skip_embedding:
         logger.info("Manually skipping embedding pipeline.")
     elif args.skip_trained and ONNX_EMBEDDING_PATH.exists():
-        logger.info(f"Skipping embedding pipeline as {ONNX_EMBEDDING_PATH} exists (--skip-trained).")
+        logger.info(
+            f"Skipping embedding pipeline as {ONNX_EMBEDDING_PATH} exists (--skip-trained)."
+        )
     else:
         run_embedding_pipeline()
-    
+
     # --- Benchmark Execution ---
     if not args.skip_benchmark:
         # Check if ONNX files are present for benchmarking
         can_benchmark = ONNX_DETECTOR_PATH.exists() and ONNX_EMBEDDING_PATH.exists()
         if not can_benchmark:
-             logger.warning(f"Skipping benchmark because required ONNX models not found.")
+            logger.warning("Skipping benchmark because required ONNX models not found.")
         else:
-            run_full_pipeline_benchmark(
-                no_wandb=args.no_wandb,
-                tag=args.tag
-            )
-    
+            run_full_pipeline_benchmark(no_wandb=args.no_wandb, tag=args.tag)
+
     # --- Final Summary ---
     # This section is only reached if all steps complete without error.
     print("\n" + "=" * 60)

@@ -10,10 +10,6 @@ import os
 import sys
 from pathlib import Path
 
-# Add project root to Python path
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-sys.path.append(str(PROJECT_ROOT))
-
 import torch
 from ultralytics import YOLO
 
@@ -23,6 +19,8 @@ from animal_id.common.constants import (
     ONNX_KEYPOINT_PATH,
 )
 from animal_id.common.utils import find_latest_run
+
+# Add project root to Python path
 
 
 def main():
@@ -63,7 +61,7 @@ def main():
         sys.exit(1)
 
     # --- Export to ONNX ---
-    print(f"\nExporting model to ONNX format...")
+    print("\nExporting model to ONNX format...")
     try:
         exported_path_str = model.export(format="onnx", opset=12, nms=True)
         exported_path = Path(exported_path_str)

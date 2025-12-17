@@ -5,10 +5,10 @@ Provides configuration and training functionality for dog keypoint detection mod
 """
 
 import sys
+from typing import Any, Dict, Optional
+
 import torch
 from ultralytics import YOLO
-from pathlib import Path
-from typing import Dict, Any, Optional
 
 from animal_id.common.constants import KEYPOINT_PROJECT_DIR, KEYPOINT_RUN_NAME
 
@@ -91,7 +91,7 @@ class KeypointTrainer:
         # For transfer learning, you would use .load('yolov11n-pose.pt') after init.
         results = self.model.train(**self.config)
 
-        print(f"\nTraining completed.")
+        print("\nTraining completed.")
         print(f"Results saved to {results.save_dir}")
 
         return results

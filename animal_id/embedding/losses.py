@@ -31,10 +31,13 @@ When running the self-test, the script will:
   behaving as expected (e.g., zero for easy cases, positive for hard cases).
 - A successful run indicates the loss functions are correctly implemented.
 """
+
+import math
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import math
+
 
 class ArcFaceLoss(nn.Module):
     """
@@ -42,6 +45,7 @@ class ArcFaceLoss(nn.Module):
     This loss function is designed to increase the discriminative power of embeddings.
     Reference: https://arxiv.org/abs/1801.07698
     """
+
     def __init__(self, in_features, out_features, s=30.0, m=0.50, label_smoothing=0.1):
         """
         Args:
@@ -66,7 +70,9 @@ class ArcFaceLoss(nn.Module):
         # Constants for numerical stability
         self.cos_m = math.cos(m)
         self.sin_m = math.sin(m)
-        self.th = math.cos(math.pi - m) # Threshold to prevent theta + m from going > pi
+        self.th = math.cos(
+            math.pi - m
+        )  # Threshold to prevent theta + m from going > pi
         self.mm = math.sin(math.pi - m) * m
 
     def forward(self, embeddings, labels):
@@ -81,7 +87,7 @@ class ArcFaceLoss(nn.Module):
         # Calculate cosine similarity between embeddings and class prototypes
         # This is equivalent to the output of a standard fully connected layer
         cosine = F.linear(embeddings, normalized_weights)
-        
+
         # Convert labels to one-hot format
         one_hot = torch.zeros_like(cosine)
         one_hot.scatter_(1, labels.view(-1, 1).long(), 1)
@@ -92,7 +98,7 @@ class ArcFaceLoss(nn.Module):
 
         # Calculate the angle theta
         sine = torch.sqrt(1.0 - torch.pow(target_cosine, 2))
-        
+
         # Calculate cos(theta + m)
         # This is the trigonometric addition formula: cos(a+b) = cos(a)cos(b) - sin(a)sin(b)
         marginal_target_cosine = target_cosine * self.cos_m - sine * self.sin_m
@@ -100,9 +106,7 @@ class ArcFaceLoss(nn.Module):
         # If theta + m > pi, use a simplified penalty (from the original paper)
         # This prevents the angle from wrapping around
         marginal_target_cosine = torch.where(
-            target_cosine > self.th,
-            marginal_target_cosine,
-            target_cosine - self.mm
+            target_cosine > self.th, marginal_target_cosine, target_cosine - self.mm
         )
 
         # Create the final output logits by substituting the modified cosine for the true class
@@ -123,7 +127,7 @@ TripletLoss = nn.TripletMarginLoss
 
 
 # --- Test script to verify loss functions --- #
-if __name__ == '__main__':
+if __name__ == "__main__":
     # --- ArcFaceLoss Test --- #
     print("--- Testing ArcFaceLoss ---")
     num_classes = 10
@@ -156,7 +160,7 @@ if __name__ == '__main__':
     # --- TripletLoss Test --- #
     print("\n--- Testing TripletLoss ---")
     margin = 1.0
-    triplet_loss = TripletLoss(margin=margin, p=2) # Explicitly use L2 distance
+    triplet_loss = TripletLoss(margin=margin, p=2)  # Explicitly use L2 distance
 
     # Test Case 1: Easy case (loss should be 0)
     # Negative is already further from anchor than positive is.
