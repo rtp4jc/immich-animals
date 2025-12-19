@@ -82,10 +82,8 @@ def main():
 
     print(f"Moving exported model to final destination: {ONNX_KEYPOINT_PATH}")
     try:
-        # Make sure the final destination exists and remove if it's a file already
-        if ONNX_KEYPOINT_PATH.exists():
-            os.remove(ONNX_KEYPOINT_PATH)
-        os.rename(exported_path, ONNX_KEYPOINT_PATH)
+        # Make sure the final destination exists
+        os.replace(exported_path, ONNX_KEYPOINT_PATH)
     except OSError as e:
         print(f"\n[ERROR] Failed to move file: {e}")
         sys.exit(1)

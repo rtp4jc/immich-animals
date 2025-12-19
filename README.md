@@ -25,6 +25,18 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+### Development Tools
+
+For developers contributing to the project, please set up the pre-commit hooks to ensure code quality:
+
+```bash
+# Install development dependencies
+pip install -e .[dev]
+
+# Install pre-commit hooks
+pre-commit install
+```
+
 ### GPU Support (Optional)
 
 For GPU acceleration, install PyTorch with CUDA support and replace `onnxruntime` with `onnxruntime-gpu`. See [PyTorch installation guide](https://pytorch.org/get-started/locally/) for details.

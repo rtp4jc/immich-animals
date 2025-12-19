@@ -136,12 +136,20 @@ def main(args):
     print(f"Using model: {model_path}")
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Initialize model in inference mode (no head)
     model = DogEmbeddingModel(
         backbone_type=args.backbone,
-        num_classes=1001,  # This doesn't matter for inference
+        num_classes=None,
         embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
     )
-    model.load_state_dict(torch.load(model_path, map_location=device))
+
+    state_dict = torch.load(model_path, map_location=device)
+    if "model_state_dict" in state_dict:
+        state_dict = state_dict["model_state_dict"]
+
+    # Load with strict=False to allow missing 'head' keys from the checkpoint
+    model.load_state_dict(state_dict, strict=False)
     model.to(device)
 
     val_dataset = DogIdentityDataset(

@@ -21,6 +21,8 @@ How to run it:
   `python -m animal_id.embedding.models`
 """
 
+from typing import Optional
+
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -89,26 +91,38 @@ class DogEmbeddingModel(nn.Module):
     def __init__(
         self,
         backbone_type: BackboneType,
-        num_classes: int,
+        num_classes: Optional[int] = None,
         embedding_dim: int = 512,
         pretrained: bool = True,
     ):
+        """
+        Args:
+            backbone_type (BackboneType): The backbone architecture.
+            num_classes (Optional[int]): Number of identity classes.
+                                         If None, model is in inference mode (no classification head).
+            embedding_dim (int): Size of embedding vector.
+            pretrained (bool): Use ImageNet weights.
+        """
         super(DogEmbeddingModel, self).__init__()
 
         self.backbone = EmbeddingNet(
             backbone_type, embedding_dim, pretrained=pretrained
         )
-        self.head = ArcFaceLoss(embedding_dim, num_classes)
+
+        if num_classes is not None:
+            self.head = ArcFaceLoss(embedding_dim, num_classes)
+        else:
+            self.head = None
 
     def forward(self, x, labels=None):
         """Forward pass for training."""
         embeddings = self.backbone(x)
-        if labels is not None:
+        if self.head is not None and labels is not None:
             # Training mode - return logits for loss calculation
             return self.head(embeddings, labels)
-        else:
-            # Inference mode - return embeddings
-            return embeddings
+
+        # Inference mode - return embeddings
+        return embeddings
 
     def get_embeddings(self, x):
         """Get embeddings without ArcFace head."""

@@ -291,7 +291,7 @@ def run_detector_export(model_path: Path):
     exported_path = Path(exported_path_str)
 
     ONNX_DETECTOR_PATH.parent.mkdir(parents=True, exist_ok=True)
-    os.rename(exported_path, ONNX_DETECTOR_PATH)
+    os.replace(exported_path, ONNX_DETECTOR_PATH)
     logger.info(f"Detector ONNX exported to: {ONNX_DETECTOR_PATH}")
 
 

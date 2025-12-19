@@ -75,6 +75,7 @@ class EmbeddingDatasetConverter:
         # Split data by identity to prevent data leakage
         print("\nSplitting data by identity to prevent leakage...")
         all_identity_ids = list(data_by_identity.keys())
+        random.seed(42)  # Ensure reproducible splits
         random.shuffle(all_identity_ids)
 
         train_data = []

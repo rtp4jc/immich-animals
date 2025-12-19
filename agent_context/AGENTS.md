@@ -8,6 +8,13 @@
 - **Generic Architecture**: Design for extensibility (animals, not just dogs; multiple model types)
 - **Elegant Naming**: Use fun, memorable names with clear progression (AmbidextrousAxolotl → BrilliantBadger)
 
+### Quality Assurance
+
+- **Pre-commit Hooks**: Always run `pre-commit install` in the dev environment. Hooks run automatically on commit to ensure quality.
+- **Linting & Formatting**: We use `ruff` for both linting and formatting. 
+  - Run manually: `ruff check .` and `ruff format .`
+  - Fix issues: `ruff check --fix .`
+
 ### Documentation & Comments
 
 - **Focus on Why**: Document design decisions, trade-offs, and requirements, not implementation details

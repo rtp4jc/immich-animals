@@ -91,6 +91,8 @@ class CocoToYoloKeypointConverter:
                                 kpt_y = keypoints[i + 1] / img_height
                                 kpt_v = keypoints[i + 2]
                                 # YOLO format expects v=0 (not present), v=1 (present but not visible), v=2 (visible)
+                                # StanfordExtra only has 0/1. We map 1 -> 2 (visible) because we lack occlusion data.
+                                # Leaving it as 1 would tell YOLO everything is occluded, which is incorrect.
                                 if kpt_v > 0:
                                     kpt_v = 2
                                 kpts_str += f" {kpt_x:.6f} {kpt_y:.6f} {kpt_v}"

@@ -34,6 +34,7 @@ dev = [
     "pytest-cov>=4.1.0",
     "jupyter>=1.0.0",
     "ruff>=0.1.0",
+    "pre-commit>=3.5.0",
 ]
 
 [tool.setuptools.packages.find]
