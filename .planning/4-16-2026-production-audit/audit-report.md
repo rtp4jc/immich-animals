@@ -133,6 +133,7 @@ Not cut because they're unimportant — cut because they pay off after the above
 - **Pin `environment.yml` deps** (or replace with `uv.lock`).
 - **Add `--force` guard to destructive dataset converters** that `shutil.rmtree` their output dirs.
 - **Bootstrap confidence intervals + per-identity breakdown in the benchmark artifact.**
+- **Migrate ONNX export to dynamo-based exporter** — `scripts/train_master.py:440-453` and `tests/integration/test_onnx_parity.py` currently use `dynamo=False` (legacy TorchScript exporter, deprecated since PyTorch 2.9). Migration requires adding `onnxscript` as a dependency and removing `dynamo=False`.
 
 ---
 
