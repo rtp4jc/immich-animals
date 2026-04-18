@@ -1,4 +1,6 @@
 __pycache__
+venv/
+requirements.lock
 data
 models
 outputs
@@ -9,3 +11,7 @@ immich-clone/
 wandb/
 /*.egg-info/**
 .coverage
+venv
+
+venv/
+requirements.lock

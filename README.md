@@ -189,3 +189,7 @@ Scripts will guide you through dataset preparation after download.
 
 - Pipeline architecture supports different animal classes through the `AnimalClass` enum
 - Keypoint-free approach currently shows better performance than the full 3-stage pipeline
+
+## Replication Guide
+
+For instructions on how to replicate this setup and run the Pet Hijack in Immich, see [REPLICATION.md](REPLICATION.md).
