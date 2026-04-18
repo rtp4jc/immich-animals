@@ -250,7 +250,7 @@ class BenchmarkEvaluator:
         return self.results
 
     def _compute_tar_at_far(self) -> Dict[float, Tuple[float, float]]:
-        """Compute TAR @ FAR metrics for identity verification using binary search."""
+        """Compute TAR @ FAR metrics for identity verification."""
         same_identity_scores = []
         different_identity_scores = []
 
@@ -270,14 +270,21 @@ class BenchmarkEvaluator:
             abs_path = str(Path(r.image_path).resolve())
             path_to_identity[abs_path] = r.identity_gt
 
-        # Collect similarity pairs
+        # Collect similarity pairs, deduplicating (A,B) / (B,A) via frozenset key
+        seen_pairs: set = set()
         for query_result in detected_results:
             query_identity = query_result.identity_gt
+            abs_query_path = str(Path(query_result.image_path).resolve())
 
             for similar_path, similarity in query_result.similar_images:
                 abs_similar_path = str(Path(similar_path).resolve())
-                similar_identity = path_to_identity.get(abs_similar_path)
 
+                pair_key = frozenset({abs_query_path, abs_similar_path})
+                if pair_key in seen_pairs:
+                    continue
+                seen_pairs.add(pair_key)
+
+                similar_identity = path_to_identity.get(abs_similar_path)
                 if similar_identity is not None:
                     if similar_identity == query_identity:
                         same_identity_scores.append(similarity)
@@ -287,46 +294,19 @@ class BenchmarkEvaluator:
         if not same_identity_scores or not different_identity_scores:
             return {}
 
-        # Convert to numpy arrays and sort for binary search
         same_scores = np.array(same_identity_scores)
-        diff_scores = np.sort(np.array(different_identity_scores))
+        diff_scores = np.array(different_identity_scores)
 
-        # Compute TAR @ FAR for standard FAR values
+        # threshold = (1-FAR) quantile of impostor scores; works for similarities in [-1, 1]
         far_values = [0.001, 0.01, 0.1]
         tar_at_far = {}
 
         for target_far in far_values:
-            threshold = self._binary_search_threshold(diff_scores, target_far)
-            tar = np.mean(same_scores >= threshold)
+            threshold = float(np.quantile(diff_scores, 1 - target_far))
+            tar = float(np.mean(same_scores >= threshold))
             tar_at_far[target_far] = (tar, threshold)
 
         return tar_at_far
-
-    def _binary_search_threshold(
-        self, sorted_diff_scores: np.ndarray, target_far: float
-    ) -> float:
-        """Binary search for threshold that achieves target FAR."""
-        left, right = 0.0, 1.0
-        tolerance = 1e-6
-
-        for _ in range(50):  # Max iterations
-            threshold = (left + right) / 2
-
-            # Compute FAR at this threshold using binary search on sorted scores
-            num_above = len(sorted_diff_scores) - np.searchsorted(
-                sorted_diff_scores, threshold, side="left"
-            )
-            far = num_above / len(sorted_diff_scores)
-
-            if abs(far - target_far) < tolerance:
-                break
-
-            if far > target_far:
-                left = threshold
-            else:
-                right = threshold
-
-        return threshold
 
     def save_results(self, output_path: str) -> None:
         """Save evaluation results to JSON file."""

@@ -152,7 +152,7 @@ def calculate_tar_at_far(
         return 0.0, 0.0
 
     threshold = np.quantile(neg_scores, 1 - far_threshold)
-    tar = np.sum(pos_scores > threshold) / len(pos_scores)
+    tar = float(np.sum(pos_scores >= threshold) / len(pos_scores))
 
     return tar, threshold
 
