@@ -88,7 +88,7 @@ Each item is ≤1 day of focused work. Ordered so earlier PRs unblock later ones
 |---|----------|-------|--------|
 | 1 | ✅ **Fix TAR@FAR threshold range bug** — replace binary search with `np.quantile`, unify the two implementations | `animal_id/benchmark/evaluator.py:305-329`, `animal_id/benchmark/metrics.py:108-157` | bench F1/F4 | b09e599 |
 | 2 | ✅ **Fix TAR@FAR pair duplication** — stop counting both `(A,B)` and `(B,A)` | `animal_id/benchmark/evaluator.py:273-285` | bench F2 | b09e599 |
-| 3 | **Restore a sane embedding baseline** — the `1e-8 / 1e-9` LRs in `animal_id/embedding/config.py:19-22` are a debugging remnant; replace with values from a known-good run and add a test asserting `HEAD_LR >= 1e-5` | `animal_id/embedding/config.py`, `tests/unit/test_config.py` (new) | train PR 3 |
+| 3 | ✅ **Restore a sane embedding baseline** — the `1e-8 / 1e-9` LRs in `animal_id/embedding/config.py:19-22` are a debugging remnant; replace with values from a known-good run and add a test asserting `HEAD_LR >= 1e-5` | `animal_id/embedding/config.py`, `tests/unit/test_config.py` (new) | train PR 3 | a806c74 |
 | 4 | **Rename dog-specific public API** — `DogEmbeddingModel` → `AnimalEmbeddingModel`, `DogIdentityDataset` → `IdentityDataset`, drop `DogIdentificationSystem` alias | `animal_id/embedding/models.py`, `animal_id/common/datasets.py`, `animal_id/benchmark/evaluator.py`, all callers | struct PR-1 |
 | 5 | **Rename `AmbidextrousAxolotl` → `AnimalPipeline`** and rename the module file | `animal_id/pipeline/ambidextrous_axolotl.py` + all imports | struct PR-2 |
 
