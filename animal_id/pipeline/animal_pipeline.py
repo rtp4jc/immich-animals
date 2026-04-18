@@ -1,5 +1,5 @@
 """
-AmbidextrousAxolotl: Advanced animal identification pipeline system.
+AnimalPipeline: Advanced animal identification pipeline system.
 
 Combines detection, keypoint, and embedding models for robust animal identification.
 """
@@ -14,7 +14,7 @@ from ..benchmark.evaluator import AnimalIdentificationSystem
 from .models import AnimalClass, DetectionModel, EmbeddingModel, KeypointModel
 
 
-class AmbidextrousAxolotl(AnimalIdentificationSystem):
+class AnimalPipeline(AnimalIdentificationSystem):
     """Advanced animal identification pipeline with injectable models."""
 
     def __init__(
@@ -28,7 +28,7 @@ class AmbidextrousAxolotl(AnimalIdentificationSystem):
         use_keypoints: bool = False,
     ):
         """
-        Initialize AmbidextrousAxolotl pipeline.
+        Initialize AnimalPipeline.
 
         Args:
             detector: Detection model instance
