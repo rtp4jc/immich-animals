@@ -16,25 +16,28 @@ Animal identification system for Immich that mirrors the people detection pipeli
 
 ### Environment
 
-```bash
-# Create and activate virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) first, then:
 
-# Install dependencies
-pip install -r requirements.txt
+```bash
+# Create venv with Python 3.12 and install dependencies
+uv venv --python 3.12 venv --seed
+uv pip install -e .[dev]
+
+# Activate (optional — prefix commands with venv/bin/ otherwise)
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+To regenerate the lock file (e.g. after changing `pyproject.toml`):
+
+```bash
+uv pip compile pyproject.toml --extra dev -o requirements.lock
 ```
 
 ### Development Tools
 
-For developers contributing to the project, please set up the pre-commit hooks to ensure code quality:
-
 ```bash
-# Install development dependencies
-pip install -e .[dev]
-
 # Install pre-commit hooks
-pre-commit install
+venv/bin/python -m pre_commit install
 ```
 
 ### GPU Support (Optional)
