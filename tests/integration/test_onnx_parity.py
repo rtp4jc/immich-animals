@@ -3,10 +3,12 @@ import onnxruntime as ort
 import torch
 
 from animal_id.embedding.backbones import BackboneType
-from animal_id.embedding.config import TRAINING_CONFIG
+from animal_id.embedding.config import DATA_CONFIG, TRAINING_CONFIG
+from animal_id.embedding.export import export_embedding_onnx
 from animal_id.embedding.models import AnimalEmbeddingModel
 
 EMBEDDING_DIM = TRAINING_CONFIG["EMBEDDING_DIM"]
+IMG_SIZE = DATA_CONFIG["IMG_SIZE"]
 
 
 def test_onnx_embedding_parity(tmp_path):
@@ -20,25 +22,13 @@ def test_onnx_embedding_parity(tmp_path):
     )
     model.eval()
 
-    dummy = torch.randn(1, 3, 224, 224)
+    dummy = torch.randn(1, 3, IMG_SIZE, IMG_SIZE)
 
     with torch.no_grad():
         pt_out = model(dummy).numpy()
 
     onnx_path = tmp_path / "embedding.onnx"
-    # dynamo=False: use legacy TorchScript exporter (no onnxscript dep required)
-    torch.onnx.export(
-        model,
-        dummy,
-        str(onnx_path),
-        dynamo=False,
-        export_params=True,
-        opset_version=12,
-        do_constant_folding=True,
-        input_names=["input"],
-        output_names=["output"],
-        dynamic_axes={"input": {0: "batch_size"}, "output": {0: "batch_size"}},
-    )
+    export_embedding_onnx(model, onnx_path, img_size=IMG_SIZE)
 
     session = ort.InferenceSession(str(onnx_path))
     onnx_out = session.run(None, {"input": dummy.numpy()})[0]

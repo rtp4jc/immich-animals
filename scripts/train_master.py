@@ -60,6 +60,7 @@ from animal_id.embedding.config import (
     TRAINING_CONFIG,
 )
 from animal_id.embedding.dataset_converter import EmbeddingDatasetConverter
+from animal_id.embedding.export import export_embedding_onnx
 from animal_id.embedding.models import AnimalEmbeddingModel
 from animal_id.embedding.trainer import EmbeddingTrainer
 from animal_id.pipeline.animal_pipeline import AnimalPipeline
@@ -432,24 +433,8 @@ def run_embedding_export(model_path, val_loader, device, num_classes):
     export_model.to(export_device)
     export_model.eval()
 
-    dummy_input = torch.randn(
-        1, 3, DATA_CONFIG["IMG_SIZE"], DATA_CONFIG["IMG_SIZE"], device=export_device
-    )
-
-    ONNX_EMBEDDING_PATH.parent.mkdir(parents=True, exist_ok=True)
-    torch.onnx.export(
-        export_model,
-        dummy_input,
-        str(ONNX_EMBEDDING_PATH),
-        export_params=True,
-        opset_version=12,
-        do_constant_folding=True,
-        input_names=["input"],
-        output_names=["output"],
-        dynamic_axes={
-            "input": {0: "batch_size"},
-            "output": {0: "batch_size"},
-        },
+    export_embedding_onnx(
+        export_model, ONNX_EMBEDDING_PATH, img_size=DATA_CONFIG["IMG_SIZE"]
     )
     logger.info(f"Embedding ONNX exported to: {ONNX_EMBEDDING_PATH}")
 
