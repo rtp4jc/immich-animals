@@ -38,13 +38,13 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from animal_id.benchmark.metrics import evaluate_embedding_model
-from animal_id.common.datasets import DogIdentityDataset
+from animal_id.common.datasets import IdentityDataset
 
 # Adjust path to import from our new package
 from animal_id.common.utils import find_latest_timestamped_run
 from animal_id.embedding.backbones import BackboneType
 from animal_id.embedding.config import DATA_CONFIG, DEFAULT_BACKBONE, TRAINING_CONFIG
-from animal_id.embedding.models import DogEmbeddingModel
+from animal_id.embedding.models import AnimalEmbeddingModel
 
 # --- Configuration ---
 FAR_TARGETS = [1e-1, 1e-2, 1e-3, 1e-4]
@@ -138,7 +138,7 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Initialize model in inference mode (no head)
-    model = DogEmbeddingModel(
+    model = AnimalEmbeddingModel(
         backbone_type=args.backbone,
         num_classes=None,
         embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
@@ -152,7 +152,7 @@ def main(args):
     model.load_state_dict(state_dict, strict=False)
     model.to(device)
 
-    val_dataset = DogIdentityDataset(
+    val_dataset = IdentityDataset(
         json_path=DATA_CONFIG["VAL_JSON_PATH"],
         img_size=DATA_CONFIG["IMG_SIZE"],
         is_training=False,

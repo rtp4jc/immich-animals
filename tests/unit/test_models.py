@@ -2,18 +2,18 @@ import torch
 import torch.nn as nn
 
 from animal_id.embedding.backbones import BackboneType
-from animal_id.embedding.models import DogEmbeddingModel, EmbeddingNet
+from animal_id.embedding.models import AnimalEmbeddingModel, EmbeddingNet
 
 
 def test_model_initialization():
     """Test initializing the model with a specific backbone."""
-    model = DogEmbeddingModel(
+    model = AnimalEmbeddingModel(
         backbone_type=BackboneType.MOBILENET_V3_SMALL,
         num_classes=10,
         embedding_dim=128,
         pretrained=False,
     )
-    assert isinstance(model, DogEmbeddingModel)
+    assert isinstance(model, AnimalEmbeddingModel)
     assert isinstance(model.backbone, EmbeddingNet)
 
     # Check embedding dimension logic
@@ -31,7 +31,7 @@ def test_model_initialization():
 
 def test_forward_pass_training():
     """Test forward pass in training mode (returns ArcFace loss logits)."""
-    model = DogEmbeddingModel(
+    model = AnimalEmbeddingModel(
         backbone_type=BackboneType.MOBILENET_V3_SMALL,
         num_classes=5,
         embedding_dim=64,
@@ -51,7 +51,7 @@ def test_forward_pass_training():
 
 def test_forward_pass_inference():
     """Test forward pass in inference mode (returns embeddings)."""
-    model = DogEmbeddingModel(
+    model = AnimalEmbeddingModel(
         backbone_type=BackboneType.MOBILENET_V3_SMALL,
         num_classes=5,
         embedding_dim=64,
@@ -74,7 +74,7 @@ def test_forward_pass_inference():
 
 def test_freeze_unfreeze_backbone():
     """Test freezing and unfreezing the backbone."""
-    model = DogEmbeddingModel(
+    model = AnimalEmbeddingModel(
         backbone_type=BackboneType.MOBILENET_V3_SMALL, num_classes=5, pretrained=False
     )
 
@@ -89,7 +89,7 @@ def test_freeze_unfreeze_backbone():
 
 def test_get_embeddings_method():
     """Test the get_embeddings helper method."""
-    model = DogEmbeddingModel(
+    model = AnimalEmbeddingModel(
         backbone_type=BackboneType.MOBILENET_V3_SMALL,
         num_classes=5,
         embedding_dim=32,

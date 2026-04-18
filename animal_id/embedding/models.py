@@ -83,9 +83,9 @@ class EmbeddingNet(nn.Module):
         return normalized_embeddings
 
 
-class DogEmbeddingModel(nn.Module):
+class AnimalEmbeddingModel(nn.Module):
     """
-    Complete dog embedding model with ArcFace loss.
+    Complete animal embedding model with ArcFace loss.
     """
 
     def __init__(
@@ -103,7 +103,7 @@ class DogEmbeddingModel(nn.Module):
             embedding_dim (int): Size of embedding vector.
             pretrained (bool): Use ImageNet weights.
         """
-        super(DogEmbeddingModel, self).__init__()
+        super(AnimalEmbeddingModel, self).__init__()
 
         self.backbone = EmbeddingNet(
             backbone_type, embedding_dim, pretrained=pretrained

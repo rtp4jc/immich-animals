@@ -97,10 +97,6 @@ class AnimalIdentificationSystem(Protocol):
         ...
 
 
-# Backward compatibility alias
-DogIdentificationSystem = AnimalIdentificationSystem
-
-
 class BenchmarkEvaluator:
     """Evaluates dog identification systems against ground truth data."""
 
@@ -122,7 +118,7 @@ class BenchmarkEvaluator:
         with open(self.ground_truth_path, "r") as f:
             return json.load(f)
 
-    def evaluate(self, system: DogIdentificationSystem) -> BenchmarkMetrics:
+    def evaluate(self, system: AnimalIdentificationSystem) -> BenchmarkMetrics:
         """
         Evaluate system against ground truth data.
 

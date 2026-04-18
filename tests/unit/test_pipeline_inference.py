@@ -4,7 +4,7 @@ import cv2
 import numpy as np
 import pytest
 
-from animal_id.pipeline.ambidextrous_axolotl import AmbidextrousAxolotl
+from animal_id.pipeline.animal_pipeline import AnimalPipeline
 from animal_id.pipeline.models import AnimalClass
 
 
@@ -28,7 +28,7 @@ def mock_embedder():
 
 @pytest.fixture
 def pipeline(mock_detector, mock_keypoint, mock_embedder):
-    return AmbidextrousAxolotl(
+    return AnimalPipeline(
         detector=mock_detector,
         keypoint_model=mock_keypoint,
         embedding_model=mock_embedder,

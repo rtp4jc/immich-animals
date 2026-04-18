@@ -1,11 +1,11 @@
 import torch
 
-from animal_id.common.datasets import DogIdentityDataset
+from animal_id.common.datasets import IdentityDataset
 
 
 def test_dataset_initialization(mock_image_dataset):
     """Test proper initialization of the dataset."""
-    dataset = DogIdentityDataset(
+    dataset = IdentityDataset(
         json_path=mock_image_dataset, img_size=224, is_training=True
     )
     assert len(dataset) == 5
@@ -15,7 +15,7 @@ def test_dataset_initialization(mock_image_dataset):
 
 def test_dataset_getitem(mock_image_dataset):
     """Test retrieving an item from the dataset."""
-    dataset = DogIdentityDataset(
+    dataset = IdentityDataset(
         json_path=mock_image_dataset, img_size=224, is_training=True
     )
 
@@ -35,7 +35,7 @@ def test_dataset_getitem(mock_image_dataset):
 def test_dataset_transforms_training(mock_image_dataset):
     """Test that training transforms are applied (smoke test)."""
     # Training has random augmentations, so multiple calls might yield different tensors
-    dataset = DogIdentityDataset(
+    dataset = IdentityDataset(
         json_path=mock_image_dataset, img_size=224, is_training=True
     )
 
@@ -53,7 +53,7 @@ def test_dataset_transforms_training(mock_image_dataset):
 
 def test_dataset_transforms_validation(mock_image_dataset):
     """Test that validation transforms are deterministic."""
-    dataset = DogIdentityDataset(
+    dataset = IdentityDataset(
         json_path=mock_image_dataset, img_size=224, is_training=False
     )
 

@@ -8,7 +8,7 @@ item from the dataset so the `DataLoader` in the training script can efficiently
 batch them and feed them to the model.
 
 What it does:
-1. Defines the `DogIdentityDataset` class, which inherits from `torch.utils.data.Dataset`.
+1. Defines the `IdentityDataset` class, which inherits from `torch.utils.data.Dataset`.
 2. The class is initialized with a path to a `.json` file containing the annotations.
 3. The `__getitem__` method defines how to load a single image by its index, apply
    data augmentations and transformations, and return the image tensor and its
@@ -26,9 +26,9 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 
 
-class DogIdentityDataset(Dataset):
+class IdentityDataset(Dataset):
     """
-    Enhanced dataset with built-in data augmentations for dog identity training.
+    Enhanced dataset with built-in data augmentations for animal identity training.
     """
 
     def __init__(self, json_path, img_size=224, is_training=True):

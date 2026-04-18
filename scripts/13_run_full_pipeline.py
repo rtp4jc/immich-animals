@@ -14,9 +14,7 @@ from scripts.train_master import run_full_pipeline_benchmark
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Benchmark AmbidextrousAxolotl pipeline."
-    )
+    parser = argparse.ArgumentParser(description="Benchmark AnimalPipeline.")
     parser.add_argument(
         "--num-images",
         type=int,

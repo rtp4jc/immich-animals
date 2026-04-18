@@ -1,9 +1,9 @@
 import torch
 from torch.utils.data import DataLoader
 
-from animal_id.common.datasets import DogIdentityDataset
+from animal_id.common.datasets import IdentityDataset
 from animal_id.embedding.backbones import BackboneType
-from animal_id.embedding.models import DogEmbeddingModel
+from animal_id.embedding.models import AnimalEmbeddingModel
 from animal_id.embedding.trainer import EmbeddingTrainer
 
 
@@ -13,7 +13,7 @@ def test_train_embedding(mock_image_dataset, tmp_path):
     Runs a single warmup epoch to verify end-to-end execution.
     """
     # 1. Setup Data
-    dataset = DogIdentityDataset(
+    dataset = IdentityDataset(
         json_path=mock_image_dataset, img_size=64, is_training=True
     )
     # Create a small loader (batch size 2 to work with 5 items)
@@ -21,7 +21,7 @@ def test_train_embedding(mock_image_dataset, tmp_path):
 
     # 2. Setup Model
     # Use MobileNetV3 for speed, pretrained=False to avoid network calls
-    model = DogEmbeddingModel(
+    model = AnimalEmbeddingModel(
         backbone_type=BackboneType.MOBILENET_V3_SMALL,
         num_classes=dataset.num_classes,
         embedding_dim=128,  # Small dim for test

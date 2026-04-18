@@ -42,7 +42,7 @@ from animal_id.common.constants import (
 )
 
 # --- Imports for Common/Utils ---
-from animal_id.common.datasets import DogIdentityDataset
+from animal_id.common.datasets import IdentityDataset
 from animal_id.common.identity_loader import IdentityLoader
 
 # --- Imports for Detection ---
@@ -60,9 +60,9 @@ from animal_id.embedding.config import (
     TRAINING_CONFIG,
 )
 from animal_id.embedding.dataset_converter import EmbeddingDatasetConverter
-from animal_id.embedding.models import DogEmbeddingModel
+from animal_id.embedding.models import AnimalEmbeddingModel
 from animal_id.embedding.trainer import EmbeddingTrainer
-from animal_id.pipeline.ambidextrous_axolotl import AmbidextrousAxolotl
+from animal_id.pipeline.animal_pipeline import AnimalPipeline
 from animal_id.pipeline.models import AnimalClass
 from animal_id.pipeline.onnx_models import ONNXDetector, ONNXEmbedding, ONNXKeypoint
 from animal_id.tracking.wandb_logger import WandBLogger
@@ -83,7 +83,7 @@ logger = logging.getLogger(__name__)
 def run_full_pipeline_benchmark(
     num_images=None, include_additional=False, tag=None, no_wandb=False
 ):
-    """Runs the full AmbidextrousAxolotl pipeline benchmark."""
+    """Runs the full AnimalPipeline benchmark."""
     logger.info("\n" + "=" * 60)
     logger.info("STARTING FULL PIPELINE BENCHMARK")
     logger.info("=" * 60)
@@ -93,7 +93,7 @@ def run_full_pipeline_benchmark(
         logger.error(f"Validation JSON not found: {val_json_path}")
         return False
 
-    logger.info("Initializing AmbidextrousAxolotl pipeline...")
+    logger.info("Initializing AnimalPipeline...")
 
     # Initialize models
     # Note: We use the just-exported ONNX models
@@ -149,14 +149,14 @@ def run_full_pipeline_benchmark(
         "num_images": num_images,
         "include_additional": include_additional,
         "dataset_size": len(ground_truth),
-        "pipeline": "AmbidextrousAxolotl",
+        "pipeline": "AnimalPipeline",
     }
     user_tags = [tag] if tag else []
 
     # --- Run 1: WITHOUT Keypoints (Primary Goal) ---
-    logger.info("\nEvaluating AmbidextrousAxolotl WITHOUT keypoints...")
+    logger.info("\nEvaluating AnimalPipeline WITHOUT keypoints...")
 
-    axolotl_without_keypoints = AmbidextrousAxolotl(
+    axolotl_without_keypoints = AnimalPipeline(
         detector=detector,
         embedding_model=embedding_model,
         keypoint_model=keypoint_model,
@@ -186,9 +186,9 @@ def run_full_pipeline_benchmark(
 
     # --- Run 2: WITH Keypoints (Optional) ---
     if has_keypoints and keypoint_model:
-        logger.info("\nEvaluating AmbidextrousAxolotl WITH keypoints...")
+        logger.info("\nEvaluating AnimalPipeline WITH keypoints...")
 
-        axolotl_with_keypoints = AmbidextrousAxolotl(
+        axolotl_with_keypoints = AnimalPipeline(
             detector=detector,
             embedding_model=embedding_model,
             keypoint_model=keypoint_model,
@@ -343,12 +343,12 @@ def run_embedding_pipeline():
     logger.info(f"Using device: {device}")
 
     # Load Datasets
-    train_dataset = DogIdentityDataset(
+    train_dataset = IdentityDataset(
         json_path=PROJECT_ROOT / DATA_CONFIG["TRAIN_JSON_PATH"],
         img_size=DATA_CONFIG["IMG_SIZE"],
         is_training=True,
     )
-    val_dataset = DogIdentityDataset(
+    val_dataset = IdentityDataset(
         json_path=PROJECT_ROOT / DATA_CONFIG["VAL_JSON_PATH"],
         img_size=DATA_CONFIG["IMG_SIZE"],
         is_training=False,
@@ -368,7 +368,7 @@ def run_embedding_pipeline():
     )
 
     # Create Model
-    model = DogEmbeddingModel(
+    model = AnimalEmbeddingModel(
         backbone_type=DEFAULT_BACKBONE,
         num_classes=train_dataset.num_classes,
         embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
@@ -402,7 +402,7 @@ def run_embedding_export(model_path, val_loader, device, num_classes):
     """Evaluates the best model and exports it to ONNX."""
 
     # Re-instantiate model for evaluation and export
-    model = DogEmbeddingModel(
+    model = AnimalEmbeddingModel(
         backbone_type=DEFAULT_BACKBONE,
         num_classes=num_classes,
         embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
@@ -423,7 +423,7 @@ def run_embedding_export(model_path, val_loader, device, num_classes):
 
     # Re-instantiate model on CPU for export to ensure consistency
     export_device = torch.device("cpu")
-    export_model = DogEmbeddingModel(
+    export_model = AnimalEmbeddingModel(
         backbone_type=DEFAULT_BACKBONE,
         num_classes=num_classes,
         embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],

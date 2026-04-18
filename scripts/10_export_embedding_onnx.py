@@ -12,7 +12,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from animal_id.common.constants import MODELS_DIR
-from animal_id.common.datasets import DogIdentityDataset
+from animal_id.common.datasets import IdentityDataset
 from animal_id.common.utils import find_latest_timestamped_run
 from animal_id.embedding.backbones import BackboneType
 from animal_id.embedding.config import DATA_CONFIG, DEFAULT_BACKBONE
@@ -46,7 +46,7 @@ def main(args):
 
     # The export function requires a dataloader and num_classes for evaluation
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    val_dataset = DogIdentityDataset(
+    val_dataset = IdentityDataset(
         json_path=DATA_CONFIG["VAL_JSON_PATH"],
         img_size=DATA_CONFIG["IMG_SIZE"],
         is_training=False,
@@ -56,7 +56,7 @@ def main(args):
     )
 
     # We also need num_classes from the *training* set to initialize the model
-    train_dataset = DogIdentityDataset(
+    train_dataset = IdentityDataset(
         json_path=DATA_CONFIG["TRAIN_JSON_PATH"],
         img_size=DATA_CONFIG["IMG_SIZE"],
         is_training=True,
