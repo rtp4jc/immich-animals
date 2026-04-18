@@ -102,7 +102,7 @@ Each item is ≤1 day of focused work. Ordered so earlier PRs unblock later ones
 | 9 | **Factor the head/loss behind a `HEAD_TYPE` config** — add `SubCenterArcFace` (SOTA recipe), `CosFaceLoss`, and a `MarginHead` base, dispatch in `AnimalEmbeddingModel.__init__` instead of hardcoding `ArcFaceLoss` at line 113 | `animal_id/embedding/{losses.py,models.py,config.py}` | train PR 11 + sota §4 |
 | 10 | **Introduce a held-out `identity_test.json`** — stop using val for both early-stopping and headline numbers. Use val for selection, test for the reported MRR/top-k/TAR@FAR artifact | `animal_id/embedding/dataset_converter.py`, `scripts/train_master.py` | bench §3 |
 | 11 | **Full-state checkpointing + resume** — save optimizer/scheduler/RNG/epoch/phase/num_classes; accept `resume_from=` in `EmbeddingTrainer.train` | `animal_id/embedding/trainer.py` | train PR 6 |
-| 12 | **ONNX parity test in CI** — train 1 epoch on mock data, export, assert `np.allclose` between PyTorch and ONNX outputs; extend to assert embedding is 512-d, L2-normalized (the one hard interop invariant) | `tests/integration/test_onnx_parity.py` (new) | train PR 9, immich §M |
+| 12 | ✅ **ONNX parity test in CI** — train 1 epoch on mock data, export, assert `np.allclose` between PyTorch and ONNX outputs; extend to assert embedding is 512-d, L2-normalized (the one hard interop invariant) | `tests/integration/test_onnx_parity.py` (new) | train PR 9, immich §M | [PR #3](https://github.com/rtp4jc/immich-animals/pull/3) |
 
 ### P2 — SOTA-track experiments (measurable against the new held-out test set)
 
