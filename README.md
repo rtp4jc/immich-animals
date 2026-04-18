@@ -133,13 +133,13 @@ We use `pytest` for testing. The test suite includes:
 
 ```bash
 # Run all tests
-python -m pytest tests/
+venv/bin/python -m pytest tests/
 
 # Run specific test file
-python -m pytest tests/unit/test_datasets.py
+venv/bin/python -m pytest tests/unit/test_datasets.py
 
 # Run with verbose output
-python -m pytest -v tests/
+venv/bin/python -m pytest -v tests/
 ```
 
 ### Coverage Report
@@ -147,7 +147,7 @@ python -m pytest -v tests/
 To see code coverage statistics (ensure dependencies are installed):
 
 ```bash
-python -m pytest --cov=animal_id tests/
+venv/bin/python -m pytest --cov=animal_id tests/
 ```
 
 ## Models
