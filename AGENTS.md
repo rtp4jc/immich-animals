@@ -21,6 +21,17 @@ venv/bin/python -m pytest --cov=animal_id tests/        # with coverage
 
 This repo uses git worktrees for isolated feature branches. When Claude Code opens a worktree the working directory is the worktree path, **not** the repo root. Key facts to avoid confusion:
 
+### Am I in a worktree?
+
+Run this first when starting a session:
+
+```bash
+git rev-parse --git-dir
+```
+
+- Main repo: prints `.git`
+- Worktree: prints an absolute path ending in `.git/worktrees/<name>` — the repo root is everything before `/.git/worktrees/`
+
 - **The venv lives at the repo root**, not inside the worktree. Use its absolute path:
   ```bash
   /mnt/e/Code/GitHub/immich-animals/venv/bin/python -m pytest tests/
