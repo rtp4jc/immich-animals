@@ -20,9 +20,11 @@ class KeypointTrainer:
         self,
         model_name: str = "yolo11n-dog-pose.yaml",
         config: Optional[Dict[str, Any]] = None,
+        seed: int = 42,
     ):
         """Initialize trainer with model and configuration."""
         self.model_name = model_name
+        self.seed = seed
         self.config = config or self._get_default_config()
         self.model = None
 
@@ -39,6 +41,7 @@ class KeypointTrainer:
             "patience": 10,
             "save_period": 5,
             "cache": False,
+            "seed": self.seed,
             # Augmentation settings (more conservative for keypoints)
             "fliplr": 0.5,
             "degrees": 10,
