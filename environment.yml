@@ -1,9 +1,0 @@
-name: immich-animals
-channels:
-  - conda-forge
-  - defaults
-dependencies:
-  - python=3.12
-  - pip
-  - pip:
-    - -e .  # This installs the project in editable mode, pulling deps from pyproject.toml

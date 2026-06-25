@@ -1,4 +1,7 @@
 __pycache__
+.pytest_cache/
+.ruff_cache/
+.venv/
 venv/
 data
 models
@@ -10,3 +13,5 @@ immich-clone/
 wandb/
 /*.egg-info/**
 .coverage
+# Claude Code agent worktrees & local settings
+.claude/

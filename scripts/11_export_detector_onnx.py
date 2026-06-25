@@ -6,11 +6,16 @@ This script finds the latest trained detector model and calls the centralized
 export function to convert it to ONNX format.
 """
 
-# Add project root to Python path
+import sys
+from pathlib import Path
 
 from animal_id.common.constants import DETECTOR_PROJECT_DIR, DETECTOR_RUN_NAME
 from animal_id.common.utils import find_latest_run
-from scripts.train_master import run_detector_export
+
+# Add project root to Python path to allow importing from `scripts`
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from scripts.train_master import run_detector_export  # noqa: E402
 
 
 def main():

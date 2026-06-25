@@ -7,6 +7,8 @@ export function to evaluate and convert it to ONNX format.
 """
 
 import argparse
+import sys
+from pathlib import Path
 
 import torch
 from torch.utils.data import DataLoader
@@ -16,9 +18,11 @@ from animal_id.common.datasets import IdentityDataset
 from animal_id.common.utils import find_latest_timestamped_run
 from animal_id.embedding.backbones import BackboneType
 from animal_id.embedding.config import DATA_CONFIG, DEFAULT_BACKBONE
-from scripts.train_master import run_embedding_export
 
-# Add project root to Python path
+# Add project root to Python path to allow importing from `scripts`
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from scripts.train_master import run_embedding_export  # noqa: E402
 
 
 def main(args):
