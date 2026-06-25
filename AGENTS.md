@@ -8,13 +8,14 @@ See [README.md](README.md) for project overview, setup, training pipeline, and d
 
 ```bash
 # Lint / format
-venv/bin/ruff check .
-venv/bin/ruff format .
+uv run ruff check .
+uv run ruff format .
 
-# Tests (always use venv/bin/ prefix — do not rely on an activated venv)
-venv/bin/python -m pytest tests/
-venv/bin/python -m pytest tests/unit/test_datasets.py   # single file
-venv/bin/python -m pytest --cov=animal_id tests/        # with coverage
+# Tests (always use `uv run` — non-interactive shells don't get mise's
+# auto-activation hook, so do not rely on an activated venv)
+uv run pytest tests/
+uv run pytest tests/unit/test_datasets.py   # single file
+uv run pytest --cov=animal_id tests/        # with coverage
 ```
 
 ## Working in a Git Worktree
@@ -69,4 +70,4 @@ Each stage has its own subpackage with `trainer.py`, `dataset_converter.py`, and
 
 ## CI
 
-GitHub Actions (`.github/workflows/python-package-conda.yml`) runs on push/PR to main: ruff lint → ruff format check → pytest, using conda + Python 3.12.
+GitHub Actions (`.github/workflows/python-package.yml`) runs on push/PR to main: ruff lint → ruff format check → pytest, using uv + Python 3.12 (`uv sync` from `uv.lock`).

@@ -16,33 +16,55 @@ Animal identification system for Immich that mirrors the people detection pipeli
 
 ### Environment
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/) first, then:
+This project uses [mise](https://mise.jdx.dev/) to manage the toolchain (Python +
+[uv](https://docs.astral.sh/uv/)) and [uv](https://docs.astral.sh/uv/) for dependencies.
+With mise installed:
 
 ```bash
-# Create venv with Python 3.12 and install dependencies
-uv venv --python 3.12 venv --seed
-uv pip install -e .[dev]
-
-# Activate (optional — prefix commands with venv/bin/ otherwise)
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+mise install      # installs the pinned toolchain (Python 3.12 + uv)
+mise run setup    # uv sync → creates .venv from uv.lock (incl. dev deps)
 ```
 
-To regenerate the lock file (e.g. after changing `pyproject.toml`):
+mise auto-activates `.venv` when you `cd` into the repo, so just run commands
+directly:
 
 ```bash
-uv pip compile pyproject.toml --extra dev -o requirements.lock
+python scripts/13_run_full_pipeline.py --num-images 50
+pytest
+ruff check .
+```
+
+> Where the mise shell hook isn't present (CI, scripts, one-off non-interactive
+> shells), prefix with `uv run` instead — it needs no activation and keeps `.venv`
+> in sync with `uv.lock`, e.g. `uv run pytest`.
+
+<details>
+<summary>Without mise (uv only)</summary>
+
+```bash
+uv sync   # uv installs Python 3.12 if needed, then builds .venv from uv.lock
+```
+</details>
+
+After changing dependencies in `pyproject.toml`, update the lock with:
+
+```bash
+mise run lock   # or: uv lock
 ```
 
 ### Development Tools
 
 ```bash
 # Install pre-commit hooks
-venv/bin/python -m pre_commit install
+pre-commit install
 ```
 
-### GPU Support (Optional)
+### GPU Support
 
-For GPU acceleration, install PyTorch with CUDA support and replace `onnxruntime` with `onnxruntime-gpu`. See [PyTorch installation guide](https://pytorch.org/get-started/locally/) for details.
+On Linux, `uv sync` installs the CUDA build of PyTorch from PyPI by default (the
+`nvidia-*` CUDA runtime ships as wheels), so GPU works out of the box — verify with
+`uv run python -c "import torch; print(torch.cuda.is_available())"`. For GPU ONNX
+inference, swap `onnxruntime` for `onnxruntime-gpu` in `pyproject.toml`.
 
 ## Quick Start
 
@@ -133,13 +155,13 @@ We use `pytest` for testing. The test suite includes:
 
 ```bash
 # Run all tests
-venv/bin/python -m pytest tests/
+pytest tests/
 
 # Run specific test file
-venv/bin/python -m pytest tests/unit/test_datasets.py
+pytest tests/unit/test_datasets.py
 
 # Run with verbose output
-venv/bin/python -m pytest -v tests/
+pytest -v tests/
 ```
 
 ### Coverage Report
@@ -147,7 +169,7 @@ venv/bin/python -m pytest -v tests/
 To see code coverage statistics (ensure dependencies are installed):
 
 ```bash
-venv/bin/python -m pytest --cov=animal_id tests/
+pytest --cov=animal_id tests/
 ```
 
 ## Models

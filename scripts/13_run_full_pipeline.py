@@ -7,11 +7,13 @@ function. All core logic is centralized in `train_master.py`.
 """
 
 import argparse
-
-from scripts.train_master import run_full_pipeline_benchmark
+import sys
+from pathlib import Path
 
 # Add project root to Python path to allow importing from `scripts`
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from scripts.train_master import run_full_pipeline_benchmark  # noqa: E402
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark AnimalPipeline.")

@@ -87,6 +87,13 @@ def analyze_data_distributions():
                 print(f"    {source}: {count} ({percentage:.1f}%)")
 
 
+def list_available_dataset_paths():
+    """Find YOLO yaml configs and COCO annotation files under DATA_DIR."""
+    yaml_paths = sorted(DATA_DIR.rglob("*.yaml")) + sorted(DATA_DIR.rglob("*.yml"))
+    coco_paths = sorted(DATA_DIR.rglob("annotations_*.json"))
+    return yaml_paths, coco_paths
+
+
 def inspect_coco_dataset(dataset_path, output_dir, num_samples, display):
     """Inspect COCO format dataset."""
     dataset_path = Path(dataset_path)
@@ -194,6 +201,13 @@ def main():
         help="Only show data distributions, skip visualizations",
     )
     args = parser.parse_args()
+
+    if args.display and args.dataset_path is None:
+        yaml_paths, coco_paths = list_available_dataset_paths()
+        print("--display requires a dataset_path. Available paths:\n")
+        for path in yaml_paths + coco_paths:
+            print(f"  {path.relative_to(DATA_DIR.parent)}")
+        parser.error("--display requires a dataset_path")
 
     print("=" * 60)
     print("Dataset Inspection")

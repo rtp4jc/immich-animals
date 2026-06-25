@@ -1,0 +1,19 @@
+[tools]
+python = "3.12"
+uv = "latest"
+
+# Auto-activate the project venv when entering the directory (if it exists).
+[env]
+_.python.venv = { path = ".venv", create = false }
+
+[tasks.setup]
+description = "Create .venv and install locked dependencies"
+run = "uv sync"
+
+[tasks.lock]
+description = "Update uv.lock from pyproject.toml"
+run = "uv lock"
+
+[tasks.test]
+description = "Run the test suite"
+run = "uv run pytest"
