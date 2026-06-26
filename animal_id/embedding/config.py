@@ -3,10 +3,29 @@ Central configuration file for the embedding model pipeline.
 """
 
 from .backbones import BackboneType
+from .losses import HeadType
 
 # --- Model Configuration ---
 # Default backbone to use for training and inference.
 DEFAULT_BACKBONE = BackboneType.RESNET50
+
+# --- Margin Head Configuration ---
+# Selects and parameterizes the train-time margin head. The default reproduces
+# the historical hardcoded behavior exactly: ArcFace with s=30, m=0.50, label
+# smoothing 0.1. Swapping HEAD_TYPE to SUBCENTER_ARCFACE (the MiewID recipe) or
+# COSFACE is a one-line change and only affects training; the embedding output
+# and ONNX inference path are unchanged.
+HEAD_CONFIG = {
+    "HEAD_TYPE": HeadType.ARCFACE,
+    # Shared margin-head hyperparameters (None => use the head's own default).
+    "ARCFACE_S": 30.0,
+    "ARCFACE_M": 0.50,
+    "LABEL_SMOOTHING": 0.1,
+    # Sub-center ArcFace: number of sub-centers per class.
+    "SUB_CENTER_K": 3,
+    # CosFace additive cosine margin (only used when HEAD_TYPE == COSFACE).
+    "COSFACE_M": 0.35,
+}
 
 # --- Training Hyperparameters ---
 TRAINING_CONFIG = {
