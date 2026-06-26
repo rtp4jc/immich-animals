@@ -27,7 +27,31 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from animal_id.embedding.backbones import BackboneType, get_backbone
-from animal_id.embedding.losses import ArcFaceLoss
+from animal_id.embedding.config import HEAD_CONFIG
+from animal_id.embedding.losses import HeadType, build_head
+
+
+def _head_kwargs_from_config(head_type, config):
+    """
+    Map the project ``HEAD_CONFIG`` dict to keyword arguments for a margin head.
+
+    Only the keys relevant to the selected ``head_type`` are forwarded. The
+    shared scale/margin/label-smoothing keys map to ``s`` / ``m`` /
+    ``label_smoothing``; per-head extras (sub-center ``k``, CosFace ``m``) are
+    added on top. ``build_head`` drops any ``None`` values so each head falls
+    back to its own defaults when a key is unset.
+    """
+    kwargs = {
+        "s": config.get("ARCFACE_S"),
+        "m": config.get("ARCFACE_M"),
+        "label_smoothing": config.get("LABEL_SMOOTHING"),
+    }
+    if head_type == HeadType.SUBCENTER_ARCFACE:
+        kwargs["k"] = config.get("SUB_CENTER_K")
+    elif head_type == HeadType.COSFACE:
+        # CosFace uses its own additive cosine margin rather than ARCFACE_M.
+        kwargs["m"] = config.get("COSFACE_M")
+    return kwargs
 
 
 class EmbeddingNet(nn.Module):
@@ -94,6 +118,8 @@ class AnimalEmbeddingModel(nn.Module):
         num_classes: Optional[int] = None,
         embedding_dim: int = 512,
         pretrained: bool = True,
+        head_type: Optional[HeadType] = None,
+        head_config: Optional[dict] = None,
     ):
         """
         Args:
@@ -102,6 +128,11 @@ class AnimalEmbeddingModel(nn.Module):
                                          If None, model is in inference mode (no classification head).
             embedding_dim (int): Size of embedding vector.
             pretrained (bool): Use ImageNet weights.
+            head_type (Optional[HeadType]): Margin head to use. Defaults to
+                ``head_config["HEAD_TYPE"]`` (ArcFace via the project config),
+                preserving historical behavior.
+            head_config (Optional[dict]): Head-hyperparameter dict. Defaults to
+                ``animal_id.embedding.config.HEAD_CONFIG``.
         """
         super(AnimalEmbeddingModel, self).__init__()
 
@@ -110,7 +141,15 @@ class AnimalEmbeddingModel(nn.Module):
         )
 
         if num_classes is not None:
-            self.head = ArcFaceLoss(embedding_dim, num_classes)
+            head_config = head_config if head_config is not None else HEAD_CONFIG
+            head_type = head_type if head_type is not None else head_config["HEAD_TYPE"]
+            head_type = HeadType(head_type)
+            self.head = build_head(
+                head_type,
+                embedding_dim,
+                num_classes,
+                **_head_kwargs_from_config(head_type, head_config),
+            )
         else:
             self.head = None
 
