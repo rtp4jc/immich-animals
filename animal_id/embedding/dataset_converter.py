@@ -14,18 +14,27 @@ class EmbeddingDatasetConverter:
         source_path: str,
         output_train_json: str,
         output_val_json: str,
+        output_test_json: str,
         min_images_per_identity: int = 5,
         val_split_ratio: float = 0.15,
+        test_split_ratio: float = 0.15,
     ):
         self.source_path = source_path
         self.output_train_json = output_train_json
         self.output_val_json = output_val_json
+        self.output_test_json = output_test_json
         self.min_images_per_identity = min_images_per_identity
         self.val_split_ratio = val_split_ratio
+        self.test_split_ratio = test_split_ratio
 
     def convert(self):
         """
-        Scans DogFaceNet for identities and creates train/validation JSON files.
+        Scans DogFaceNet for identities and creates train/val/test JSON files.
+
+        The split is performed BY IDENTITY (open-set, no identity leakage): the
+        train, validation, and test sets contain disjoint identities. Validation
+        is used for model selection / early-stopping, while the held-out test set
+        is reserved for the reported retrieval metrics (MRR / top-k / TAR@FAR).
         """
         print("--- Embedding Data Preparation ---")
 
@@ -80,22 +89,29 @@ class EmbeddingDatasetConverter:
 
         train_data = []
         val_data = []
+        test_data = []
         total_images = sum(len(imgs) for imgs in data_by_identity.values())
         val_target_count = int(total_images * self.val_split_ratio)
+        test_target_count = int(total_images * self.test_split_ratio)
 
+        # Assign whole identities to test first, then val, then train so that the
+        # three identity sets are pairwise disjoint (open-set protocol).
         for identity_id in all_identity_ids:
-            # Add identities to validation set until we reach the desired ratio
-            if len(val_data) < val_target_count:
+            if len(test_data) < test_target_count:
+                test_data.extend(data_by_identity[identity_id])
+            elif len(val_data) < val_target_count:
                 val_data.extend(data_by_identity[identity_id])
             else:
                 train_data.extend(data_by_identity[identity_id])
 
         print(f"Total images: {total_images}")
         print(f"Target validation images: ~{val_target_count}")
+        print(f"Target test images: ~{test_target_count}")
 
         # Ensure output directories exist
         os.makedirs(os.path.dirname(self.output_train_json), exist_ok=True)
         os.makedirs(os.path.dirname(self.output_val_json), exist_ok=True)
+        os.makedirs(os.path.dirname(self.output_test_json), exist_ok=True)
 
         # Save to JSON
         print(f"Writing {len(train_data)} training samples to {self.output_train_json}")
@@ -106,10 +122,15 @@ class EmbeddingDatasetConverter:
         with open(self.output_val_json, "w") as f:
             json.dump(val_data, f, indent=2)
 
+        print(f"Writing {len(test_data)} test samples to {self.output_test_json}")
+        with open(self.output_test_json, "w") as f:
+            json.dump(test_data, f, indent=2)
+
         print("Dataset preparation complete!")
         print(
-            f"Training identities: {len([id for id in all_identity_ids if any(item['identity_label'] == id for item in train_data)])}"
+            f"Training identities: {len({item['identity_label'] for item in train_data})}"
         )
         print(
-            f"Validation identities: {len([id for id in all_identity_ids if any(item['identity_label'] == id for item in val_data)])}"
+            f"Validation identities: {len({item['identity_label'] for item in val_data})}"
         )
+        print(f"Test identities: {len({item['identity_label'] for item in test_data})}")

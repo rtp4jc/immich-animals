@@ -89,9 +89,11 @@ def run_full_pipeline_benchmark(
     logger.info("STARTING FULL PIPELINE BENCHMARK")
     logger.info("=" * 60)
 
-    val_json_path = DATA_DIR / "identity_val.json"
-    if not val_json_path.exists():
-        logger.error(f"Validation JSON not found: {val_json_path}")
+    # Headline benchmark numbers are reported on the held-out TEST split (disjoint
+    # identities from train/val). Val is reserved for model selection / early-stopping.
+    test_json_path = DATA_DIR / "identity_test.json"
+    if not test_json_path.exists():
+        logger.error(f"Test JSON not found: {test_json_path}")
         return False
 
     logger.info("Initializing AnimalPipeline...")
@@ -121,8 +123,8 @@ def run_full_pipeline_benchmark(
     if has_keypoints:
         keypoint_model = ONNXKeypoint(str(ONNX_KEYPOINT_PATH))
 
-    # Load validation data
-    loader = IdentityLoader()
+    # Load held-out test data for the reported (headline) benchmark
+    loader = IdentityLoader(json_filename="identity_test.json")
     ground_truth = loader.load_validation_data(
         num_images=num_images, include_additional=include_additional
     )
@@ -134,9 +136,7 @@ def run_full_pipeline_benchmark(
     }
 
     dataset_size = "full dataset" if num_images is None else f"{num_images} images"
-    logger.info(
-        f"Found {len(ground_truth)} validation images. Processing {dataset_size}."
-    )
+    logger.info(f"Found {len(ground_truth)} test images. Processing {dataset_size}.")
 
     # Save temporary ground truth file for Evaluator
     temp_gt_path = PROJECT_ROOT / "outputs/temp_ground_truth.json"
@@ -306,6 +306,7 @@ def run_embedding_data_prep():
         source_path=DATA_CONFIG["DOGFACENET_PATH"],
         output_train_json=DATA_CONFIG["TRAIN_JSON_PATH"],
         output_val_json=DATA_CONFIG["VAL_JSON_PATH"],
+        output_test_json=DATA_CONFIG["TEST_JSON_PATH"],
     )
     dataset_converter.convert()
 
