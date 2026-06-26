@@ -47,7 +47,7 @@ class EmbeddingDatasetConverter:
 
         # Scan DogFaceNet directory structure
         filtered_identities = {}
-        for identity_folder in os.listdir(self.source_path):
+        for identity_folder in sorted(os.listdir(self.source_path)):
             identity_path = os.path.join(self.source_path, identity_folder)
             if os.path.isdir(identity_path):
                 image_files = [

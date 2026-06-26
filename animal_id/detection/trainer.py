@@ -17,10 +17,14 @@ class DetectionTrainer:
     """Trainer for YOLO detection models."""
 
     def __init__(
-        self, model_name: str = "yolo11n.pt", config: Optional[Dict[str, Any]] = None
+        self,
+        model_name: str = "yolo11n.pt",
+        config: Optional[Dict[str, Any]] = None,
+        seed: int = 42,
     ):
         """Initialize trainer with model and configuration."""
         self.model_name = model_name
+        self.seed = seed
         self.config = config or self._get_default_config()
         self.model = None
 
@@ -38,6 +42,7 @@ class DetectionTrainer:
             "save_period": 5,
             "cache": False,
             "dropout": 0.1,
+            "seed": self.seed,
             # Augmentation settings
             "fliplr": 0.5,
             "degrees": 15.0,

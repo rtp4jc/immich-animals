@@ -44,6 +44,7 @@ from animal_id.common.constants import (
 # --- Imports for Common/Utils ---
 from animal_id.common.datasets import IdentityDataset
 from animal_id.common.identity_loader import IdentityLoader
+from animal_id.common.seed import set_seed, worker_init_fn
 
 # --- Imports for Detection ---
 from animal_id.detection.dataset_converter import (
@@ -70,6 +71,8 @@ from animal_id.tracking.wandb_logger import WandBLogger
 
 # Define project root
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+SEED = 42
 
 
 # --- Logging Setup ---
@@ -344,6 +347,8 @@ def run_embedding_pipeline():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
 
+    g = set_seed(SEED)
+
     # Load Datasets
     train_dataset = IdentityDataset(
         json_path=PROJECT_ROOT / DATA_CONFIG["TRAIN_JSON_PATH"],
@@ -361,6 +366,8 @@ def run_embedding_pipeline():
         batch_size=DATA_CONFIG["BATCH_SIZE"],
         shuffle=True,
         num_workers=TRAINING_CONFIG["HARDWARE_WORKERS"],
+        generator=g,
+        worker_init_fn=worker_init_fn,
     )
     val_loader = DataLoader(
         val_dataset,
