@@ -13,9 +13,17 @@ from .constants import DATA_DIR, PROJECT_ROOT
 class IdentityLoader:
     """Loads and manages identity validation data with optional augmentation."""
 
-    def __init__(self, seed: int = 42):
-        """Initialize with random seed for reproducible sampling."""
+    def __init__(self, seed: int = 42, json_filename: str = "identity_val.json"):
+        """Initialize with random seed for reproducible sampling.
+
+        Args:
+            seed: Random seed for reproducible sampling.
+            json_filename: Name of the base split JSON file (relative to DATA_DIR)
+                to load as the gallery/probe set. Defaults to the validation split;
+                pass ``identity_test.json`` to evaluate on the held-out test set.
+        """
         self.seed = seed
+        self.json_filename = json_filename
         random.seed(seed)
 
     def load_validation_data(
@@ -60,8 +68,8 @@ class IdentityLoader:
         )
 
     def _load_base_validation(self) -> List[Dict[str, str]]:
-        """Load base validation data from identity_val.json."""
-        val_json_path = DATA_DIR / "identity_val.json"
+        """Load base evaluation data from the configured split JSON file."""
+        val_json_path = DATA_DIR / self.json_filename
 
         with open(val_json_path) as f:
             val_data = json.load(f)
