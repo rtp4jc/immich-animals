@@ -77,10 +77,12 @@ class EmbeddingNet(nn.Module):
 
         self.feature_extractor, num_features = get_backbone(backbone_type, pretrained)
 
-        # Define the new projection head with Dropout
+        # Global pooling + flatten now live inside each backbone wrapper
+        # (the feature extractor emits a flat (B, num_features) vector), so the
+        # projection head is just Dropout + Linear. For the torchvision CNNs
+        # this is numerically identical to the previous GAP->Flatten->Dropout->
+        # Linear head — the pooling was simply relocated into the extractor.
         self.projection_head = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(),
             nn.Dropout(p=dropout_prob),
             nn.Linear(num_features, embedding_dim),
         )
