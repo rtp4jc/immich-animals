@@ -178,3 +178,18 @@ class AnimalEmbeddingModel(nn.Module):
         """Unfreeze backbone parameters."""
         for param in self.backbone.parameters():
             param.requires_grad = True
+
+    def freeze_feature_extractor(self):
+        """Freeze only the backbone trunk, leaving the projection head trainable.
+
+        Used for linear probing: the pretrained feature extractor is held fixed
+        while the projection + margin head learn on top, isolating raw feature
+        quality without tuning a per-backbone learning rate.
+        """
+        for param in self.backbone.feature_extractor.parameters():
+            param.requires_grad = False
+
+    def unfreeze_feature_extractor(self):
+        """Unfreeze the backbone trunk."""
+        for param in self.backbone.feature_extractor.parameters():
+            param.requires_grad = True

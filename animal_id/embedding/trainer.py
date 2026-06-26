@@ -164,11 +164,56 @@ class EmbeddingTrainer:
 
         return False  # Continue training
 
+    @staticmethod
+    def _convert_metric(o):
+        """Recursively convert numpy/tensor values to plain floats for JSON."""
+        if hasattr(o, "item"):
+            return o.item()
+        if isinstance(o, dict):
+            return {k: EmbeddingTrainer._convert_metric(v) for k, v in o.items()}
+        return o
+
     def train(
-        self, warmup_epochs, full_epochs, head_lr, backbone_lr, full_lr, patience
+        self,
+        warmup_epochs,
+        full_epochs,
+        head_lr,
+        backbone_lr,
+        full_lr,
+        patience,
+        linear_probe=False,
     ):
-        """Full training loop with warmup and fine-tuning phases."""
+        """Full training loop with warmup and fine-tuning phases.
+
+        When ``linear_probe`` is True, the backbone trunk is held frozen and only
+        the projection + margin head are trained (for ``warmup_epochs`` epochs);
+        the fine-tuning phase is skipped. This isolates pretrained feature
+        quality without tuning a per-backbone learning rate.
+        """
         print(f"Starting training in run directory: {self.run_dir}")
+
+        if linear_probe:
+            print(f"\n=== Linear probe ({warmup_epochs} epochs, frozen trunk) ===")
+            self.model.freeze_feature_extractor()
+            optimizer = optim.Adam(
+                filter(lambda p: p.requires_grad, self.model.parameters()),
+                lr=head_lr,
+            )
+            for epoch in range(warmup_epochs):
+                should_stop = self._train_and_validate_epoch(
+                    optimizer, epoch, warmup_epochs, "linear_probe", patience
+                )
+                if should_stop:
+                    break
+
+            with open(self.run_dir / "training_metrics.json", "w") as f:
+                json.dump(
+                    [self._convert_metric(m) for m in self.epoch_metrics], f, indent=2
+                )
+            print(
+                f"Linear probe complete. Best validation mAP: {self.best_val_metric:.4f}"
+            )
+            return self.run_dir / "best_model.pt"
 
         # Phase 1: Warmup (freeze backbone)
         print(f"\n=== Phase 1: Warmup ({warmup_epochs} epochs) ===")
@@ -231,15 +276,9 @@ class EmbeddingTrainer:
 
         # Save training metrics
         with open(self.run_dir / "training_metrics.json", "w") as f:
-            # Helper to convert numpy/tensor values to float
-            def convert(o):
-                if hasattr(o, "item"):
-                    return o.item()
-                if isinstance(o, dict):
-                    return {k: convert(v) for k, v in o.items()}
-                return o
-
-            json.dump([convert(m) for m in self.epoch_metrics], f, indent=2)
+            json.dump(
+                [self._convert_metric(m) for m in self.epoch_metrics], f, indent=2
+            )
 
         print(f"Training completed. Best validation mAP: {self.best_val_metric:.4f}")
         return self.run_dir / "best_model.pt"
