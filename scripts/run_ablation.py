@@ -25,9 +25,9 @@ Examples (run from the repo root, where ``data/`` lives):
     # Quick smoke test (1 epoch, subsampled) to confirm the cell runs
     uv run python scripts/run_ablation.py --backbone resnet50 --epochs 1 --smoke
 
-Results are appended to ``results.csv`` (+ a regenerated ``results.md`` table)
-under the planning directory. The script never overwrites prior rows, so it is
-safe to run repeatedly and resume an interrupted sweep.
+Results are appended to ``outputs/ablation/results.csv`` (+ a regenerated
+``results.md`` table). The script never overwrites prior rows, so it is safe to
+run repeatedly and resume an interrupted sweep.
 """
 
 import argparse
@@ -53,9 +53,9 @@ from animal_id.embedding.models import AnimalEmbeddingModel
 from animal_id.embedding.trainer import EmbeddingTrainer
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PLAN_DIR = PROJECT_ROOT / ".planning" / "6-25-2026-embedding-backbone-ablation"
-RESULTS_CSV = PLAN_DIR / "results.csv"
-RESULTS_MD = PLAN_DIR / "results.md"
+OUTPUT_DIR = PROJECT_ROOT / "outputs" / "ablation"
+RESULTS_CSV = OUTPUT_DIR / "results.csv"
+RESULTS_MD = OUTPUT_DIR / "results.md"
 
 CSV_FIELDS = [
     "timestamp",
@@ -134,7 +134,7 @@ def check_onnx_export(model, img_size):
 
 def write_results_row(row: dict):
     """Append one row to results.csv and regenerate the markdown table."""
-    PLAN_DIR.mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     is_new = not RESULTS_CSV.exists()
     with open(RESULTS_CSV, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=CSV_FIELDS)
