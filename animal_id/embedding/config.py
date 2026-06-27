@@ -34,7 +34,7 @@ TRAINING_CONFIG = {
     "HARDWARE_WORKERS": 8,
     "WARMUP_EPOCHS": 25,
     "FULL_TRAIN_EPOCHS": 45,
-    "EARLY_STOPPING_PATIENCE": 5,
+    "EARLY_STOPPING_PATIENCE": 10,
     "HEAD_LR": 1e-4,  # ArcFace head warmup; standard Adam range for metric-learning head
     "BACKBONE_LR": 1e-6,  # Fine-tune pretrained ResNet50; 100x smaller than head
     "FULL_TRAIN_LR": 1e-5,  # Head in phase 2; differential LR above backbone

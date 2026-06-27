@@ -27,6 +27,8 @@ dependencies = [
     "requests>=2.31.0",
     "pathlib2>=2.3.7",
     "wandb>=0.23.1",
+    "timm>=1.0.27",
+    "huggingface-hub>=1.20.1",
 ]
 
 [dependency-groups]
