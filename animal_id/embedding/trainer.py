@@ -170,9 +170,9 @@ class EmbeddingTrainer:
         """Full training loop with warmup and fine-tuning phases."""
         print(f"Starting training in run directory: {self.run_dir}")
 
-        # Phase 1: Warmup (freeze backbone)
+        # Phase 1: Warmup (freeze trunk, train projection + margin head)
         print(f"\n=== Phase 1: Warmup ({warmup_epochs} epochs) ===")
-        self.model.freeze_backbone()
+        self.model.freeze_feature_extractor()
         optimizer = optim.Adam(self.model.parameters(), lr=head_lr)
 
         for epoch in range(warmup_epochs):
@@ -193,7 +193,7 @@ class EmbeddingTrainer:
                 torch.load(best_phase1_path, map_location=self.device)
             )
 
-        self.model.unfreeze_backbone()
+        self.model.unfreeze_feature_extractor()
 
         # Reset phase tracking for new phase
         self.phase_best_val_metric = -1.0
@@ -207,8 +207,9 @@ class EmbeddingTrainer:
             ]
         )
 
-        # Sequential scheduler: Linear warmup → Cosine annealing
-        warmup_epochs_phase2 = 20
+        # Linear warmup → cosine; ramp < patience so base LR is reached before
+        # early stopping can fire.
+        warmup_epochs_phase2 = 5
         linear_scheduler = optim.lr_scheduler.LinearLR(
             optimizer, start_factor=0.01, total_iters=warmup_epochs_phase2
         )
