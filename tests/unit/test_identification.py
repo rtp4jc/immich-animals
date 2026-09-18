@@ -190,6 +190,8 @@ class TestEmbedGallery:
         assert len(labels) == 0
         assert len(paths) == 0
         assert embeddings.shape[0] == 0
+        # Must stay 2-D so callers can read .shape[1] without special-casing.
+        assert embeddings.ndim == 2
 
     def test_output_dtype_float32(self):
         """Returned embeddings are float32 regardless of pipeline output dtype."""

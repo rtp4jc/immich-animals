@@ -15,7 +15,9 @@ def embed_gallery(
 
     ``items`` are dicts with ``"image_path"`` / ``"identity_label"`` keys. Items
     whose embedding is ``None`` are dropped, keeping the three outputs aligned.
-    ``embeddings`` is an ``(N, D)`` float32 array.
+    ``embeddings`` is an ``(N, D)`` float32 array; if every item is dropped there
+    is no ``D`` to report, so the result is ``(0, 0)`` rather than a bare ``(0,)``
+    — still 2-D, so callers can index ``.shape[1]`` without special-casing.
     """
     embeddings: list[np.ndarray] = []
     labels: list = []
@@ -34,4 +36,4 @@ def embed_gallery(
     if embeddings:
         return np.stack(embeddings, axis=0), labels, paths
 
-    return np.empty((0,), dtype=np.float32), labels, paths
+    return np.empty((0, 0), dtype=np.float32), labels, paths
