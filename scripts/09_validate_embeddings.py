@@ -1,29 +1,8 @@
-"""
-Validates the performance of a trained embedding model.
+"""Evaluates a trained embedding model, qualitatively and quantitatively.
 
-What it's for:
-This script provides a unified entry point for evaluating a trained embedding model.
-It can perform both qualitative validation (visualizing nearest neighbors) and
-quantitative validation (calculating TAR@FAR metrics).
-
-What it does:
-1. Loads the best trained embedding model.
-2. Computes embedding vectors for all images in the validation set.
-3. Based on command-line flags, it can either:
-   - Visualize nearest neighbors: For a few random query images, it finds and
-     plots the most similar images from the validation set.
-   - Calculate TAR@FAR: It generates thousands of positive and negative pairs,
-     calculates their similarity, and computes the True Accept Rate at various
-     False Accept Rates.
-
-How to run it:
-- This script should be run after a model has been trained.
-- To visualize nearest neighbors:
-  `python scripts/07_validate_embeddings.py --show-neighbors`
-- To calculate TAR@FAR metrics:
-  `python scripts/07_validate_embeddings.py --calculate-metrics`
-- To run both (default action):
-  `python scripts/07_validate_embeddings.py`
+python scripts/09_validate_embeddings.py --show-neighbors    # nearest neighbours
+python scripts/09_validate_embeddings.py --calculate-metrics # TAR@FAR
+python scripts/09_validate_embeddings.py                     # both
 """
 
 import argparse
@@ -39,8 +18,6 @@ from tqdm import tqdm
 
 from animal_id.benchmark.metrics import evaluate_embedding_model
 from animal_id.common.datasets import IdentityDataset
-
-# Adjust path to import from our new package
 from animal_id.common.utils import find_latest_timestamped_run
 from animal_id.embedding.backbones import BackboneType
 from animal_id.embedding.config import DATA_CONFIG, DEFAULT_BACKBONE, TRAINING_CONFIG

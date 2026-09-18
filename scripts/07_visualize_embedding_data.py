@@ -1,28 +1,8 @@
-"""
-Visualizes the validation identity dataset and shows statistics for both train and val sets.
+"""Prints per-split identity statistics and plots the validation identities.
 
-What it's for:
-This script is a crucial debugging and verification tool. It allows you to inspect the
-dataset statistics for both training and validation sets, and visually inspect the
-validation dataset to ensure label integrity.
-
-What it does:
-1. For both `identity_train.json` and `identity_val.json`, it calculates and prints:
-   - Total number of unique identities.
-   - Distribution of samples per identity.
-   - Min, max, average, and median samples per identity.
-2. For the validation set, it calls the centralized `visualize_identity_dataset`
-   function to generate a non-interactive plot, saving it to the `outputs` directory.
-
-How to run it:
-- This script should be run after `train_master.py embedding-data`.
-- Run from the root of the project:
-  `python scripts/07_visualize_embedding_data.py`
-
-How to interpret the results:
-- The script will print statistics to the console for both datasets.
-- It will save a plot for the validation set to `outputs/phase2_visualizations/identity_verification.png`.
-- Each row in the plot is a unique dog, confirming dataset integrity.
+Run after `train_master.py embedding-data`. Writes
+outputs/phase2_visualizations/identity_verification.png, one row per dog, to confirm
+label integrity.
 """
 
 import json
@@ -32,8 +12,6 @@ from collections import Counter, defaultdict
 import numpy as np
 
 from animal_id.common.visualization import visualize_identity_dataset
-
-# Adjust path to import from our new package
 from animal_id.embedding.config import DATA_CONFIG
 
 # --- Configuration ---
