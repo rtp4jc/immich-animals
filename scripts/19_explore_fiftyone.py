@@ -48,12 +48,12 @@ def _build_pipeline() -> AnimalPipeline:
     if not ONNX_DETECTOR_PATH.exists():
         raise FileNotFoundError(
             f"Detector ONNX model not found: {ONNX_DETECTOR_PATH}\n"
-            "Run scripts/11_export_detector_onnx.py first."
+            "Run scripts/train_master.py export-detector first."
         )
     if not ONNX_EMBEDDING_PATH.exists():
         raise FileNotFoundError(
             f"Embedding ONNX model not found: {ONNX_EMBEDDING_PATH}\n"
-            "Run scripts/10_export_embedding_onnx.py first."
+            "Run scripts/train_master.py export-embedding first."
         )
 
     detector = ONNXDetector(str(ONNX_DETECTOR_PATH))

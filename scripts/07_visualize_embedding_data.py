@@ -15,7 +15,7 @@ What it does:
    function to generate a non-interactive plot, saving it to the `outputs` directory.
 
 How to run it:
-- This script should be run after `06_prepare_embedding_data.py`.
+- This script should be run after `train_master.py embedding-data`.
 - Run from the root of the project:
   `python scripts/07_visualize_embedding_data.py`
 
@@ -46,7 +46,7 @@ def print_dataset_stats(json_path: str, dataset_name: str):
     print(f"--- {dataset_name} Dataset Statistics ---")
     if not os.path.exists(json_path):
         print(f"Error: {dataset_name} JSON not found at {json_path}")
-        print("Please run `scripts/06_prepare_embedding_data.py` first.")
+        print("Please run `scripts/train_master.py embedding-data` first.")
         print("-------------------------------------\n")
         return
 
