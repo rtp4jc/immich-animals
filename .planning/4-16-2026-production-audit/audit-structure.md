@@ -1,7 +1,7 @@
 # Structure, Conventions, and Extensibility Audit
 
 **Date**: 2026-04-16  
-**Scope**: `/mnt/e/Code/GitHub/immich-animals`  
+**Scope**: repository root  
 **Audience**: Immich maintainers evaluating adoption of this project
 
 ---
