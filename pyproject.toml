@@ -31,6 +31,11 @@ dependencies = [
     "huggingface-hub>=1.20.1",
 ]
 
+[project.optional-dependencies]
+viz = [
+    "fiftyone>=1.17.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=7.4.0",
