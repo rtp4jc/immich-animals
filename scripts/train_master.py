@@ -8,6 +8,7 @@ benchmark.
 
     python scripts/train_master.py                    # everything
     python scripts/train_master.py embedding          # just the embedding model
+    python scripts/train_master.py embedding --backbone convnextv2_tiny --seed 1
     python scripts/train_master.py benchmark --tag v2
 """
 
@@ -17,7 +18,7 @@ import json
 import logging
 import os
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import torch
@@ -47,13 +48,16 @@ from animal_id.detection.trainer import DetectionTrainer
 from animal_id.detection.yolo_converter import (
     CocoToYoloDetectionConverter,
 )
+from animal_id.embedding.backbones import BackboneType
 from animal_id.embedding.config import (
     DATA_CONFIG,
     DEFAULT_BACKBONE,
+    HEAD_CONFIG,
     TRAINING_CONFIG,
 )
 from animal_id.embedding.dataset_converter import EmbeddingDatasetConverter
 from animal_id.embedding.export import export_embedding_onnx
+from animal_id.embedding.losses import HeadType
 from animal_id.embedding.models import AnimalEmbeddingModel
 from animal_id.embedding.trainer import EmbeddingTrainer
 from animal_id.pipeline.animal_pipeline import AnimalPipeline
@@ -293,7 +297,43 @@ def run_embedding_data_prep():
     dataset_converter.convert()
 
 
-def run_embedding_pipeline():
+def save_run_config(run_dir, backbone, head, seed, training_config):
+    """Record what export needs to rebuild this model without re-specifying flags."""
+    config_to_save = {
+        "backbone": backbone.value,
+        "head": head.value,
+        "seed": seed,
+        "training_config": asdict(training_config),
+        "data_config": asdict(DATA_CONFIG),
+        "timestamp": datetime.datetime.now().isoformat(),
+    }
+    with open(run_dir / "config.json", "w") as f:
+        json.dump(config_to_save, f, indent=2)
+
+
+def load_run_config(run_dir):
+    """Backbone and head a run was trained with, falling back to the config defaults.
+
+    A checkpoint only loads into the architecture that produced it, so export reads
+    this instead of assuming the defaults.
+    """
+    try:
+        saved = json.loads((run_dir / "config.json").read_text())
+        return (
+            BackboneType(saved.get("backbone", DEFAULT_BACKBONE.value)),
+            HeadType(saved.get("head", HEAD_CONFIG.head_type.value)),
+        )
+    except (OSError, ValueError):
+        logger.warning(f"No usable config.json in {run_dir}; assuming defaults.")
+        return DEFAULT_BACKBONE, HEAD_CONFIG.head_type
+
+
+def run_embedding_pipeline(
+    backbone: BackboneType = DEFAULT_BACKBONE,
+    head: HeadType = HEAD_CONFIG.head_type,
+    seed: int = SEED,
+    epochs: int | None = None,
+):
     """Runs the full embedding pipeline."""
     logger.info("STARTING EMBEDDING PIPELINE")
 
@@ -304,27 +344,24 @@ def run_embedding_pipeline():
     # 2. Train Model
     logger.info("\nStep 2: Training Embedding Model")
 
+    training_config = TRAINING_CONFIG
+    if epochs is not None:
+        training_config = replace(
+            TRAINING_CONFIG, warmup_epochs=epochs, full_train_epochs=epochs
+        )
+
     # Setup Run Directory
     timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    backbone_name = DEFAULT_BACKBONE.value
-    run_dir = PROJECT_ROOT / "runs" / f"{timestamp}_{backbone_name}"
+    run_dir = PROJECT_ROOT / "runs" / f"{timestamp}_{backbone.value}"
     run_dir.mkdir(parents=True, exist_ok=True)
     logger.info(f"Training run directory: {run_dir}")
 
-    # Save Run Config
-    config_to_save = {
-        "backbone": backbone_name,
-        "training_config": asdict(TRAINING_CONFIG),
-        "data_config": asdict(DATA_CONFIG),
-        "timestamp": datetime.datetime.now().isoformat(),
-    }
-    with open(run_dir / "config.json", "w") as f:
-        json.dump(config_to_save, f, indent=2)
+    save_run_config(run_dir, backbone, head, seed, training_config)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     logger.info(f"Using device: {device}")
 
-    g = set_seed(SEED)
+    g = set_seed(seed)
 
     # Load Datasets
     train_dataset = IdentityDataset(
@@ -342,7 +379,7 @@ def run_embedding_pipeline():
         train_dataset,
         batch_size=DATA_CONFIG.batch_size,
         shuffle=True,
-        num_workers=TRAINING_CONFIG.hardware_workers,
+        num_workers=training_config.hardware_workers,
         generator=g,
         worker_init_fn=worker_init_fn,
     )
@@ -350,14 +387,15 @@ def run_embedding_pipeline():
         val_dataset,
         batch_size=DATA_CONFIG.batch_size,
         shuffle=False,
-        num_workers=TRAINING_CONFIG.hardware_workers,
+        num_workers=training_config.hardware_workers,
     )
 
     # Create Model
     model = AnimalEmbeddingModel(
-        backbone_type=DEFAULT_BACKBONE,
+        backbone_type=backbone,
         num_classes=train_dataset.num_classes,
-        embedding_dim=TRAINING_CONFIG.embedding_dim,
+        embedding_dim=training_config.embedding_dim,
+        head_type=head,
     ).to(device)
 
     # Create Trainer
@@ -371,27 +409,42 @@ def run_embedding_pipeline():
 
     # Execute Training
     best_model_path = trainer.train(
-        warmup_epochs=TRAINING_CONFIG.warmup_epochs,
-        full_epochs=TRAINING_CONFIG.full_train_epochs,
-        head_lr=TRAINING_CONFIG.head_lr,
-        backbone_lr=TRAINING_CONFIG.backbone_lr,
-        full_lr=TRAINING_CONFIG.full_train_lr,
-        patience=TRAINING_CONFIG.early_stopping_patience,
+        warmup_epochs=training_config.warmup_epochs,
+        full_epochs=training_config.full_train_epochs,
+        head_lr=training_config.head_lr,
+        backbone_lr=training_config.backbone_lr,
+        full_lr=training_config.full_train_lr,
+        patience=training_config.early_stopping_patience,
     )
     logger.info(f"Embedding training complete. Best model: {best_model_path}")
 
     # 3. Evaluate Best Model and Export
-    run_embedding_export(best_model_path, val_loader, device, train_dataset.num_classes)
+    run_embedding_export(
+        best_model_path,
+        val_loader,
+        device,
+        train_dataset.num_classes,
+        backbone=backbone,
+        head=head,
+    )
 
 
-def run_embedding_export(model_path, val_loader, device, num_classes):
+def run_embedding_export(
+    model_path,
+    val_loader,
+    device,
+    num_classes,
+    backbone: BackboneType = DEFAULT_BACKBONE,
+    head: HeadType = HEAD_CONFIG.head_type,
+):
     """Evaluates the best model and exports it to ONNX."""
 
     # Re-instantiate model for evaluation and export
     model = AnimalEmbeddingModel(
-        backbone_type=DEFAULT_BACKBONE,
+        backbone_type=backbone,
         num_classes=num_classes,
         embedding_dim=TRAINING_CONFIG.embedding_dim,
+        head_type=head,
     )
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
@@ -410,9 +463,10 @@ def run_embedding_export(model_path, val_loader, device, num_classes):
     # Re-instantiate model on CPU for export to ensure consistency
     export_device = torch.device("cpu")
     export_model = AnimalEmbeddingModel(
-        backbone_type=DEFAULT_BACKBONE,
+        backbone_type=backbone,
         num_classes=num_classes,
         embedding_dim=TRAINING_CONFIG.embedding_dim,
+        head_type=head,
     )
     export_model.load_state_dict(torch.load(model_path, map_location=export_device))
     export_model.to(export_device)
@@ -442,8 +496,11 @@ def run_embedding_export_latest():
     latest_run = find_latest_timestamped_run()
     model_path = latest_run / "best_model.pt" if latest_run else None
 
-    if model_path is None or not model_path.exists():
+    if model_path is not None and model_path.exists():
+        backbone, head = load_run_config(latest_run)
+    else:
         # Fall back to the pre-`runs/` checkpoint location.
+        backbone, head = DEFAULT_BACKBONE, HEAD_CONFIG.head_type
         model_path = MODELS_DIR / "dog_embedding_best.pt"
         if not model_path.exists():
             raise FileNotFoundError(
@@ -470,7 +527,14 @@ def run_embedding_export_latest():
         is_training=True,
     )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    run_embedding_export(model_path, val_loader, device, train_dataset.num_classes)
+    run_embedding_export(
+        model_path,
+        val_loader,
+        device,
+        train_dataset.num_classes,
+        backbone=backbone,
+        head=head,
+    )
 
 
 def run_all(args):
@@ -491,7 +555,7 @@ def run_all(args):
             f"Skipping embedding pipeline as {ONNX_EMBEDDING_PATH} exists (--skip-trained)."
         )
     else:
-        run_embedding_pipeline()
+        run_embedding_pipeline(**embedding_overrides(args))
 
     if not args.skip_benchmark:
         if ONNX_DETECTOR_PATH.exists() and ONNX_EMBEDDING_PATH.exists():
@@ -513,7 +577,9 @@ def build_parser():
     )
     sub.add_parser("detection", help="Prepare, train and export the detector")
     sub.add_parser("embedding-data", help="Prepare the embedding dataset")
-    sub.add_parser("embedding", help="Prepare, train and export the embedding model")
+    embedding = sub.add_parser(
+        "embedding", help="Prepare, train and export the embedding model"
+    )
     sub.add_parser("export-detector", help="Export the latest detector run to ONNX")
     sub.add_parser("export-embedding", help="Export the latest embedding run to ONNX")
 
@@ -553,14 +619,53 @@ def build_parser():
         p.add_argument("--no-wandb", action="store_true", help="Disable WandB logging")
         p.add_argument("--tag", default=None, help="Tag for the WandB run")
 
+    # Embedding-run overrides apply to both commands that can train the embedder.
+    for p in (embedding, run_all_parser):
+        add_embedding_overrides(p)
+
     return parser
+
+
+def add_embedding_overrides(parser):
+    """Flags that let an embedding run be specified without editing config.py."""
+    parser.add_argument(
+        "--backbone",
+        default=DEFAULT_BACKBONE.value,
+        choices=[b.value for b in BackboneType],
+        help=f"Embedding backbone (default: {DEFAULT_BACKBONE.value})",
+    )
+    parser.add_argument(
+        "--head",
+        default=HEAD_CONFIG.head_type.value,
+        choices=[h.value for h in HeadType],
+        help=f"Margin head (default: {HEAD_CONFIG.head_type.value})",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=SEED, help=f"Random seed (default: {SEED})"
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=None,
+        help="Override both the warmup and full epoch budgets",
+    )
+
+
+def embedding_overrides(args):
+    """Parsed embedding flags as run_embedding_pipeline kwargs."""
+    return {
+        "backbone": BackboneType(args.backbone),
+        "head": HeadType(args.head),
+        "seed": args.seed,
+        "epochs": args.epochs,
+    }
 
 
 COMMANDS = {
     "detection-data": lambda args: run_detection_data_prep(),
     "detection": lambda args: run_detection_pipeline(),
     "embedding-data": lambda args: run_embedding_data_prep(),
-    "embedding": lambda args: run_embedding_pipeline(),
+    "embedding": lambda args: run_embedding_pipeline(**embedding_overrides(args)),
     "export-detector": lambda args: run_detector_export_latest(),
     "export-embedding": lambda args: run_embedding_export_latest(),
     "benchmark": lambda args: run_full_pipeline_benchmark(

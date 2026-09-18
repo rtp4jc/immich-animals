@@ -63,6 +63,8 @@ uv run python scripts/train_master.py benchmark --num-images 50 --tag baseline
 
 Other subcommands: `detection-data`, `embedding-data`, `export-detector`, `export-embedding`. Keypoints are trained separately via scripts 04, 05, and 12.
 
+`embedding` and `all` also take `--backbone`, `--head`, `--seed` and `--epochs`, so a run is fully specified without editing `embedding/config.py`. The run directory's `config.json` records them, and `export-embedding` reads it back to rebuild the right architecture.
+
 ```bash
 # Immich-like identification: cluster embeddings and score against ground truth
 uv run python scripts/18_run_identification.py --split val --num-images 200
