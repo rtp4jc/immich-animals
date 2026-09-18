@@ -51,7 +51,7 @@ include = ["animal_id*"]
 
 [tool.ruff]
 target-version = "py312"
-exclude = ["immich-clone", ".gemini"]
+exclude = ["immich-clone"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]

@@ -20,7 +20,7 @@ The immich-animals pipeline and Immich's facial-recognition pipeline share a sup
 
 ### 1.1 Face Detection (`FaceDetector`)
 
-**File:** `/mnt/e/Code/GitHub/immich-app/machine-learning/immich_ml/models/facial_recognition/detection.py`
+**File:** `<immich-app>/machine-learning/immich_ml/models/facial_recognition/detection.py`
 
 | Property | Value |
 |---|---|
@@ -41,7 +41,7 @@ The immich-animals pipeline and Immich's facial-recognition pipeline share a sup
 
 ### 1.2 Face Recognition / Embedding (`FaceRecognizer`)
 
-**File:** `/mnt/e/Code/GitHub/immich-app/machine-learning/immich_ml/models/facial_recognition/recognition.py`
+**File:** `<immich-app>/machine-learning/immich_ml/models/facial_recognition/recognition.py`
 
 | Property | Value |
 |---|---|
@@ -60,7 +60,7 @@ The immich-animals pipeline and Immich's facial-recognition pipeline share a sup
 
 ### 1.3 Model Registry / Discovery
 
-**File:** `/mnt/e/Code/GitHub/immich-app/machine-learning/immich_ml/models/constants.py:70-75`
+**File:** `<immich-app>/machine-learning/immich_ml/models/constants.py:70-75`
 
 Immich recognises only four InsightFace model names: `antelopev2`, `buffalo_s`, `buffalo_m`, `buffalo_l`. Models are downloaded from HuggingFace Hub as `immich-app/<model_name>` and placed at a path derived from `model_type` + `model_name`. ONNX files must be at `<cache>/<task>/<model_name>/detection/model.onnx` and `…/recognition/model.onnx`.
 
@@ -70,7 +70,7 @@ Immich recognises only four InsightFace model names: `antelopev2`, `buffalo_s`, 
 
 ### 2.1 Detection (`ONNXDetector`)
 
-**File:** `/mnt/e/Code/GitHub/immich-animals/animal_id/pipeline/onnx_models.py:10-53`
+**File:** `./animal_id/pipeline/onnx_models.py:10-53`
 
 | Property | Value |
 |---|---|
@@ -86,7 +86,7 @@ Immich recognises only four InsightFace model names: `antelopev2`, `buffalo_s`, 
 
 ### 2.2 Keypoint Model (`ONNXKeypoint`)
 
-**File:** `/mnt/e/Code/GitHub/immich-animals/animal_id/pipeline/onnx_models.py:56-92`
+**File:** `./animal_id/pipeline/onnx_models.py:56-92`
 
 | Property | Value |
 |---|---|
@@ -98,7 +98,7 @@ Immich recognises only four InsightFace model names: `antelopev2`, `buffalo_s`, 
 
 ### 2.3 Embedding (`ONNXEmbedding`)
 
-**File:** `/mnt/e/Code/GitHub/immich-animals/animal_id/pipeline/onnx_models.py:95-115`; exported in `train_master.py:401-454`
+**File:** `./animal_id/pipeline/onnx_models.py:95-115`; exported in `train_master.py:401-454`
 
 | Property | Value |
 |---|---|
@@ -236,15 +236,15 @@ If modifying Immich source is acceptable, the minimum viable adapter is:
 
 | File | Purpose |
 |---|---|
-| `/mnt/e/Code/GitHub/immich-app/machine-learning/immich_ml/models/facial_recognition/detection.py` | Immich face detector (RetinaFace wrapper) |
-| `/mnt/e/Code/GitHub/immich-app/machine-learning/immich_ml/models/facial_recognition/recognition.py` | Immich face recognizer (ArcFaceONNX wrapper) |
-| `/mnt/e/Code/GitHub/immich-app/machine-learning/immich_ml/models/transforms.py` | Immich image decode/normalise utils |
-| `/mnt/e/Code/GitHub/immich-app/machine-learning/immich_ml/schemas.py` | Immich type contracts (FaceDetectionOutput, etc.) |
-| `/mnt/e/Code/GitHub/immich-app/machine-learning/immich_ml/models/constants.py` | Immich model registry (known model names) |
-| `/mnt/e/Code/GitHub/immich-app/machine-learning/test_main.py:718-776` | Tests confirming crop shape (112,112,3), embedding dim 512 |
-| `/mnt/e/Code/GitHub/immich-animals/animal_id/pipeline/onnx_models.py` | Our ONNX wrappers (detector, keypoint, embedding) |
-| `/mnt/e/Code/GitHub/immich-animals/animal_id/pipeline/ambidextrous_axolotl.py` | Our inference orchestrator (crop geometry, cosine sim) |
-| `/mnt/e/Code/GitHub/immich-animals/animal_id/embedding/models.py` | EmbeddingNet (512-dim, L2-normalised output) |
-| `/mnt/e/Code/GitHub/immich-animals/animal_id/embedding/config.py` | Embedding config (IMG_SIZE=224, EMBEDDING_DIM=512) |
-| `/mnt/e/Code/GitHub/immich-animals/scripts/train_master.py:279-295,401-454` | ONNX export logic (input/output names, opset, dynamic axes) |
-| `/mnt/e/Code/GitHub/immich-animals/animal_id/common/constants.py:29-31` | ONNX file paths |
+| `<immich-app>/machine-learning/immich_ml/models/facial_recognition/detection.py` | Immich face detector (RetinaFace wrapper) |
+| `<immich-app>/machine-learning/immich_ml/models/facial_recognition/recognition.py` | Immich face recognizer (ArcFaceONNX wrapper) |
+| `<immich-app>/machine-learning/immich_ml/models/transforms.py` | Immich image decode/normalise utils |
+| `<immich-app>/machine-learning/immich_ml/schemas.py` | Immich type contracts (FaceDetectionOutput, etc.) |
+| `<immich-app>/machine-learning/immich_ml/models/constants.py` | Immich model registry (known model names) |
+| `<immich-app>/machine-learning/test_main.py:718-776` | Tests confirming crop shape (112,112,3), embedding dim 512 |
+| `./animal_id/pipeline/onnx_models.py` | Our ONNX wrappers (detector, keypoint, embedding) |
+| `./animal_id/pipeline/ambidextrous_axolotl.py` | Our inference orchestrator (crop geometry, cosine sim) |
+| `./animal_id/embedding/models.py` | EmbeddingNet (512-dim, L2-normalised output) |
+| `./animal_id/embedding/config.py` | Embedding config (IMG_SIZE=224, EMBEDDING_DIM=512) |
+| `./scripts/train_master.py:279-295,401-454` | ONNX export logic (input/output names, opset, dynamic axes) |
+| `./animal_id/common/constants.py:29-31` | ONNX file paths |

@@ -1,73 +1,10 @@
-# CLAUDE.md
+# Agent notes
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Read [README.md](README.md) first: setup, commands, architecture, and the script map live there. The rules below are the ones you can't infer from the repo.
 
-See [README.md](README.md) for project overview, setup, training pipeline, and data requirements.
-
-## Commands
-
-```bash
-# Lint / format
-uv run ruff check .
-uv run ruff format .
-
-# Tests (always use `uv run` — non-interactive shells don't get mise's
-# auto-activation hook, so do not rely on an activated venv)
-uv run pytest tests/
-uv run pytest tests/unit/test_datasets.py   # single file
-uv run pytest --cov=animal_id tests/        # with coverage
-```
-
-## Working in a Git Worktree
-
-This repo uses git worktrees for isolated feature branches. When Claude Code opens a worktree the working directory is the worktree path, **not** the repo root. Key facts to avoid confusion:
-
-### Am I in a worktree?
-
-Run this first when starting a session:
-
-```bash
-git rev-parse --git-dir
-```
-
-- Main repo: prints `.git`
-- Worktree: prints an absolute path ending in `.git/worktrees/<name>` — the repo root is everything before `/.git/worktrees/`
-
-- **The venv lives at the repo root**, not inside the worktree. Use its absolute path:
-  ```bash
-  /mnt/e/Code/GitHub/immich-animals/venv/bin/python -m pytest tests/
-  /mnt/e/Code/GitHub/immich-animals/venv/bin/ruff check .
-  ```
-- **The venv is shared** across all worktrees. Installing a package via `uv` targets the single shared venv — it applies everywhere.
-- **Installing deps from the worktree's pyproject.toml** requires pointing uv at the repo root venv explicitly:
-  ```bash
-  uv pip install <package> --python /mnt/e/Code/GitHub/immich-animals/venv/bin/python
-  # or to sync all deps from worktree's pyproject.toml:
-  uv pip install -e "<worktree_path>/.[dev]" --python /mnt/e/Code/GitHub/immich-animals/venv/bin/python
-  ```
-  Running `uv pip install -e .[dev]` from inside the worktree will pick up the **parent repo's** `pyproject.toml`, not the worktree's.
-- **Git commands** work normally from the worktree root — `git status`, `git add`, `git commit`, `git push` all operate on the worktree branch.
-- **`CLAUDE.md` commands** like `venv/bin/python ...` are relative to the repo root, not the worktree. Prefix them with the absolute venv path shown above when running from inside a worktree.
-
-## Architecture
-
-### Three-stage inference pipeline
-`animal_id/pipeline/animal_pipeline.py` is the main orchestrator (`AnimalPipeline` class):
-1. **Detection** (`ONNXDetector`) — YOLO11n, outputs bounding boxes
-2. **Keypoints** (`ONNXKeypoint`) — YOLO11n-pose, estimates 4 facial landmarks for crop refinement (currently disabled by default — benchmarks show better results without it)
-3. **Embedding** (`ONNXEmbedding`) — ResNet50 + ArcFace, 512-dim vectors for identity matching
-
-`pipeline/onnx_models.py` wraps the three ONNX models. `pipeline/models.py` defines the `DetectionModel`, `KeypointModel`, and `EmbeddingModel` Protocol classes for loose coupling.
-
-### Training modules
-Each stage has its own subpackage with `trainer.py`, `dataset_converter.py`, and `yolo_converter.py`:
-- `animal_id/detection/` — wraps Ultralytics YOLO training
-- `animal_id/keypoint/` — YOLO-pose training on Stanford Dogs keypoints
-- `animal_id/embedding/` — custom PyTorch: `models.py` (AnimalEmbeddingModel + ArcFace head), `backbones.py` (ResNet50/MobileNetV3/EfficientNet), `losses.py` (ArcFace/CosFace)
-
-### Shared utilities
-`animal_id/common/constants.py` is the single source of truth for all paths (`PROJECT_ROOT`, `MODELS_DIR`, `DATA_DIR`, `ONNX_DIR`). `animal_id/benchmark/evaluator.py` computes MRR, top-k accuracy, and TAR@FAR metrics.
-
-## CI
-
-GitHub Actions (`.github/workflows/python-package.yml`) runs on push/PR to main: ruff lint → ruff format check → pytest, using uv + Python 3.12 (`uv sync` from `uv.lock`).
+- **Always prefix commands with `uv run`** (`uv run pytest`, `uv run ruff check .`). Non-interactive shells don't get mise's venv activation, so a bare `pytest` fails.
+- **In a git worktree**, reuse the main checkout's venv instead of syncing a second copy of torch: `UV_PROJECT_ENVIRONMENT=<repo-root>/.venv uv run --no-sync ...`. `git rev-parse --git-dir` prints `.git/worktrees/<name>` when you're in one; the repo root is everything before `/.git/`.
+- **Add dependencies with `uv add <pkg>`** (or `uv add --group dev <pkg>`). Never hand-edit version pins in `pyproject.toml`.
+- **Keep docstrings and comments short.** Say why, not what.
+- **Never commit absolute paths.** The repo is cloned on several machines; use paths relative to the repo root or `animal_id/common/constants.py`.
+- **`.planning/` holds dated design docs, not instructions.** `4-16-2026-production-audit/` is the roadmap the P0/P1 PRs come from. `6-25-2026-embedding-backbone-ablation/` drives `scripts/run_ablation.py`.
