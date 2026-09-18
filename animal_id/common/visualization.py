@@ -251,10 +251,7 @@ def visualize_detection_results(
         ax.add_patch(rect)
         ax.text(bbox[0], bbox[1] - 5, f"{conf:.2f}", color="red", fontsize=10)
 
-    if output_path:
-        save_or_show_plot(output_path, display)
-    else:
-        save_or_show_plot(None, display)
+    save_or_show_plot(output_path, display)
 
 
 # Keypoint Results Visualization
@@ -304,10 +301,7 @@ def visualize_keypoint_results(
     if keypoints:
         ax.legend()
 
-    if output_path:
-        save_or_show_plot(output_path, display)
-    else:
-        save_or_show_plot(None, display)
+    save_or_show_plot(output_path, display)
 
 
 # Training Metrics Visualization
@@ -334,10 +328,7 @@ def visualize_training_metrics(
 
     plt.tight_layout()
 
-    if output_path:
-        save_or_show_plot(output_path, display)
-    else:
-        save_or_show_plot(None, display)
+    save_or_show_plot(output_path, display)
 
 
 # Embedding Visualization
