@@ -51,18 +51,18 @@ def main(args):
     # The export function requires a dataloader and num_classes for evaluation
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     val_dataset = IdentityDataset(
-        json_path=DATA_CONFIG["VAL_JSON_PATH"],
-        img_size=DATA_CONFIG["IMG_SIZE"],
+        json_path=DATA_CONFIG.val_json_path,
+        img_size=DATA_CONFIG.img_size,
         is_training=False,
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=DATA_CONFIG["BATCH_SIZE"], shuffle=False, num_workers=2
+        val_dataset, batch_size=DATA_CONFIG.batch_size, shuffle=False, num_workers=2
     )
 
     # We also need num_classes from the *training* set to initialize the model
     train_dataset = IdentityDataset(
-        json_path=DATA_CONFIG["TRAIN_JSON_PATH"],
-        img_size=DATA_CONFIG["IMG_SIZE"],
+        json_path=DATA_CONFIG.train_json_path,
+        img_size=DATA_CONFIG.img_size,
         is_training=True,
     )
     num_classes = train_dataset.num_classes

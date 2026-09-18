@@ -211,7 +211,7 @@ def build_loader(json_name, img_size, batch_size, is_training, generator=None):
         dataset,
         batch_size=batch_size,
         shuffle=is_training,
-        num_workers=TRAINING_CONFIG["HARDWARE_WORKERS"],
+        num_workers=TRAINING_CONFIG.hardware_workers,
         generator=generator if is_training else None,
         worker_init_fn=worker_init_fn if is_training else None,
     )
@@ -267,7 +267,7 @@ def main():
     args = parser.parse_args()
 
     head = HeadType(args.head)
-    batch_size = DATA_CONFIG["BATCH_SIZE"]
+    batch_size = DATA_CONFIG.batch_size
     epochs = args.epochs or (1 if args.smoke else None)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -290,14 +290,14 @@ def main():
         generator = set_seed(args.seed)
 
         train_dataset, train_loader = build_loader(
-            DATA_CONFIG["TRAIN_JSON_PATH"].split("/")[-1],
+            DATA_CONFIG.train_json_path.split("/")[-1],
             img_size,
             batch_size,
             is_training=True,
             generator=generator,
         )
         _, val_loader = build_loader(
-            DATA_CONFIG["VAL_JSON_PATH"].split("/")[-1],
+            DATA_CONFIG.val_json_path.split("/")[-1],
             img_size,
             batch_size,
             is_training=False,
@@ -309,7 +309,7 @@ def main():
         model = AnimalEmbeddingModel(
             backbone_type=backbone,
             num_classes=train_dataset.num_classes,
-            embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
+            embedding_dim=TRAINING_CONFIG.embedding_dim,
             head_type=head,
         ).to(device)
 
@@ -330,24 +330,24 @@ def main():
         )
 
         if args.mode == "probe":
-            probe_epochs = epochs or TRAINING_CONFIG["FULL_TRAIN_EPOCHS"]
+            probe_epochs = epochs or TRAINING_CONFIG.full_train_epochs
             best_model_path = trainer.train(
                 warmup_epochs=probe_epochs,
                 full_epochs=0,
-                head_lr=TRAINING_CONFIG["HEAD_LR"],
-                backbone_lr=TRAINING_CONFIG["BACKBONE_LR"],
-                full_lr=TRAINING_CONFIG["FULL_TRAIN_LR"],
-                patience=TRAINING_CONFIG["EARLY_STOPPING_PATIENCE"],
+                head_lr=TRAINING_CONFIG.head_lr,
+                backbone_lr=TRAINING_CONFIG.backbone_lr,
+                full_lr=TRAINING_CONFIG.full_train_lr,
+                patience=TRAINING_CONFIG.early_stopping_patience,
                 linear_probe=True,
             )
         else:
             best_model_path = trainer.train(
-                warmup_epochs=epochs or TRAINING_CONFIG["WARMUP_EPOCHS"],
-                full_epochs=epochs or TRAINING_CONFIG["FULL_TRAIN_EPOCHS"],
-                head_lr=TRAINING_CONFIG["HEAD_LR"],
-                backbone_lr=TRAINING_CONFIG["BACKBONE_LR"],
-                full_lr=TRAINING_CONFIG["FULL_TRAIN_LR"],
-                patience=TRAINING_CONFIG["EARLY_STOPPING_PATIENCE"],
+                warmup_epochs=epochs or TRAINING_CONFIG.warmup_epochs,
+                full_epochs=epochs or TRAINING_CONFIG.full_train_epochs,
+                head_lr=TRAINING_CONFIG.head_lr,
+                backbone_lr=TRAINING_CONFIG.backbone_lr,
+                full_lr=TRAINING_CONFIG.full_train_lr,
+                patience=TRAINING_CONFIG.early_stopping_patience,
                 linear_probe=False,
             )
 

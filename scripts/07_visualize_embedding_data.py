@@ -86,8 +86,8 @@ def print_dataset_stats(json_path: str, dataset_name: str):
 
 def main():
     """Main function to run the statistics and visualization."""
-    train_json_path = DATA_CONFIG["TRAIN_JSON_PATH"]
-    val_json_path = DATA_CONFIG["VAL_JSON_PATH"]
+    train_json_path = DATA_CONFIG.train_json_path
+    val_json_path = DATA_CONFIG.val_json_path
 
     # Process training set (stats only)
     print_dataset_stats(train_json_path, "Training")

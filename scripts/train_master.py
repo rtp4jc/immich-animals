@@ -26,6 +26,7 @@ import datetime
 import json
 import logging
 import os
+from dataclasses import asdict
 from pathlib import Path
 
 # --- Imports for Embedding ---
@@ -302,10 +303,10 @@ def run_embedding_data_prep():
     logger.info("-" * 60)
 
     dataset_converter = EmbeddingDatasetConverter(
-        source_path=DATA_CONFIG["DOGFACENET_PATH"],
-        output_train_json=DATA_CONFIG["TRAIN_JSON_PATH"],
-        output_val_json=DATA_CONFIG["VAL_JSON_PATH"],
-        output_test_json=DATA_CONFIG["TEST_JSON_PATH"],
+        source_path=DATA_CONFIG.dogfacenet_path,
+        output_train_json=DATA_CONFIG.train_json_path,
+        output_val_json=DATA_CONFIG.val_json_path,
+        output_test_json=DATA_CONFIG.test_json_path,
     )
     dataset_converter.convert()
 
@@ -333,8 +334,8 @@ def run_embedding_pipeline():
     # Save Run Config
     config_to_save = {
         "backbone": backbone_name,
-        "training_config": TRAINING_CONFIG,
-        "data_config": DATA_CONFIG,
+        "training_config": asdict(TRAINING_CONFIG),
+        "data_config": asdict(DATA_CONFIG),
         "timestamp": datetime.datetime.now().isoformat(),
     }
     with open(run_dir / "config.json", "w") as f:
@@ -347,36 +348,36 @@ def run_embedding_pipeline():
 
     # Load Datasets
     train_dataset = IdentityDataset(
-        json_path=PROJECT_ROOT / DATA_CONFIG["TRAIN_JSON_PATH"],
-        img_size=DATA_CONFIG["IMG_SIZE"],
+        json_path=PROJECT_ROOT / DATA_CONFIG.train_json_path,
+        img_size=DATA_CONFIG.img_size,
         is_training=True,
     )
     val_dataset = IdentityDataset(
-        json_path=PROJECT_ROOT / DATA_CONFIG["VAL_JSON_PATH"],
-        img_size=DATA_CONFIG["IMG_SIZE"],
+        json_path=PROJECT_ROOT / DATA_CONFIG.val_json_path,
+        img_size=DATA_CONFIG.img_size,
         is_training=False,
     )
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=DATA_CONFIG["BATCH_SIZE"],
+        batch_size=DATA_CONFIG.batch_size,
         shuffle=True,
-        num_workers=TRAINING_CONFIG["HARDWARE_WORKERS"],
+        num_workers=TRAINING_CONFIG.hardware_workers,
         generator=g,
         worker_init_fn=worker_init_fn,
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=DATA_CONFIG["BATCH_SIZE"],
+        batch_size=DATA_CONFIG.batch_size,
         shuffle=False,
-        num_workers=TRAINING_CONFIG["HARDWARE_WORKERS"],
+        num_workers=TRAINING_CONFIG.hardware_workers,
     )
 
     # Create Model
     model = AnimalEmbeddingModel(
         backbone_type=DEFAULT_BACKBONE,
         num_classes=train_dataset.num_classes,
-        embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
+        embedding_dim=TRAINING_CONFIG.embedding_dim,
     ).to(device)
 
     # Create Trainer
@@ -390,12 +391,12 @@ def run_embedding_pipeline():
 
     # Execute Training
     best_model_path = trainer.train(
-        warmup_epochs=TRAINING_CONFIG["WARMUP_EPOCHS"],
-        full_epochs=TRAINING_CONFIG["FULL_TRAIN_EPOCHS"],
-        head_lr=TRAINING_CONFIG["HEAD_LR"],
-        backbone_lr=TRAINING_CONFIG["BACKBONE_LR"],
-        full_lr=TRAINING_CONFIG["FULL_TRAIN_LR"],
-        patience=TRAINING_CONFIG["EARLY_STOPPING_PATIENCE"],
+        warmup_epochs=TRAINING_CONFIG.warmup_epochs,
+        full_epochs=TRAINING_CONFIG.full_train_epochs,
+        head_lr=TRAINING_CONFIG.head_lr,
+        backbone_lr=TRAINING_CONFIG.backbone_lr,
+        full_lr=TRAINING_CONFIG.full_train_lr,
+        patience=TRAINING_CONFIG.early_stopping_patience,
     )
     logger.info(f"Embedding training complete. Best model: {best_model_path}")
 
@@ -410,7 +411,7 @@ def run_embedding_export(model_path, val_loader, device, num_classes):
     model = AnimalEmbeddingModel(
         backbone_type=DEFAULT_BACKBONE,
         num_classes=num_classes,
-        embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
+        embedding_dim=TRAINING_CONFIG.embedding_dim,
     )
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
@@ -431,14 +432,14 @@ def run_embedding_export(model_path, val_loader, device, num_classes):
     export_model = AnimalEmbeddingModel(
         backbone_type=DEFAULT_BACKBONE,
         num_classes=num_classes,
-        embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
+        embedding_dim=TRAINING_CONFIG.embedding_dim,
     )
     export_model.load_state_dict(torch.load(model_path, map_location=export_device))
     export_model.to(export_device)
     export_model.eval()
 
     export_embedding_onnx(
-        export_model, ONNX_EMBEDDING_PATH, img_size=DATA_CONFIG["IMG_SIZE"]
+        export_model, ONNX_EMBEDDING_PATH, img_size=DATA_CONFIG.img_size
     )
     logger.info(f"Embedding ONNX exported to: {ONNX_EMBEDDING_PATH}")
 

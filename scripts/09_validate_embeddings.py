@@ -73,7 +73,7 @@ def visualize_neighbors(
         query_img = (
             Image.open(query_path)
             .convert("RGB")
-            .resize((DATA_CONFIG["IMG_SIZE"], DATA_CONFIG["IMG_SIZE"]))
+            .resize((DATA_CONFIG.img_size, DATA_CONFIG.img_size))
         )
         ax = axes[i, 0]
         ax.imshow(query_img)
@@ -90,7 +90,7 @@ def visualize_neighbors(
             neighbor_img = (
                 Image.open(neighbor_path)
                 .convert("RGB")
-                .resize((DATA_CONFIG["IMG_SIZE"], DATA_CONFIG["IMG_SIZE"]))
+                .resize((DATA_CONFIG.img_size, DATA_CONFIG.img_size))
             )
             ax = axes[i, j + 1]
             ax.imshow(neighbor_img)
@@ -124,11 +124,11 @@ def main(args):
 
     # Fall back to old location if not found
     if model_path is None:
-        model_path = TRAINING_CONFIG["MODEL_OUTPUT_PATH"]
+        model_path = TRAINING_CONFIG.model_output_path
         if not os.path.exists(model_path):
             print("Error: No trained model found.")
             print(
-                f"Checked: runs/*/best_model.pt and {TRAINING_CONFIG['MODEL_OUTPUT_PATH']}"
+                f"Checked: runs/*/best_model.pt and {TRAINING_CONFIG.model_output_path}"
             )
             print("Please run training first.")
             return
@@ -141,7 +141,7 @@ def main(args):
     model = AnimalEmbeddingModel(
         backbone_type=args.backbone,
         num_classes=None,
-        embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
+        embedding_dim=TRAINING_CONFIG.embedding_dim,
     )
 
     state_dict = torch.load(model_path, map_location=device)
@@ -153,12 +153,12 @@ def main(args):
     model.to(device)
 
     val_dataset = IdentityDataset(
-        json_path=DATA_CONFIG["VAL_JSON_PATH"],
-        img_size=DATA_CONFIG["IMG_SIZE"],
+        json_path=DATA_CONFIG.val_json_path,
+        img_size=DATA_CONFIG.img_size,
         is_training=False,
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=DATA_CONFIG["BATCH_SIZE"], shuffle=False, num_workers=2
+        val_dataset, batch_size=DATA_CONFIG.batch_size, shuffle=False, num_workers=2
     )
 
     if args.calculate_metrics:
