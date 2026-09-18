@@ -27,7 +27,7 @@ Examples (run from the repo root, where ``data/`` lives):
     uv run python scripts/run_ablation.py --backbone convnextv2_tiny \
         --mode finetune --seed 1
 
-    # Quick smoke test (1 epoch, subsampled) to confirm the cell runs
+    # Quick smoke test (1 epoch per phase) to confirm the cell runs
     uv run python scripts/run_ablation.py --backbone resnet50 --epochs 1 --smoke
 
 Results are appended to ``outputs/ablation/results.csv`` (+ a regenerated
@@ -178,11 +178,20 @@ def _regenerate_markdown():
                 tar1=_fmt(row["tar@1%"]),
                 params=row["params_total_M"],
                 cpu=row["cpu_ms"],
-                onnx="✅" if row["onnx_ok"] == "True" else "❌",
+                onnx=_fmt_onnx(row["onnx_ok"]),
                 tag=row["tag"],
             )
         )
     RESULTS_MD.write_text("\n".join(lines) + "\n")
+
+
+def _fmt_onnx(value):
+    """Render the CSV's onnx_ok cell; "skipped" must not read as a failure."""
+    if value == "True":
+        return "✅"
+    if value == "skipped":
+        return "–"
+    return "❌"
 
 
 def _fmt(value):
@@ -334,7 +343,7 @@ def main():
         else:
             best_model_path = trainer.train(
                 warmup_epochs=epochs or TRAINING_CONFIG["WARMUP_EPOCHS"],
-                full_epochs=TRAINING_CONFIG["FULL_TRAIN_EPOCHS"],
+                full_epochs=epochs or TRAINING_CONFIG["FULL_TRAIN_EPOCHS"],
                 head_lr=TRAINING_CONFIG["HEAD_LR"],
                 backbone_lr=TRAINING_CONFIG["BACKBONE_LR"],
                 full_lr=TRAINING_CONFIG["FULL_TRAIN_LR"],
@@ -364,7 +373,7 @@ def main():
             sum(p.numel() for p in model.parameters() if p.requires_grad) / 1e6
         )
         cpu_ms = measure_cpu_latency(model, img_size)
-        onnx_ok = False if args.no_onnx else check_onnx_export(model, img_size)
+        onnx_ok = "skipped" if args.no_onnx else check_onnx_export(model, img_size)
 
         row = {
             "timestamp": timestamp,
@@ -384,7 +393,7 @@ def main():
             "params_total_M": round(total_params, 2),
             "params_trainable_M": round(trainable_params, 2),
             "cpu_ms": round(cpu_ms, 1),
-            "onnx_ok": onnx_ok if not args.no_onnx else "skipped",
+            "onnx_ok": onnx_ok,
             "tag": args.tag,
         }
         write_results_row(row)
