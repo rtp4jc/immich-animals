@@ -1,24 +1,14 @@
 #!/usr/bin/env python
-"""
-Master Training Script
+"""Training and export pipeline for the Animal ID models.
 
-This script orchestrates the entire training pipeline for the animal_id project.
-It can train both the detector and the embedding model from scratch, ensuring
-a consistent and reproducible workflow.
+Subcommands cover each stage on its own (``detection-data``, ``detection``,
+``embedding-data``, ``embedding``, ``export-detector``, ``export-embedding``,
+``benchmark``); ``all`` — the default — runs detection, then embedding, then the
+benchmark.
 
-Workflow:
-1. Detection Pipeline:
-   - Prepare detection data (COCO -> YOLO format)
-   - Train YOLOv11 detector
-   - Export best detector to ONNX
-
-2. Embedding Pipeline:
-   - Prepare embedding data (DogFaceNet -> JSON)
-   - Train Embedding model (ResNet backbone with ArcFace/CosFace)
-   - Export best embedding model to ONNX
-
-Usage:
-    python scripts/train_master.py
+    python scripts/train_master.py                    # everything
+    python scripts/train_master.py embedding          # just the embedding model
+    python scripts/train_master.py benchmark --tag v2
 """
 
 import argparse
@@ -26,9 +16,10 @@ import datetime
 import json
 import logging
 import os
+import sys
+from dataclasses import asdict
 from pathlib import Path
 
-# --- Imports for Embedding ---
 import torch
 from torch.utils.data import DataLoader
 
@@ -36,17 +27,18 @@ from animal_id.benchmark.evaluator import BenchmarkEvaluator
 from animal_id.benchmark.metrics import evaluate_embedding_model
 from animal_id.common.constants import (
     DATA_DIR,
+    DETECTOR_PROJECT_DIR,
+    DETECTOR_RUN_NAME,
+    MODELS_DIR,
     ONNX_DETECTOR_PATH,
     ONNX_EMBEDDING_PATH,
     ONNX_KEYPOINT_PATH,
 )
-
-# --- Imports for Common/Utils ---
 from animal_id.common.datasets import IdentityDataset
 from animal_id.common.identity_loader import IdentityLoader
+from animal_id.common.logging_config import setup_logging
 from animal_id.common.seed import set_seed, worker_init_fn
-
-# --- Imports for Detection ---
+from animal_id.common.utils import find_latest_run, find_latest_timestamped_run
 from animal_id.detection.dataset_converter import (
     CocoDetectorDatasetConverter,
     create_default_config,
@@ -75,12 +67,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SEED = 42
 
 
-# --- Logging Setup ---
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],
-)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -88,9 +75,7 @@ def run_full_pipeline_benchmark(
     num_images=None, include_additional=False, tag=None, no_wandb=False
 ):
     """Runs the full AnimalPipeline benchmark."""
-    logger.info("\n" + "=" * 60)
     logger.info("STARTING FULL PIPELINE BENCHMARK")
-    logger.info("=" * 60)
 
     # Headline benchmark numbers are reported on the held-out TEST split (disjoint
     # identities from train/val). Val is reserved for model selection / early-stopping.
@@ -231,9 +216,7 @@ def run_detection_data_prep(
     output_dir="data/detector/coco", yaml_path="data/detector/dogs_detection.yaml"
 ):
     """Runs the data preparation and conversion for the detection model."""
-    logger.info("\n" + "-" * 60)
     logger.info("STARTING DETECTION DATA PREPARATION")
-    logger.info("-" * 60)
 
     # Create COCO dataset
     config = create_default_config()
@@ -255,9 +238,7 @@ def run_detection_pipeline(
     output_dir="data/detector/coco", yaml_path="data/detector/dogs_detection.yaml"
 ):
     """Runs the full detection pipeline."""
-    logger.info("=" * 60)
     logger.info("STARTING DETECTION PIPELINE")
-    logger.info("=" * 60)
 
     # 1. Prepare Data
     logger.info("Step 1: Preparing Detection Dataset (COCO -> YOLO)")
@@ -301,24 +282,20 @@ def run_detector_export(model_path: Path):
 
 def run_embedding_data_prep():
     """Runs the data preparation step for the embedding model."""
-    logger.info("\n" + "-" * 60)
     logger.info("STARTING EMBEDDING DATA PREPARATION")
-    logger.info("-" * 60)
 
     dataset_converter = EmbeddingDatasetConverter(
-        source_path=DATA_CONFIG["DOGFACENET_PATH"],
-        output_train_json=DATA_CONFIG["TRAIN_JSON_PATH"],
-        output_val_json=DATA_CONFIG["VAL_JSON_PATH"],
-        output_test_json=DATA_CONFIG["TEST_JSON_PATH"],
+        source_path=DATA_CONFIG.dogfacenet_path,
+        output_train_json=DATA_CONFIG.train_json_path,
+        output_val_json=DATA_CONFIG.val_json_path,
+        output_test_json=DATA_CONFIG.test_json_path,
     )
     dataset_converter.convert()
 
 
 def run_embedding_pipeline():
     """Runs the full embedding pipeline."""
-    logger.info("\n" + "=" * 60)
     logger.info("STARTING EMBEDDING PIPELINE")
-    logger.info("=" * 60)
 
     # 1. Prepare Data
     logger.info("Step 1: Preparing Embedding Dataset")
@@ -337,8 +314,8 @@ def run_embedding_pipeline():
     # Save Run Config
     config_to_save = {
         "backbone": backbone_name,
-        "training_config": TRAINING_CONFIG,
-        "data_config": DATA_CONFIG,
+        "training_config": asdict(TRAINING_CONFIG),
+        "data_config": asdict(DATA_CONFIG),
         "timestamp": datetime.datetime.now().isoformat(),
     }
     with open(run_dir / "config.json", "w") as f:
@@ -351,36 +328,36 @@ def run_embedding_pipeline():
 
     # Load Datasets
     train_dataset = IdentityDataset(
-        json_path=PROJECT_ROOT / DATA_CONFIG["TRAIN_JSON_PATH"],
-        img_size=DATA_CONFIG["IMG_SIZE"],
+        json_path=PROJECT_ROOT / DATA_CONFIG.train_json_path,
+        img_size=DATA_CONFIG.img_size,
         is_training=True,
     )
     val_dataset = IdentityDataset(
-        json_path=PROJECT_ROOT / DATA_CONFIG["VAL_JSON_PATH"],
-        img_size=DATA_CONFIG["IMG_SIZE"],
+        json_path=PROJECT_ROOT / DATA_CONFIG.val_json_path,
+        img_size=DATA_CONFIG.img_size,
         is_training=False,
     )
 
     train_loader = DataLoader(
         train_dataset,
-        batch_size=DATA_CONFIG["BATCH_SIZE"],
+        batch_size=DATA_CONFIG.batch_size,
         shuffle=True,
-        num_workers=TRAINING_CONFIG["HARDWARE_WORKERS"],
+        num_workers=TRAINING_CONFIG.hardware_workers,
         generator=g,
         worker_init_fn=worker_init_fn,
     )
     val_loader = DataLoader(
         val_dataset,
-        batch_size=DATA_CONFIG["BATCH_SIZE"],
+        batch_size=DATA_CONFIG.batch_size,
         shuffle=False,
-        num_workers=TRAINING_CONFIG["HARDWARE_WORKERS"],
+        num_workers=TRAINING_CONFIG.hardware_workers,
     )
 
     # Create Model
     model = AnimalEmbeddingModel(
         backbone_type=DEFAULT_BACKBONE,
         num_classes=train_dataset.num_classes,
-        embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
+        embedding_dim=TRAINING_CONFIG.embedding_dim,
     ).to(device)
 
     # Create Trainer
@@ -394,12 +371,12 @@ def run_embedding_pipeline():
 
     # Execute Training
     best_model_path = trainer.train(
-        warmup_epochs=TRAINING_CONFIG["WARMUP_EPOCHS"],
-        full_epochs=TRAINING_CONFIG["FULL_TRAIN_EPOCHS"],
-        head_lr=TRAINING_CONFIG["HEAD_LR"],
-        backbone_lr=TRAINING_CONFIG["BACKBONE_LR"],
-        full_lr=TRAINING_CONFIG["FULL_TRAIN_LR"],
-        patience=TRAINING_CONFIG["EARLY_STOPPING_PATIENCE"],
+        warmup_epochs=TRAINING_CONFIG.warmup_epochs,
+        full_epochs=TRAINING_CONFIG.full_train_epochs,
+        head_lr=TRAINING_CONFIG.head_lr,
+        backbone_lr=TRAINING_CONFIG.backbone_lr,
+        full_lr=TRAINING_CONFIG.full_train_lr,
+        patience=TRAINING_CONFIG.early_stopping_patience,
     )
     logger.info(f"Embedding training complete. Best model: {best_model_path}")
 
@@ -414,7 +391,7 @@ def run_embedding_export(model_path, val_loader, device, num_classes):
     model = AnimalEmbeddingModel(
         backbone_type=DEFAULT_BACKBONE,
         num_classes=num_classes,
-        embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
+        embedding_dim=TRAINING_CONFIG.embedding_dim,
     )
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
@@ -435,45 +412,69 @@ def run_embedding_export(model_path, val_loader, device, num_classes):
     export_model = AnimalEmbeddingModel(
         backbone_type=DEFAULT_BACKBONE,
         num_classes=num_classes,
-        embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
+        embedding_dim=TRAINING_CONFIG.embedding_dim,
     )
     export_model.load_state_dict(torch.load(model_path, map_location=export_device))
     export_model.to(export_device)
     export_model.eval()
 
     export_embedding_onnx(
-        export_model, ONNX_EMBEDDING_PATH, img_size=DATA_CONFIG["IMG_SIZE"]
+        export_model, ONNX_EMBEDDING_PATH, img_size=DATA_CONFIG.img_size
     )
     logger.info(f"Embedding ONNX exported to: {ONNX_EMBEDDING_PATH}")
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Master Training Script for Animal ID Pipeline"
-    )
-    parser.add_argument(
-        "--skip-detection", action="store_true", help="Manually skip detection pipeline"
-    )
-    parser.add_argument(
-        "--skip-embedding", action="store_true", help="Manually skip embedding pipeline"
-    )
-    parser.add_argument(
-        "--skip-benchmark", action="store_true", help="Skip full pipeline benchmark"
-    )
-    parser.add_argument(
-        "--skip-trained",
-        action="store_true",
-        help="Automatically skip training a model if its ONNX file already exists.",
-    )
-    parser.add_argument(
-        "--no-wandb", action="store_true", help="Disable WandB logging during benchmark"
-    )
-    parser.add_argument(
-        "--tag", type=str, default=None, help="Tag for WandB benchmark run"
-    )
-    args = parser.parse_args()
+def run_detector_export_latest():
+    """Exports the most recent trained detector run to ONNX."""
+    latest_run_dir = find_latest_run(DETECTOR_PROJECT_DIR, DETECTOR_RUN_NAME)
+    if not latest_run_dir:
+        raise FileNotFoundError(
+            f"No training runs found for '{DETECTOR_RUN_NAME}' in '{DETECTOR_PROJECT_DIR}'."
+        )
 
-    # --- Detection Pipeline Execution ---
+    model_checkpoint = latest_run_dir / "weights/best.pt"
+    logger.info(f"Found latest model checkpoint: {model_checkpoint}")
+    run_detector_export(model_checkpoint)
+
+
+def run_embedding_export_latest():
+    """Exports the most recent trained embedding run to ONNX."""
+    latest_run = find_latest_timestamped_run()
+    model_path = latest_run / "best_model.pt" if latest_run else None
+
+    if model_path is None or not model_path.exists():
+        # Fall back to the pre-`runs/` checkpoint location.
+        model_path = MODELS_DIR / "dog_embedding_best.pt"
+        if not model_path.exists():
+            raise FileNotFoundError(
+                f"No trained model found. Checked runs/*/best_model.pt and {model_path}"
+            )
+
+    logger.info(f"Found latest model checkpoint: {model_path}")
+
+    # The export function evaluates the model first, so it needs a val loader, and
+    # num_classes from the *training* split to rebuild the head.
+    val_loader = DataLoader(
+        IdentityDataset(
+            json_path=DATA_CONFIG.val_json_path,
+            img_size=DATA_CONFIG.img_size,
+            is_training=False,
+        ),
+        batch_size=DATA_CONFIG.batch_size,
+        shuffle=False,
+        num_workers=2,
+    )
+    train_dataset = IdentityDataset(
+        json_path=DATA_CONFIG.train_json_path,
+        img_size=DATA_CONFIG.img_size,
+        is_training=True,
+    )
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    run_embedding_export(model_path, val_loader, device, train_dataset.num_classes)
+
+
+def run_all(args):
+    """Detection pipeline, then embedding pipeline, then the benchmark."""
     if args.skip_detection:
         logger.info("Manually skipping detection pipeline.")
     elif args.skip_trained and ONNX_DETECTOR_PATH.exists():
@@ -483,7 +484,6 @@ def main():
     else:
         run_detection_pipeline()
 
-    # --- Embedding Pipeline Execution ---
     if args.skip_embedding:
         logger.info("Manually skipping embedding pipeline.")
     elif args.skip_trained and ONNX_EMBEDDING_PATH.exists():
@@ -493,21 +493,94 @@ def main():
     else:
         run_embedding_pipeline()
 
-    # --- Benchmark Execution ---
     if not args.skip_benchmark:
-        # Check if ONNX files are present for benchmarking
-        can_benchmark = ONNX_DETECTOR_PATH.exists() and ONNX_EMBEDDING_PATH.exists()
-        if not can_benchmark:
-            logger.warning("Skipping benchmark because required ONNX models not found.")
-        else:
+        if ONNX_DETECTOR_PATH.exists() and ONNX_EMBEDDING_PATH.exists():
             run_full_pipeline_benchmark(no_wandb=args.no_wandb, tag=args.tag)
+        else:
+            logger.warning("Skipping benchmark because required ONNX models not found.")
 
-    # --- Final Summary ---
-    # This section is only reached if all steps complete without error.
-    print("\n" + "=" * 60)
-    print("MASTER SCRIPT COMPLETE")
-    print("=" * 60)
-    print("All pipeline steps completed successfully.")
+    logger.info("All pipeline steps completed successfully.")
+
+
+def build_parser():
+    parser = argparse.ArgumentParser(
+        description="Training and export pipeline for the Animal ID models."
+    )
+    sub = parser.add_subparsers(dest="command")
+
+    sub.add_parser(
+        "detection-data", help="Prepare the detection dataset (COCO -> YOLO)"
+    )
+    sub.add_parser("detection", help="Prepare, train and export the detector")
+    sub.add_parser("embedding-data", help="Prepare the embedding dataset")
+    sub.add_parser("embedding", help="Prepare, train and export the embedding model")
+    sub.add_parser("export-detector", help="Export the latest detector run to ONNX")
+    sub.add_parser("export-embedding", help="Export the latest embedding run to ONNX")
+
+    benchmark = sub.add_parser("benchmark", help="Benchmark the full AnimalPipeline")
+    benchmark.add_argument(
+        "--num-images",
+        type=int,
+        default=None,
+        help="Images to process from the test set. Default: the whole split.",
+    )
+    benchmark.add_argument(
+        "--include-additional",
+        action="store_true",
+        help="Include identities from data/additional_identities",
+    )
+
+    run_all_parser = sub.add_parser(
+        "all", help="Detection, then embedding, then benchmark (the default)"
+    )
+    run_all_parser.add_argument(
+        "--skip-detection", action="store_true", help="Skip the detection pipeline"
+    )
+    run_all_parser.add_argument(
+        "--skip-embedding", action="store_true", help="Skip the embedding pipeline"
+    )
+    run_all_parser.add_argument(
+        "--skip-benchmark", action="store_true", help="Skip the pipeline benchmark"
+    )
+    run_all_parser.add_argument(
+        "--skip-trained",
+        action="store_true",
+        help="Skip training a model whose ONNX file already exists",
+    )
+
+    # WandB options apply to both commands that can run the benchmark.
+    for p in (benchmark, run_all_parser):
+        p.add_argument("--no-wandb", action="store_true", help="Disable WandB logging")
+        p.add_argument("--tag", default=None, help="Tag for the WandB run")
+
+    return parser
+
+
+COMMANDS = {
+    "detection-data": lambda args: run_detection_data_prep(),
+    "detection": lambda args: run_detection_pipeline(),
+    "embedding-data": lambda args: run_embedding_data_prep(),
+    "embedding": lambda args: run_embedding_pipeline(),
+    "export-detector": lambda args: run_detector_export_latest(),
+    "export-embedding": lambda args: run_embedding_export_latest(),
+    "benchmark": lambda args: run_full_pipeline_benchmark(
+        num_images=args.num_images,
+        include_additional=args.include_additional,
+        tag=args.tag,
+        no_wandb=args.no_wandb,
+    ),
+    "all": run_all,
+}
+
+
+def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
+    # No subcommand means "all", so the historical flag-only invocation
+    # (`train_master.py --skip-detection`) still works.
+    if not argv or (argv[0] not in COMMANDS and argv[0] not in ("-h", "--help")):
+        argv.insert(0, "all")
+    args = build_parser().parse_args(argv)
+    COMMANDS[args.command](args)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,6 @@ Utility class for loading identity validation data with optional augmentation.
 import json
 import random
 from collections import defaultdict
-from typing import Dict, List, Optional
 
 from .constants import DATA_DIR, PROJECT_ROOT
 
@@ -28,10 +27,10 @@ class IdentityLoader:
 
     def load_validation_data(
         self,
-        num_images: Optional[int] = None,
+        num_images: int | None = None,
         include_additional: bool = False,
-        max_per_identity: Optional[int] = None,
-    ) -> List[Dict[str, str]]:
+        max_per_identity: int | None = None,
+    ) -> list[dict[str, str]]:
         """
         Load validation data with optional additional identities.
 
@@ -67,7 +66,7 @@ class IdentityLoader:
             max_per_identity=max_per_identity,
         )
 
-    def _load_base_validation(self) -> List[Dict[str, str]]:
+    def _load_base_validation(self) -> list[dict[str, str]]:
         """Load base evaluation data from the configured split JSON file."""
         val_json_path = DATA_DIR / self.json_filename
 
@@ -81,7 +80,7 @@ class IdentityLoader:
             if item.get("identity_label")  # Only include items with identities
         ]
 
-    def _scan_additional_identities(self) -> Dict[str, List[str]]:
+    def _scan_additional_identities(self) -> dict[str, list[str]]:
         """Scan additional_identities directory for new identities."""
         additional_dir = DATA_DIR / "additional_identities"
 
@@ -107,8 +106,8 @@ class IdentityLoader:
         return identities
 
     def _limit_per_identity(
-        self, data: List[Dict[str, str]], max_per_identity: int
-    ) -> List[Dict[str, str]]:
+        self, data: list[dict[str, str]], max_per_identity: int
+    ) -> list[dict[str, str]]:
         """Limit number of images per identity."""
         identity_counts = defaultdict(int)
         limited_data = []
@@ -123,11 +122,11 @@ class IdentityLoader:
 
     def _create_augmented_dataset(
         self,
-        base_data: List[Dict[str, str]],
-        additional_identities: Dict[str, List[str]],
-        num_images: Optional[int],
-        max_per_identity: Optional[int],
-    ) -> List[Dict[str, str]]:
+        base_data: list[dict[str, str]],
+        additional_identities: dict[str, list[str]],
+        num_images: int | None,
+        max_per_identity: int | None,
+    ) -> list[dict[str, str]]:
         """Create augmented dataset prioritizing additional identities."""
 
         selected_images = []

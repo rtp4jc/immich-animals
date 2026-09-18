@@ -6,19 +6,22 @@ and creates a unified COCO format dataset for keypoint training.
 """
 
 import json
+import logging
 import random
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import cv2
 from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 
 class CocoKeypointDatasetConverter:
     """Convert StanfordExtra keypoint dataset to COCO format."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """Initialize converter with configuration."""
         self.config = config
         self.source_json = Path(config["source_json"])
@@ -47,8 +50,8 @@ class CocoKeypointDatasetConverter:
             dir_path.mkdir(parents=True)
 
     def _map_and_transform_keypoints(
-        self, joints: List[List[float]], x_offset: int, y_offset: int
-    ) -> List[float]:
+        self, joints: list[list[float]], x_offset: int, y_offset: int
+    ) -> list[float]:
         """
         Selects our 4 target keypoints from the 24 available, and transforms
         their coordinates from original image space to cropped space.
@@ -69,8 +72,8 @@ class CocoKeypointDatasetConverter:
         return output_keypoints
 
     def _validate_keypoints(
-        self, keypoints: List[float], width: int, height: int
-    ) -> List[float]:
+        self, keypoints: list[float], width: int, height: int
+    ) -> list[float]:
         """Validate transformed keypoints to ensure they are within the cropped image bounds."""
         final_kpts = []
         for i in range(0, len(keypoints), 3):
@@ -84,8 +87,8 @@ class CocoKeypointDatasetConverter:
         return final_kpts
 
     def _process_image(
-        self, entry: Dict[str, Any], image_id_counter: int, annotation_id_counter: int
-    ) -> Tuple[Optional[Dict], Optional[Dict]]:
+        self, entry: dict[str, Any], image_id_counter: int, annotation_id_counter: int
+    ) -> tuple[dict | None, dict | None]:
         """Process a single image entry and return image and annotation dictionaries."""
         if entry.get("is_multiple_dogs", False):
             return None, None
@@ -167,17 +170,15 @@ class CocoKeypointDatasetConverter:
 
     def convert(self) -> None:
         """Main conversion function."""
-        print("=" * 60)
-        print("Creating Cropped Keypoint Dataset in COCO Format")
-        print("=" * 60)
+        logger.info("Creating Cropped Keypoint Dataset in COCO Format")
 
         if not self.source_json.exists():
-            print(f"Error: Source keypoint JSON not found: {self.source_json}")
+            logger.error(f"Source keypoint JSON not found: {self.source_json}")
             return
 
         self._setup_output_dirs()
 
-        with open(self.source_json, "r") as f:
+        with open(self.source_json) as f:
             source_data = json.load(f)
 
         coco_output = {
@@ -246,15 +247,14 @@ class CocoKeypointDatasetConverter:
         with open(self.output_coco_dir / "annotations_val.json", "w") as f:
             json.dump(val_coco, f, indent=2)
 
-        print(
+        logger.info(
             f"\nSuccessfully created {len(train_images)} training samples and {len(val_images)} validation samples."
         )
-        print(f"Cropped images saved to: {self.cropped_image_dir}")
-        print(f"COCO annotations saved to: {self.output_coco_dir}")
-        print("=" * 60)
+        logger.info(f"Cropped images saved to: {self.cropped_image_dir}")
+        logger.info(f"COCO annotations saved to: {self.output_coco_dir}")
 
 
-def create_default_config() -> Dict[str, Any]:
+def create_default_config() -> dict[str, Any]:
     """Create default configuration for keypoint dataset conversion."""
     return {
         "source_json": "data/stanford_dogs/stanford_extra_keypoints.json",

@@ -29,7 +29,7 @@ mise auto-activates `.venv` when you `cd` into the repo, so just run commands
 directly:
 
 ```bash
-python scripts/13_run_full_pipeline.py --num-images 50
+python scripts/train_master.py benchmark --num-images 50
 pytest
 ruff check .
 ```
@@ -71,8 +71,8 @@ inference, swap `onnxruntime` for `onnxruntime-gpu` in `pyproject.toml`.
 ### Run Full Pipeline
 
 ```bash
-# Benchmark with 50 images, 5 queries per identity
-python scripts/13_run_full_pipeline.py --num-images 50 --num-queries 5
+# Benchmark on 50 images from the held-out test split
+python scripts/train_master.py benchmark --num-images 50
 ```
 
 ### Tracking & Benchmarking
@@ -85,10 +85,10 @@ The pipeline script automatically logs metrics to W&B. Use tags to organize your
 
 ```bash
 # Run with a custom tag
-python scripts/13_run_full_pipeline.py --num-images 50 --tag "baseline-v1"
+python scripts/train_master.py benchmark --num-images 50 --tag "baseline-v1"
 
 # Disable W&B logging
-python scripts/13_run_full_pipeline.py --num-images 10 --no-wandb
+python scripts/train_master.py benchmark --num-images 10 --no-wandb
 ```
 
 ### Dashboard Tips
@@ -102,20 +102,22 @@ To compare results over time in the W&B dashboard:
 ## Data Preparation and Training
 
 ```bash
-# Prepare detection dataset
-python scripts/01_prepare_detection_data.py
+# Everything: detection, then embedding, then the benchmark
+python scripts/train_master.py
+
+# Or one stage at a time
+python scripts/train_master.py detection-data     # COCO -> YOLO
+python scripts/train_master.py detection          # prepare, train, export detector
+python scripts/train_master.py embedding-data
+python scripts/train_master.py embedding          # prepare, train, export embedder
+python scripts/train_master.py export-detector    # re-export the latest run
+python scripts/train_master.py export-embedding
 
 # Inspect datasets
 python scripts/02_inspect_detection_datasets.py
 
-# Train models (requires GPU for reasonable training time)
-python scripts/03_train_detection_model.py
+# Keypoints have their own scripts (not part of train_master)
 python scripts/05_train_keypoint_model.py
-python scripts/08_train_embedding_model.py
-
-# Export to ONNX
-python scripts/10_export_embedding_onnx.py
-python scripts/11_export_detector_onnx.py
 python scripts/12_export_keypoint_onnx.py
 ```
 

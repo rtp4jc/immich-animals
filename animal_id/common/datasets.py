@@ -1,29 +1,13 @@
-"""
-Defines the custom PyTorch Dataset objects for this project.
-
-What it's for:
-This script acts as the bridge between our prepared data (the `.json` files) and the
-PyTorch training pipeline. It defines how to load, open, and transform a single
-item from the dataset so the `DataLoader` in the training script can efficiently
-batch them and feed them to the model.
-
-What it does:
-1. Defines the `IdentityDataset` class, which inherits from `torch.utils.data.Dataset`.
-2. The class is initialized with a path to a `.json` file containing the annotations.
-3. The `__getitem__` method defines how to load a single image by its index, apply
-   data augmentations and transformations, and return the image tensor and its
-   corresponding identity label.
-
-How to run it:
-- This script is not run directly. It is imported by other scripts, primarily
-  the training scripts.
-"""
+"""PyTorch Dataset objects bridging the prepared .json annotations and training."""
 
 import json
+import logging
 
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
+
+logger = logging.getLogger(__name__)
 
 
 class IdentityDataset(Dataset):
@@ -32,7 +16,7 @@ class IdentityDataset(Dataset):
     """
 
     def __init__(self, json_path, img_size=224, is_training=True):
-        with open(json_path, "r") as f:
+        with open(json_path) as f:
             self.annotations = json.load(f)
 
         # Get max label value for ArcFace (not just unique count)
@@ -82,7 +66,7 @@ class IdentityDataset(Dataset):
         try:
             image = Image.open(img_path).convert("RGB")
         except Exception as e:
-            print(f"Warning: Error loading image {img_path}: {e}. Skipping.")
+            logger.warning(f"Error loading image {img_path}: {e}. Skipping.")
             return self.__getitem__((idx + 1) % len(self))
 
         image = self.transform(image)

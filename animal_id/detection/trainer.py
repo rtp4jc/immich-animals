@@ -4,13 +4,16 @@ Training utilities for YOLO detection models.
 Provides configuration and training functionality for dog detection models.
 """
 
+import logging
 import sys
-from typing import Any, Dict, Optional
+from typing import Any
 
 import torch
 from ultralytics import YOLO
 
 from animal_id.common.constants import DETECTOR_PROJECT_DIR, DETECTOR_RUN_NAME
+
+logger = logging.getLogger(__name__)
 
 
 class DetectionTrainer:
@@ -19,7 +22,7 @@ class DetectionTrainer:
     def __init__(
         self,
         model_name: str = "yolo11n.pt",
-        config: Optional[Dict[str, Any]] = None,
+        config: dict[str, Any] | None = None,
         seed: int = 42,
     ):
         """Initialize trainer with model and configuration."""
@@ -28,7 +31,7 @@ class DetectionTrainer:
         self.config = config or self._get_default_config()
         self.model = None
 
-    def _get_default_config(self) -> Dict[str, Any]:
+    def _get_default_config(self) -> dict[str, Any]:
         """Get default training configuration."""
         return {
             "data": "data/detector/dogs_detection.yaml",
@@ -54,28 +57,28 @@ class DetectionTrainer:
 
     def verify_prerequisites(self) -> bool:
         """Verify system prerequisites for training."""
-        print("Verifying prerequisites...")
-        print(f"Python version: {sys.version}")
-        print(f"PyTorch version: {torch.__version__}")
-        print(f"CUDA available: {torch.cuda.is_available()}")
+        logger.info("Verifying prerequisites...")
+        logger.info(f"Python version: {sys.version}")
+        logger.info(f"PyTorch version: {torch.__version__}")
+        logger.info(f"CUDA available: {torch.cuda.is_available()}")
 
         if self.config.get("device") == "cpu":
-            print("Warning: Training on CPU as requested.")
+            logger.warning("Training on CPU as requested.")
             return True
 
         if not torch.cuda.is_available():
-            print("Error: CUDA not available. Training requires GPU.")
+            logger.error("CUDA not available. Training requires GPU.")
             return False
 
         device_name = (
             torch.cuda.get_device_name(0) if torch.cuda.is_available() else "N/A"
         )
-        print(f"Device: {device_name}")
+        logger.info(f"Device: {device_name}")
         return True
 
     def load_model(self) -> None:
         """Load the YOLO model."""
-        print(f"Loading model: {self.model_name}")
+        logger.info(f"Loading model: {self.model_name}")
         self.model = YOLO(self.model_name)
 
     def train(self) -> Any:
@@ -86,13 +89,13 @@ class DetectionTrainer:
         if self.model is None:
             self.load_model()
 
-        print(f"\nStarting detector training with config: {self.config}")
+        logger.info(f"\nStarting detector training with config: {self.config}")
 
         # Train the model
         results = self.model.train(**self.config)
 
-        print("\nTraining completed.")
-        print(f"Results saved to {results.save_dir}")
+        logger.info("\nTraining completed.")
+        logger.info(f"Results saved to {results.save_dir}")
 
         return results
 

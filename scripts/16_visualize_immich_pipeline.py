@@ -6,7 +6,6 @@ Benchmark animal identification pipeline using the Immich API as a black box.
 import argparse
 import json
 from pathlib import Path
-from typing import List, Tuple
 
 import numpy as np
 import requests
@@ -15,6 +14,9 @@ from tqdm import tqdm
 from animal_id.benchmark.evaluator import AnimalIdentificationSystem, BenchmarkEvaluator
 from animal_id.benchmark.visualizer import BenchmarkVisualizer
 from animal_id.common.identity_loader import IdentityLoader
+from animal_id.common.logging_config import setup_logging
+
+setup_logging()
 
 # Define project root
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -38,7 +40,7 @@ class ImmichAnimalSystem(AnimalIdentificationSystem):
         self.gallery_embeddings = None
         self.gallery_paths = None
 
-    def build_gallery(self, image_paths: List[str]) -> None:
+    def build_gallery(self, image_paths: list[str]) -> None:
         """Pre-compute embeddings for all gallery images."""
         embeddings = []
         valid_paths = []
@@ -56,7 +58,7 @@ class ImmichAnimalSystem(AnimalIdentificationSystem):
             self.gallery_embeddings = None
             self.gallery_paths = None
 
-    def predict(self, image_path: str) -> Tuple[bool, List[Tuple[str, float]]]:
+    def predict(self, image_path: str) -> tuple[bool, list[tuple[str, float]]]:
         """Predict if image contains target animal and return similar images."""
         query_embedding = self._get_embedding(image_path)
 

@@ -19,7 +19,10 @@ from pathlib import Path
 import cv2
 from ultralytics import YOLO
 
+from animal_id.common.logging_config import setup_logging
 from animal_id.common.visualization import setup_output_dir
+
+setup_logging()
 
 # Add project root to Python path
 

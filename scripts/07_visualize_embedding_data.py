@@ -1,28 +1,8 @@
-"""
-Visualizes the validation identity dataset and shows statistics for both train and val sets.
+"""Prints per-split identity statistics and plots the validation identities.
 
-What it's for:
-This script is a crucial debugging and verification tool. It allows you to inspect the
-dataset statistics for both training and validation sets, and visually inspect the
-validation dataset to ensure label integrity.
-
-What it does:
-1. For both `identity_train.json` and `identity_val.json`, it calculates and prints:
-   - Total number of unique identities.
-   - Distribution of samples per identity.
-   - Min, max, average, and median samples per identity.
-2. For the validation set, it calls the centralized `visualize_identity_dataset`
-   function to generate a non-interactive plot, saving it to the `outputs` directory.
-
-How to run it:
-- This script should be run after `06_prepare_embedding_data.py`.
-- Run from the root of the project:
-  `python scripts/07_visualize_embedding_data.py`
-
-How to interpret the results:
-- The script will print statistics to the console for both datasets.
-- It will save a plot for the validation set to `outputs/phase2_visualizations/identity_verification.png`.
-- Each row in the plot is a unique dog, confirming dataset integrity.
+Run after `train_master.py embedding-data`. Writes
+outputs/phase2_visualizations/identity_verification.png, one row per dog, to confirm
+label integrity.
 """
 
 import json
@@ -31,10 +11,11 @@ from collections import Counter, defaultdict
 
 import numpy as np
 
+from animal_id.common.logging_config import setup_logging
 from animal_id.common.visualization import visualize_identity_dataset
-
-# Adjust path to import from our new package
 from animal_id.embedding.config import DATA_CONFIG
+
+setup_logging()
 
 # --- Configuration ---
 NUM_IDENTITIES_TO_SHOW = 4
@@ -46,12 +27,12 @@ def print_dataset_stats(json_path: str, dataset_name: str):
     print(f"--- {dataset_name} Dataset Statistics ---")
     if not os.path.exists(json_path):
         print(f"Error: {dataset_name} JSON not found at {json_path}")
-        print("Please run `scripts/06_prepare_embedding_data.py` first.")
+        print("Please run `scripts/train_master.py embedding-data` first.")
         print("-------------------------------------\n")
         return
 
     print(f"Loading {dataset_name.lower()} dataset from {json_path}...")
-    with open(json_path, "r") as f:
+    with open(json_path) as f:
         annotations = json.load(f)
     print("Loading complete.")
 
@@ -86,8 +67,8 @@ def print_dataset_stats(json_path: str, dataset_name: str):
 
 def main():
     """Main function to run the statistics and visualization."""
-    train_json_path = DATA_CONFIG["TRAIN_JSON_PATH"]
-    val_json_path = DATA_CONFIG["VAL_JSON_PATH"]
+    train_json_path = DATA_CONFIG.train_json_path
+    val_json_path = DATA_CONFIG.val_json_path
 
     # Process training set (stats only)
     print_dataset_stats(train_json_path, "Training")

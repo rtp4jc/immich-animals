@@ -1,51 +1,81 @@
-"""
-Central configuration file for the embedding model pipeline.
-"""
+"""Central configuration for the embedding model pipeline."""
+
+from dataclasses import dataclass
 
 from .backbones import BackboneType
 from .losses import HeadType
 
-# --- Model Configuration ---
-# Default backbone to use for training and inference.
+# Default backbone for training and inference.
 DEFAULT_BACKBONE = BackboneType.RESNET50
 
-# --- Margin Head Configuration ---
-# Selects and parameterizes the train-time margin head. The default reproduces
-# the historical hardcoded behavior exactly: ArcFace with s=30, m=0.50, label
-# smoothing 0.1. Swapping HEAD_TYPE to SUBCENTER_ARCFACE (the MiewID recipe) or
-# COSFACE is a one-line change and only affects training; the embedding output
-# and ONNX inference path are unchanged.
-HEAD_CONFIG = {
-    "HEAD_TYPE": HeadType.ARCFACE,
-    # Shared margin-head hyperparameters (None => use the head's own default).
-    "ARCFACE_S": 30.0,
-    "ARCFACE_M": 0.50,
-    "LABEL_SMOOTHING": 0.1,
-    # Sub-center ArcFace: number of sub-centers per class.
-    "SUB_CENTER_K": 3,
-    # CosFace additive cosine margin (only used when HEAD_TYPE == COSFACE).
-    "COSFACE_M": 0.35,
-}
 
-# --- Training Hyperparameters ---
-TRAINING_CONFIG = {
-    "MODEL_OUTPUT_PATH": "models/dog_embedding_best.pt",
-    "EMBEDDING_DIM": 512,
-    "HARDWARE_WORKERS": 8,
-    "WARMUP_EPOCHS": 25,
-    "FULL_TRAIN_EPOCHS": 45,
-    "EARLY_STOPPING_PATIENCE": 10,
-    "HEAD_LR": 1e-4,  # ArcFace head warmup; standard Adam range for metric-learning head
-    "BACKBONE_LR": 1e-6,  # Fine-tune pretrained ResNet50; 100x smaller than head
-    "FULL_TRAIN_LR": 1e-5,  # Head in phase 2; differential LR above backbone
-}
+@dataclass(frozen=True)
+class HeadConfig:
+    """Train-time margin head and its hyperparameters.
 
-# --- Data Configuration ---
-DATA_CONFIG = {
-    "TRAIN_JSON_PATH": "data/identity_train.json",
-    "VAL_JSON_PATH": "data/identity_val.json",
-    "TEST_JSON_PATH": "data/identity_test.json",
-    "DOGFACENET_PATH": "data/dogfacenet/DogFaceNet_224resized/after_4_bis",
-    "IMG_SIZE": 224,
-    "BATCH_SIZE": 32,
-}
+    The defaults reproduce the project's historical behavior: ArcFace, s=30, m=0.50,
+    label smoothing 0.1. Switching ``head_type`` to SUBCENTER_ARCFACE (the MiewID
+    recipe) or COSFACE only affects training — the embedding output and the ONNX
+    inference path are unchanged.
+    """
+
+    head_type: HeadType = HeadType.ARCFACE
+    s: float = 30.0
+    m: float = 0.50
+    label_smoothing: float = 0.1
+    k: int = 3  # Sub-center ArcFace: sub-centers per class.
+    cosface_m: float = 0.35  # CosFace uses its own additive cosine margin.
+
+    def head_kwargs(self) -> dict:
+        """Constructor keyword arguments for the selected head."""
+        kwargs = {"s": self.s, "m": self.m, "label_smoothing": self.label_smoothing}
+        if self.head_type is HeadType.SUBCENTER_ARCFACE:
+            kwargs["k"] = self.k
+        elif self.head_type is HeadType.COSFACE:
+            kwargs["m"] = self.cosface_m
+        return kwargs
+
+
+@dataclass(frozen=True)
+class TrainingConfig:
+    """Training hyperparameters."""
+
+    model_output_path: str = "models/dog_embedding_best.pt"
+    embedding_dim: int = 512
+    hardware_workers: int = 8
+    warmup_epochs: int = 25
+    full_train_epochs: int = 45
+    early_stopping_patience: int = 10
+    # ArcFace head warmup; standard Adam range for a metric-learning head.
+    head_lr: float = 1e-4
+    # Fine-tune the pretrained trunk; 100x smaller than the head.
+    backbone_lr: float = 1e-6
+    # Head in phase 2; differential LR above the backbone.
+    full_train_lr: float = 1e-5
+
+
+@dataclass(frozen=True)
+class DataConfig:
+    """Dataset paths and input shape."""
+
+    train_json_path: str = "data/identity_train.json"
+    val_json_path: str = "data/identity_val.json"
+    test_json_path: str = "data/identity_test.json"
+    dogfacenet_path: str = "data/dogfacenet/DogFaceNet_224resized/after_4_bis"
+    img_size: int = 224
+    batch_size: int = 32
+
+
+HEAD_CONFIG = HeadConfig()
+TRAINING_CONFIG = TrainingConfig()
+DATA_CONFIG = DataConfig()
+
+__all__ = [
+    "DATA_CONFIG",
+    "DEFAULT_BACKBONE",
+    "HEAD_CONFIG",
+    "TRAINING_CONFIG",
+    "DataConfig",
+    "HeadConfig",
+    "TrainingConfig",
+]

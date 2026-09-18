@@ -6,9 +6,9 @@ torchvision CNNs, timm CNNs, and timm transformers share one contract. The retur
 signature is always ``(feature_extractor, num_features)``.
 """
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Callable
 
 import torch.nn as nn
 

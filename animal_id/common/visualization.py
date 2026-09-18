@@ -11,17 +11,20 @@ All functions default to saving files to outputs/ directory with optional displa
 """
 
 import json
+import logging
 import random
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 import cv2
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 
+logger = logging.getLogger(__name__)
 
-def setup_output_dir(output_dir: Union[str, Path]) -> Path:
+
+def setup_output_dir(output_dir: str | Path) -> Path:
     """Create output directory if it doesn't exist."""
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -29,12 +32,12 @@ def setup_output_dir(output_dir: Union[str, Path]) -> Path:
 
 
 def save_or_show_plot(
-    save_path: Optional[Union[str, Path]] = None, display: bool = False, dpi: int = 150
+    save_path: str | Path | None = None, display: bool = False, dpi: int = 150
 ) -> None:
     """Save plot to file and/or display it."""
     if save_path:
         plt.savefig(save_path, dpi=dpi, bbox_inches="tight")
-        print(f"Saved plot to: {save_path}")
+        logger.info(f"Saved plot to: {save_path}")
 
     if display:
         plt.show()
@@ -44,9 +47,9 @@ def save_or_show_plot(
 
 # COCO Dataset Visualization
 def visualize_coco_annotations(
-    coco_json_path: Union[str, Path],
-    data_root: Union[str, Path],
-    output_dir: Union[str, Path] = "outputs/coco_visualization",
+    coco_json_path: str | Path,
+    data_root: str | Path,
+    output_dir: str | Path = "outputs/coco_visualization",
     num_samples: int = 5,
     display: bool = False,
 ) -> None:
@@ -56,10 +59,10 @@ def visualize_coco_annotations(
     output_path = setup_output_dir(output_dir)
 
     if not coco_path.exists():
-        print(f"COCO file not found: {coco_path}")
+        logger.warning(f"COCO file not found: {coco_path}")
         return
 
-    with open(coco_path, "r") as f:
+    with open(coco_path) as f:
         coco_data = json.load(f)
 
     images = coco_data["images"]
@@ -110,8 +113,8 @@ def visualize_coco_annotations(
 
 # YOLO Dataset Visualization
 def visualize_yolo_annotations(
-    data_yaml_path: Union[str, Path],
-    output_dir: Union[str, Path] = "outputs/yolo_visualization",
+    data_yaml_path: str | Path,
+    output_dir: str | Path = "outputs/yolo_visualization",
     num_samples: int = 5,
     display: bool = False,
 ) -> None:
@@ -122,19 +125,19 @@ def visualize_yolo_annotations(
     output_path = setup_output_dir(output_dir)
 
     if not yaml_path.exists():
-        print(f"YOLO config file not found: {yaml_path}")
+        logger.warning(f"YOLO config file not found: {yaml_path}")
         return
 
-    with open(yaml_path, "r") as f:
+    with open(yaml_path) as f:
         config = yaml.safe_load(f)
 
     # Read validation images
     val_txt = Path(config["val"])
     if not val_txt.exists():
-        print(f"Validation file not found: {val_txt}")
+        logger.warning(f"Validation file not found: {val_txt}")
         return
 
-    with open(val_txt, "r") as f:
+    with open(val_txt) as f:
         image_paths = [line.strip() for line in f.readlines()]
 
     # Filter for images with annotations (non-empty label files)
@@ -151,7 +154,7 @@ def visualize_yolo_annotations(
             images_with_labels.append(img_path)
 
     if not images_with_labels:
-        print("No images with annotations found")
+        logger.info("No images with annotations found")
         return
 
     # Sample from images with labels
@@ -182,7 +185,7 @@ def visualize_yolo_annotations(
         label_path = Path(label_path_str)
 
         if label_path.exists():
-            with open(label_path, "r") as f:
+            with open(label_path) as f:
                 for line in f:
                     parts = line.strip().split()
                     if len(parts) >= 5:
@@ -219,9 +222,9 @@ def visualize_yolo_annotations(
 
 # Detection Results Visualization
 def visualize_detection_results(
-    image_path: Union[str, Path],
-    detections: List[Dict[str, Any]],
-    output_path: Optional[Union[str, Path]] = None,
+    image_path: str | Path,
+    detections: list[dict[str, Any]],
+    output_path: str | Path | None = None,
     display: bool = False,
 ) -> None:
     """Visualize detection model outputs."""
@@ -248,17 +251,14 @@ def visualize_detection_results(
         ax.add_patch(rect)
         ax.text(bbox[0], bbox[1] - 5, f"{conf:.2f}", color="red", fontsize=10)
 
-    if output_path:
-        save_or_show_plot(output_path, display)
-    else:
-        save_or_show_plot(None, display)
+    save_or_show_plot(output_path, display)
 
 
 # Keypoint Results Visualization
 def visualize_keypoint_results(
-    image_path: Union[str, Path],
-    keypoints: List[Dict[str, Any]],
-    output_path: Optional[Union[str, Path]] = None,
+    image_path: str | Path,
+    keypoints: list[dict[str, Any]],
+    output_path: str | Path | None = None,
     display: bool = False,
 ) -> None:
     """Visualize keypoint model outputs."""
@@ -301,16 +301,13 @@ def visualize_keypoint_results(
     if keypoints:
         ax.legend()
 
-    if output_path:
-        save_or_show_plot(output_path, display)
-    else:
-        save_or_show_plot(None, display)
+    save_or_show_plot(output_path, display)
 
 
 # Training Metrics Visualization
 def visualize_training_metrics(
-    metrics_data: Dict[str, List[float]],
-    output_path: Optional[Union[str, Path]] = None,
+    metrics_data: dict[str, list[float]],
+    output_path: str | Path | None = None,
     display: bool = False,
 ) -> None:
     """Visualize training metrics and loss curves."""
@@ -331,17 +328,14 @@ def visualize_training_metrics(
 
     plt.tight_layout()
 
-    if output_path:
-        save_or_show_plot(output_path, display)
-    else:
-        save_or_show_plot(None, display)
+    save_or_show_plot(output_path, display)
 
 
 # Embedding Visualization
 def visualize_identity_dataset(
-    identity_json_path: Union[str, Path],
-    data_root: Union[str, Path],
-    output_dir: Union[str, Path] = "outputs/identity_visualization",
+    identity_json_path: str | Path,
+    data_root: str | Path,
+    output_dir: str | Path = "outputs/identity_visualization",
     num_identities: int = 4,
     min_images_per_id: int = 3,
     display: bool = False,
@@ -352,10 +346,10 @@ def visualize_identity_dataset(
     output_path = setup_output_dir(output_dir)
 
     if not json_path.exists():
-        print(f"Identity JSON not found: {json_path}")
+        logger.warning(f"Identity JSON not found: {json_path}")
         return
 
-    with open(json_path, "r") as f:
+    with open(json_path) as f:
         data = json.load(f)
 
     # Group by identity
@@ -369,7 +363,7 @@ def visualize_identity_dataset(
     }
 
     if len(valid_identities) < num_identities:
-        print(
+        logger.info(
             f"Only {len(valid_identities)} identities have >= {min_images_per_id} images"
         )
         num_identities = len(valid_identities)
@@ -404,9 +398,9 @@ def visualize_identity_dataset(
 
 
 # Dataset Statistics
-def print_dataset_statistics(coco_json_path: Union[str, Path]) -> Dict[str, Any]:
+def print_dataset_statistics(coco_json_path: str | Path) -> dict[str, Any]:
     """Print and return dataset statistics."""
-    with open(coco_json_path, "r") as f:
+    with open(coco_json_path) as f:
         data = json.load(f)
 
     stats = {
@@ -416,10 +410,10 @@ def print_dataset_statistics(coco_json_path: Union[str, Path]) -> Dict[str, Any]
         "has_keypoints": any("keypoints" in ann for ann in data.get("annotations", [])),
     }
 
-    print("Dataset Statistics:")
-    print(f"  Images: {stats['num_images']}")
-    print(f"  Annotations: {stats['num_annotations']}")
-    print(f"  Categories: {stats['num_categories']}")
-    print(f"  Has Keypoints: {stats['has_keypoints']}")
+    logger.info("Dataset Statistics:")
+    logger.info(f"  Images: {stats['num_images']}")
+    logger.info(f"  Annotations: {stats['num_annotations']}")
+    logger.info(f"  Categories: {stats['num_categories']}")
+    logger.info(f"  Has Keypoints: {stats['has_keypoints']}")
 
     return stats

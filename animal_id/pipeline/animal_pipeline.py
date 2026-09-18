@@ -4,8 +4,6 @@ AnimalPipeline: Advanced animal identification pipeline system.
 Combines detection, keypoint, and embedding models for robust animal identification.
 """
 
-from typing import List, Optional, Tuple
-
 import cv2
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
@@ -21,7 +19,7 @@ class AnimalPipeline(AnimalIdentificationSystem):
         self,
         detector: DetectionModel,
         embedding_model: EmbeddingModel,
-        keypoint_model: Optional[KeypointModel] = None,
+        keypoint_model: KeypointModel | None = None,
         target_class: AnimalClass = AnimalClass.DOG,
         detection_threshold: float = 0.5,
         keypoint_threshold: float = 0.3,
@@ -52,7 +50,7 @@ class AnimalPipeline(AnimalIdentificationSystem):
         self.gallery_embeddings = None
         self.gallery_paths = None
 
-    def build_gallery(self, image_paths: List[str]) -> None:
+    def build_gallery(self, image_paths: list[str]) -> None:
         """Pre-compute embeddings for all gallery images."""
         embeddings = []
         valid_paths = []
@@ -70,7 +68,7 @@ class AnimalPipeline(AnimalIdentificationSystem):
             self.gallery_embeddings = None
             self.gallery_paths = None
 
-    def predict(self, image_path: str) -> Tuple[bool, List[Tuple[str, float]]]:
+    def predict(self, image_path: str) -> tuple[bool, list[tuple[str, float]]]:
         """Predict if image contains target animal and return similar images."""
         embedding = self.generate_embedding(image_path)
 
@@ -93,7 +91,7 @@ class AnimalPipeline(AnimalIdentificationSystem):
 
         return True, similar_images
 
-    def generate_embedding(self, image_path: str) -> Optional[np.ndarray]:
+    def generate_embedding(self, image_path: str) -> np.ndarray | None:
         """
         Generate embedding for image using full pipeline.
 

@@ -7,8 +7,8 @@ from animal_id.embedding.config import DATA_CONFIG, TRAINING_CONFIG
 from animal_id.embedding.export import export_embedding_onnx
 from animal_id.embedding.models import AnimalEmbeddingModel
 
-EMBEDDING_DIM = TRAINING_CONFIG["EMBEDDING_DIM"]
-IMG_SIZE = DATA_CONFIG["IMG_SIZE"]
+EMBEDDING_DIM = TRAINING_CONFIG.embedding_dim
+IMG_SIZE = DATA_CONFIG.img_size
 
 
 def test_onnx_embedding_parity(tmp_path):

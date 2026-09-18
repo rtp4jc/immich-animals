@@ -1,29 +1,8 @@
-"""
-Validates the performance of a trained embedding model.
+"""Evaluates a trained embedding model, qualitatively and quantitatively.
 
-What it's for:
-This script provides a unified entry point for evaluating a trained embedding model.
-It can perform both qualitative validation (visualizing nearest neighbors) and
-quantitative validation (calculating TAR@FAR metrics).
-
-What it does:
-1. Loads the best trained embedding model.
-2. Computes embedding vectors for all images in the validation set.
-3. Based on command-line flags, it can either:
-   - Visualize nearest neighbors: For a few random query images, it finds and
-     plots the most similar images from the validation set.
-   - Calculate TAR@FAR: It generates thousands of positive and negative pairs,
-     calculates their similarity, and computes the True Accept Rate at various
-     False Accept Rates.
-
-How to run it:
-- This script should be run after a model has been trained.
-- To visualize nearest neighbors:
-  `python scripts/07_validate_embeddings.py --show-neighbors`
-- To calculate TAR@FAR metrics:
-  `python scripts/07_validate_embeddings.py --calculate-metrics`
-- To run both (default action):
-  `python scripts/07_validate_embeddings.py`
+python scripts/09_validate_embeddings.py --show-neighbors    # nearest neighbours
+python scripts/09_validate_embeddings.py --calculate-metrics # TAR@FAR
+python scripts/09_validate_embeddings.py                     # both
 """
 
 import argparse
@@ -39,12 +18,13 @@ from tqdm import tqdm
 
 from animal_id.benchmark.metrics import evaluate_embedding_model
 from animal_id.common.datasets import IdentityDataset
-
-# Adjust path to import from our new package
+from animal_id.common.logging_config import setup_logging
 from animal_id.common.utils import find_latest_timestamped_run
 from animal_id.embedding.backbones import BackboneType
 from animal_id.embedding.config import DATA_CONFIG, DEFAULT_BACKBONE, TRAINING_CONFIG
 from animal_id.embedding.models import AnimalEmbeddingModel
+
+setup_logging()
 
 # --- Configuration ---
 FAR_TARGETS = [1e-1, 1e-2, 1e-3, 1e-4]
@@ -73,7 +53,7 @@ def visualize_neighbors(
         query_img = (
             Image.open(query_path)
             .convert("RGB")
-            .resize((DATA_CONFIG["IMG_SIZE"], DATA_CONFIG["IMG_SIZE"]))
+            .resize((DATA_CONFIG.img_size, DATA_CONFIG.img_size))
         )
         ax = axes[i, 0]
         ax.imshow(query_img)
@@ -90,7 +70,7 @@ def visualize_neighbors(
             neighbor_img = (
                 Image.open(neighbor_path)
                 .convert("RGB")
-                .resize((DATA_CONFIG["IMG_SIZE"], DATA_CONFIG["IMG_SIZE"]))
+                .resize((DATA_CONFIG.img_size, DATA_CONFIG.img_size))
             )
             ax = axes[i, j + 1]
             ax.imshow(neighbor_img)
@@ -124,11 +104,11 @@ def main(args):
 
     # Fall back to old location if not found
     if model_path is None:
-        model_path = TRAINING_CONFIG["MODEL_OUTPUT_PATH"]
+        model_path = TRAINING_CONFIG.model_output_path
         if not os.path.exists(model_path):
             print("Error: No trained model found.")
             print(
-                f"Checked: runs/*/best_model.pt and {TRAINING_CONFIG['MODEL_OUTPUT_PATH']}"
+                f"Checked: runs/*/best_model.pt and {TRAINING_CONFIG.model_output_path}"
             )
             print("Please run training first.")
             return
@@ -141,7 +121,7 @@ def main(args):
     model = AnimalEmbeddingModel(
         backbone_type=args.backbone,
         num_classes=None,
-        embedding_dim=TRAINING_CONFIG["EMBEDDING_DIM"],
+        embedding_dim=TRAINING_CONFIG.embedding_dim,
     )
 
     state_dict = torch.load(model_path, map_location=device)
@@ -153,12 +133,12 @@ def main(args):
     model.to(device)
 
     val_dataset = IdentityDataset(
-        json_path=DATA_CONFIG["VAL_JSON_PATH"],
-        img_size=DATA_CONFIG["IMG_SIZE"],
+        json_path=DATA_CONFIG.val_json_path,
+        img_size=DATA_CONFIG.img_size,
         is_training=False,
     )
     val_loader = DataLoader(
-        val_dataset, batch_size=DATA_CONFIG["BATCH_SIZE"], shuffle=False, num_workers=2
+        val_dataset, batch_size=DATA_CONFIG.batch_size, shuffle=False, num_workers=2
     )
 
     if args.calculate_metrics:
