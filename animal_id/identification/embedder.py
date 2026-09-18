@@ -1,22 +1,21 @@
-"""Embed a gallery of labeled images via a pipeline's ``generate_embedding``."""
-
-from typing import Any
+"""Embed a gallery of labeled images via an ``EmbeddingPipeline``."""
 
 import numpy as np
 from tqdm import tqdm
 
+from animal_id.pipeline.models import EmbeddingPipeline
+
 
 def embed_gallery(
-    pipeline: Any,
+    pipeline: EmbeddingPipeline,
     items: list[dict],
     show_progress: bool = True,
 ) -> tuple[np.ndarray, list, list[str]]:
     """Embed labeled images, returning aligned ``(embeddings, labels, paths)``.
 
-    ``pipeline`` is any object with ``generate_embedding(image_path) -> ndarray |
-    None``; ``items`` are dicts with ``"image_path"`` / ``"identity_label"`` keys.
-    Items whose embedding is ``None`` are dropped, keeping the three outputs
-    aligned. ``embeddings`` is an ``(N, D)`` float32 array.
+    ``items`` are dicts with ``"image_path"`` / ``"identity_label"`` keys. Items
+    whose embedding is ``None`` are dropped, keeping the three outputs aligned.
+    ``embeddings`` is an ``(N, D)`` float32 array.
     """
     embeddings: list[np.ndarray] = []
     labels: list = []

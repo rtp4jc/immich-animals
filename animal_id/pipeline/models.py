@@ -5,7 +5,7 @@ Defines interfaces for detection, keypoint, and embedding models.
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Protocol
+from typing import Any, Dict, List, Optional, Protocol
 
 import numpy as np
 
@@ -48,6 +48,22 @@ class KeypointModel(Protocol):
 
         Returns:
             List of keypoint detections with 'keypoints' [[x, y, conf], ...] and 'confidence'
+        """
+        ...
+
+
+class EmbeddingPipeline(Protocol):
+    """Protocol for end-to-end pipelines that embed an image file."""
+
+    def generate_embedding(self, image_path: str) -> Optional[np.ndarray]:
+        """
+        Generate an embedding for the image at image_path.
+
+        Args:
+            image_path: Path to image file
+
+        Returns:
+            Embedding vector, or None if no target animal was detected
         """
         ...
 
