@@ -18,7 +18,10 @@ from animal_id.common.constants import (
     KEYPOINT_RUN_NAME,
     ONNX_KEYPOINT_PATH,
 )
+from animal_id.common.logging_config import setup_logging
 from animal_id.common.utils import find_latest_run
+
+setup_logging()
 
 # Add project root to Python path
 

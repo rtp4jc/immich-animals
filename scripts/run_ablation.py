@@ -49,6 +49,7 @@ from torch.utils.data import DataLoader
 from animal_id.benchmark.metrics import evaluate_embedding_model
 from animal_id.common.constants import DATA_DIR
 from animal_id.common.datasets import IdentityDataset
+from animal_id.common.logging_config import setup_logging
 from animal_id.common.seed import set_seed, worker_init_fn
 from animal_id.embedding.backbones import BackboneType, get_backbone_input_size
 from animal_id.embedding.config import DATA_CONFIG, TRAINING_CONFIG
@@ -56,6 +57,8 @@ from animal_id.embedding.export import export_embedding_onnx
 from animal_id.embedding.losses import HeadType
 from animal_id.embedding.models import AnimalEmbeddingModel
 from animal_id.embedding.trainer import EmbeddingTrainer
+
+setup_logging()
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "ablation"

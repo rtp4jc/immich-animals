@@ -18,10 +18,13 @@ from tqdm import tqdm
 
 from animal_id.benchmark.metrics import evaluate_embedding_model
 from animal_id.common.datasets import IdentityDataset
+from animal_id.common.logging_config import setup_logging
 from animal_id.common.utils import find_latest_timestamped_run
 from animal_id.embedding.backbones import BackboneType
 from animal_id.embedding.config import DATA_CONFIG, DEFAULT_BACKBONE, TRAINING_CONFIG
 from animal_id.embedding.models import AnimalEmbeddingModel
+
+setup_logging()
 
 # --- Configuration ---
 FAR_TARGETS = [1e-1, 1e-2, 1e-3, 1e-4]

@@ -12,12 +12,15 @@ from collections import Counter
 from pathlib import Path
 
 from animal_id.common.constants import DATA_DIR
+from animal_id.common.logging_config import setup_logging
 from animal_id.common.visualization import (
     print_dataset_statistics,
     setup_output_dir,
     visualize_coco_annotations,
     visualize_yolo_annotations,
 )
+
+setup_logging()
 
 # Add project root to Python path
 

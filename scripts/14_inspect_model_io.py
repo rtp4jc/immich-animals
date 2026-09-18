@@ -12,6 +12,10 @@ from pathlib import Path
 
 import onnxruntime as ort
 
+from animal_id.common.logging_config import setup_logging
+
+setup_logging()
+
 # Add project root to Python path
 
 

@@ -14,6 +14,9 @@ from tqdm import tqdm
 from animal_id.benchmark.evaluator import AnimalIdentificationSystem, BenchmarkEvaluator
 from animal_id.benchmark.visualizer import BenchmarkVisualizer
 from animal_id.common.identity_loader import IdentityLoader
+from animal_id.common.logging_config import setup_logging
+
+setup_logging()
 
 # Define project root
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

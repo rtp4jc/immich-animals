@@ -10,6 +10,10 @@ from pathlib import Path
 
 import requests
 
+from animal_id.common.logging_config import setup_logging
+
+setup_logging()
+
 
 def main(args):
     """Main test function."""

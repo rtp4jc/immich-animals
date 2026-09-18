@@ -11,8 +11,11 @@ from collections import Counter, defaultdict
 
 import numpy as np
 
+from animal_id.common.logging_config import setup_logging
 from animal_id.common.visualization import visualize_identity_dataset
 from animal_id.embedding.config import DATA_CONFIG
+
+setup_logging()
 
 # --- Configuration ---
 NUM_IDENTITIES_TO_SHOW = 4
