@@ -5,10 +5,9 @@ Utility functions for the animal_id project.
 
 import re
 from pathlib import Path
-from typing import Optional
 
 
-def find_latest_run(project_dir: Path, run_name: str) -> Optional[Path]:
+def find_latest_run(project_dir: Path, run_name: str) -> Path | None:
     """
     Finds the latest training run directory.
 
@@ -48,7 +47,7 @@ def find_latest_run(project_dir: Path, run_name: str) -> Optional[Path]:
     return latest_run_dir
 
 
-def find_latest_timestamped_run(runs_dir: Path = Path("runs")) -> Optional[Path]:
+def find_latest_timestamped_run(runs_dir: Path = Path("runs")) -> Path | None:
     """
     Finds the latest timestamped training run directory.
 

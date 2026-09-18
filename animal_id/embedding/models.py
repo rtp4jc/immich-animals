@@ -21,8 +21,6 @@ How to run it:
   `python -m animal_id.embedding.models`
 """
 
-from typing import Optional
-
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -73,7 +71,7 @@ class EmbeddingNet(nn.Module):
             pretrained (bool): Whether to use weights pre-trained on ImageNet for the backbone.
             dropout_prob (float): Probability for the dropout layer.
         """
-        super(EmbeddingNet, self).__init__()
+        super().__init__()
 
         self.feature_extractor, num_features = get_backbone(backbone_type, pretrained)
 
@@ -117,11 +115,11 @@ class AnimalEmbeddingModel(nn.Module):
     def __init__(
         self,
         backbone_type: BackboneType,
-        num_classes: Optional[int] = None,
+        num_classes: int | None = None,
         embedding_dim: int = 512,
         pretrained: bool = True,
-        head_type: Optional[HeadType] = None,
-        head_config: Optional[dict] = None,
+        head_type: HeadType | None = None,
+        head_config: dict | None = None,
     ):
         """
         Args:
@@ -136,7 +134,7 @@ class AnimalEmbeddingModel(nn.Module):
             head_config (Optional[dict]): Head-hyperparameter dict. Defaults to
                 ``animal_id.embedding.config.HEAD_CONFIG``.
         """
-        super(AnimalEmbeddingModel, self).__init__()
+        super().__init__()
 
         self.backbone = EmbeddingNet(
             backbone_type, embedding_dim, pretrained=pretrained

@@ -5,12 +5,14 @@ Converts COCO format keypoint datasets to YOLO pose format for training with Ult
 """
 
 import json
+import logging
 import shutil
 from pathlib import Path
-from typing import List
 
 import yaml
 from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 
 class CocoToYoloKeypointConverter:
@@ -29,18 +31,18 @@ class CocoToYoloKeypointConverter:
         self.data_root = Path(data_root)
         self.yaml_output_path = Path(yaml_output_path)
 
-    def convert_split(self, split_name: str) -> List[str]:
+    def convert_split(self, split_name: str) -> list[str]:
         """Processes a single split (e.g., 'train' or 'val')."""
         coco_json_path = self.coco_annotations_dir / f"annotations_{split_name}.json"
 
         if not coco_json_path.exists():
-            print(
-                f"Warning: Annotation file not found, skipping split '{split_name}': {coco_json_path}"
+            logger.warning(
+                f"Annotation file not found, skipping split '{split_name}': {coco_json_path}"
             )
             return []
 
-        print(f"Processing {split_name} split from {coco_json_path}...")
-        with open(coco_json_path, "r") as f:
+        logger.info(f"Processing {split_name} split from {coco_json_path}...")
+        with open(coco_json_path) as f:
             coco_data = json.load(f)
 
         images_map = {img["id"]: img for img in coco_data["images"]}
@@ -104,11 +106,11 @@ class CocoToYoloKeypointConverter:
                             f"0 {x_center_norm:.6f} {y_center_norm:.6f} {width_norm:.6f} {height_norm:.6f}{kpts_str}\n"
                         )
 
-        print(f"Split {split_name}: Processed {len(image_paths)} images")
+        logger.info(f"Split {split_name}: Processed {len(image_paths)} images")
         return image_paths
 
     def create_yaml_config(
-        self, train_image_paths: List[str], val_image_paths: List[str]
+        self, train_image_paths: list[str], val_image_paths: list[str]
     ) -> None:
         """Creates the final YOLOv8 dataset YAML configuration file for keypoint detection."""
         train_txt_path = self.data_root / "keypoints/train.txt"
@@ -117,14 +119,16 @@ class CocoToYoloKeypointConverter:
         with open(train_txt_path, "w") as f:
             for path in sorted(train_image_paths):
                 f.write(f"{Path(path).as_posix()}\n")
-        print(
+        logger.info(
             f"Created {train_txt_path.name} with {len(train_image_paths)} image paths."
         )
 
         with open(val_txt_path, "w") as f:
             for path in sorted(val_image_paths):
                 f.write(f"{Path(path).as_posix()}\n")
-        print(f"Created {val_txt_path.name} with {len(val_image_paths)} image paths.")
+        logger.info(
+            f"Created {val_txt_path.name} with {len(val_image_paths)} image paths."
+        )
 
         # Create YAML for keypoints, specifying kpt_shape and flip_idx
         yaml_content = {
@@ -142,15 +146,13 @@ class CocoToYoloKeypointConverter:
         with open(self.yaml_output_path, "w") as f:
             yaml.dump(yaml_content, f, sort_keys=False, default_flow_style=False)
 
-        print(
+        logger.info(
             f"Successfully created YAML config for keypoints at: {self.yaml_output_path}"
         )
 
     def convert(self) -> None:
         """Main conversion function."""
-        print("=" * 60)
-        print("Converting Cropped COCO Keypoint Dataset to YOLOv8 Pose Format")
-        print("=" * 60)
+        logger.info("Converting Cropped COCO Keypoint Dataset to YOLOv8 Pose Format")
 
         if self.labels_output_dir.exists():
             shutil.rmtree(self.labels_output_dir)
@@ -160,16 +162,15 @@ class CocoToYoloKeypointConverter:
         val_paths = self.convert_split("val")
 
         if not train_paths and not val_paths:
-            print(
-                f"Error: No data was processed. Check that your COCO JSON files exist in {self.coco_annotations_dir}"
+            logger.error(
+                f"No data was processed. Check that your COCO JSON files exist in {self.coco_annotations_dir}"
             )
             return
 
         self.create_yaml_config(train_paths, val_paths)
 
-        print("\nConversion complete!")
-        print("You are now ready to train the YOLOv8 keypoint model.")
-        print("=" * 60)
+        logger.info("\nConversion complete!")
+        logger.info("You are now ready to train the YOLOv8 keypoint model.")
 
 
 def create_default_converter() -> CocoToYoloKeypointConverter:

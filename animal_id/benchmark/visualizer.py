@@ -4,8 +4,8 @@ Visualization interface for benchmark results.
 Provides interactive visualization of query images and their most similar matches.
 """
 
+import logging
 from pathlib import Path
-from typing import List, Optional, Union
 
 import cv2
 import matplotlib.pyplot as plt
@@ -13,6 +13,8 @@ import numpy as np
 
 from ..common.visualization import save_or_show_plot, setup_output_dir
 from .evaluator import BenchmarkEvaluator
+
+logger = logging.getLogger(__name__)
 
 
 class BenchmarkVisualizer:
@@ -25,8 +27,8 @@ class BenchmarkVisualizer:
 
     def visualize_queries(
         self,
-        query_images: List[str],
-        output_dir: Union[str, Path] = "outputs/benchmark_visualization",
+        query_images: list[str],
+        output_dir: str | Path = "outputs/benchmark_visualization",
         top_k: int = 5,
         display: bool = False,
     ) -> None:
@@ -42,7 +44,7 @@ class BenchmarkVisualizer:
                     break
 
         if not query_results:
-            print("No query images found in evaluation results")
+            logger.info("No query images found in evaluation results")
             return
 
         # Create visualization grid
@@ -92,7 +94,7 @@ class BenchmarkVisualizer:
 
     def plot_metrics_summary(
         self,
-        output_dir: Union[str, Path] = "outputs/benchmark_visualization",
+        output_dir: str | Path = "outputs/benchmark_visualization",
         display: bool = False,
     ) -> None:
         """Plot summary of benchmark metrics."""
@@ -136,14 +138,14 @@ class BenchmarkVisualizer:
         plt.tight_layout()
         save_or_show_plot(output_path / "metrics_summary.png", display)
 
-    def _load_image(self, image_path: Union[str, Path]) -> np.ndarray:
+    def _load_image(self, image_path: str | Path) -> np.ndarray:
         """Load and convert image to RGB."""
         img = cv2.imread(str(image_path))
         if img is None:
             return np.zeros((224, 224, 3), dtype=np.uint8)
         return cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-    def _get_identity_for_path(self, image_path: str) -> Optional[str]:
+    def _get_identity_for_path(self, image_path: str) -> str | None:
         """Get identity label for an image path."""
         try:
             rel_path = str(Path(image_path).relative_to(self.data_root))

@@ -1,6 +1,6 @@
 from collections import defaultdict
 from itertools import combinations
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import numpy as np
 import torch
@@ -9,8 +9,8 @@ from sklearn.metrics import average_precision_score
 
 
 def _generate_positive_pairs(
-    labels: np.ndarray, labels_to_indices: Dict[Any, List[int]]
-) -> List[Tuple[int, int]]:
+    labels: np.ndarray, labels_to_indices: dict[Any, list[int]]
+) -> list[tuple[int, int]]:
     """Generate all possible pairs of indices belonging to the same identity."""
     positive_pairs = []
     for _, idxs in labels_to_indices.items():
@@ -20,8 +20,8 @@ def _generate_positive_pairs(
 
 
 def _generate_negative_pairs(
-    labels: np.ndarray, labels_to_indices: Dict[Any, List[int]], num_target_pairs: int
-) -> List[Tuple[int, int]]:
+    labels: np.ndarray, labels_to_indices: dict[Any, list[int]], num_target_pairs: int
+) -> list[tuple[int, int]]:
     """
     Generate pairs of indices belonging to different identities.
     Uses exact generation for small datasets and efficient sampling for large ones.
@@ -88,7 +88,7 @@ def _generate_negative_pairs(
 
 
 def _calculate_pair_scores(
-    embeddings: torch.Tensor, pairs: List[Tuple[int, int]]
+    embeddings: torch.Tensor, pairs: list[tuple[int, int]]
 ) -> np.ndarray:
     """Calculate cosine similarity scores for a list of index pairs."""
     if not pairs:
@@ -110,7 +110,7 @@ def calculate_tar_at_far(
     labels: np.ndarray,
     far_threshold: float = 0.01,
     seed: int = 42,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """
     Calculate True Accept Rate at given False Accept Rate.
     """
@@ -178,7 +178,7 @@ def _calculate_map(embeddings: np.ndarray, labels: np.ndarray) -> float:
     return np.mean(aps) if aps else 0.0
 
 
-def evaluate_embedding_model(model, dataloader, device) -> Dict[str, float]:
+def evaluate_embedding_model(model, dataloader, device) -> dict[str, float]:
     """Evaluate model and return comprehensive metrics."""
     model.eval()
     all_embeddings = []

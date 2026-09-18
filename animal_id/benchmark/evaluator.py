@@ -12,7 +12,7 @@ import json
 from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Protocol, Tuple
+from typing import Any, Protocol
 
 import numpy as np
 from tqdm import tqdm
@@ -25,10 +25,10 @@ class EvaluationResult:
     image_path: str
     has_animal_gt: bool
     has_animal_pred: bool
-    identity_gt: Optional[str]
-    similar_images: List[Tuple[str, float]]  # (image_path, similarity_score)
+    identity_gt: str | None
+    similar_images: list[tuple[str, float]]  # (image_path, similarity_score)
     detection_correct: bool
-    identity_rank: Optional[int]  # Rank of correct identity in results (1-based)
+    identity_rank: int | None  # Rank of correct identity in results (1-based)
 
 
 @dataclass
@@ -39,8 +39,8 @@ class BenchmarkMetrics:
     detection_precision: float
     detection_recall: float
     mean_reciprocal_rank: float
-    top_k_accuracy: Dict[int, float]
-    tar_at_far: Dict[float, Tuple[float, float]]  # FAR -> (TAR, threshold)
+    top_k_accuracy: dict[int, float]
+    tar_at_far: dict[float, tuple[float, float]]  # FAR -> (TAR, threshold)
     total_images: int
     animal_images: int
     non_animal_images: int
@@ -74,7 +74,7 @@ class BenchmarkMetrics:
 class AnimalIdentificationSystem(Protocol):
     """Protocol for animal identification systems to be benchmarked."""
 
-    def build_gallery(self, image_paths: List[str]) -> None:
+    def build_gallery(self, image_paths: list[str]) -> None:
         """
         Pre-compute embeddings for all gallery images.
 
@@ -83,7 +83,7 @@ class AnimalIdentificationSystem(Protocol):
         """
         ...
 
-    def predict(self, image_path: str) -> Tuple[bool, List[Tuple[str, float]]]:
+    def predict(self, image_path: str) -> tuple[bool, list[tuple[str, float]]]:
         """
         Predict if image contains target animal and return similar images.
 
@@ -111,11 +111,11 @@ class BenchmarkEvaluator:
         self.ground_truth_path = Path(ground_truth_path)
         self.data_root = Path(data_root)
         self.ground_truth = self._load_ground_truth()
-        self.results: List[EvaluationResult] = []
+        self.results: list[EvaluationResult] = []
 
-    def _load_ground_truth(self) -> List[Dict[str, Any]]:
+    def _load_ground_truth(self) -> list[dict[str, Any]]:
         """Load ground truth data from JSON file."""
-        with open(self.ground_truth_path, "r") as f:
+        with open(self.ground_truth_path) as f:
             return json.load(f)
 
     def evaluate(self, system: AnimalIdentificationSystem) -> BenchmarkMetrics:
@@ -241,11 +241,11 @@ class BenchmarkEvaluator:
             non_animal_images=non_animal_images,
         )
 
-    def get_results(self) -> List[EvaluationResult]:
+    def get_results(self) -> list[EvaluationResult]:
         """Get detailed evaluation results."""
         return self.results
 
-    def _compute_tar_at_far(self) -> Dict[float, Tuple[float, float]]:
+    def _compute_tar_at_far(self) -> dict[float, tuple[float, float]]:
         """Compute TAR @ FAR metrics for identity verification."""
         same_identity_scores = []
         different_identity_scores = []

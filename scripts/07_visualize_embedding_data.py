@@ -51,7 +51,7 @@ def print_dataset_stats(json_path: str, dataset_name: str):
         return
 
     print(f"Loading {dataset_name.lower()} dataset from {json_path}...")
-    with open(json_path, "r") as f:
+    with open(json_path) as f:
         annotations = json.load(f)
     print("Loading complete.")
 

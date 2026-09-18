@@ -5,17 +5,19 @@ Provides model validation and inference functionality for dog detection models.
 """
 
 import glob
+import logging
 import os
 from pathlib import Path
-from typing import Dict, Optional, Tuple
 
 from ultralytics import YOLO
+
+logger = logging.getLogger(__name__)
 
 
 class DetectionValidator:
     """Validator for YOLO detection models."""
 
-    def __init__(self, model_path: Optional[str] = None):
+    def __init__(self, model_path: str | None = None):
         """Initialize validator with optional model path."""
         self.model_path = model_path
         self.model = None
@@ -34,24 +36,24 @@ class DetectionValidator:
 
         return model_path
 
-    def load_model(self, model_path: Optional[str] = None) -> None:
+    def load_model(self, model_path: str | None = None) -> None:
         """Load model for validation."""
         if model_path:
             self.model_path = model_path
         elif not self.model_path:
             self.model_path = self.find_latest_detector_model()
 
-        print(f"Loading model from: {self.model_path}")
+        logger.info(f"Loading model from: {self.model_path}")
         self.model = YOLO(self.model_path)
 
     def validate_model(
         self, data_yaml: str = "data/detector/dogs_detection.yaml"
-    ) -> Tuple[YOLO, Dict[str, float]]:
+    ) -> tuple[YOLO, dict[str, float]]:
         """Run validation on the model and return metrics."""
         if self.model is None:
             self.load_model()
 
-        print("Running validation on the detector model...")
+        logger.info("Running validation on the detector model...")
         results = self.model.val(data=data_yaml, verbose=True)
 
         # Metrics for an object detector
@@ -84,13 +86,13 @@ class DetectionValidator:
             result[0].save(output_path / f"result_{Path(image_path).name}")
             results.append(result[0])
 
-        print(f"Inference results saved to: {output_path}")
+        logger.info(f"Inference results saved to: {output_path}")
         return results
 
 
 def validate_latest_detector(
     data_yaml: str = "data/detector/dogs_detection.yaml",
-) -> Tuple[YOLO, Dict[str, float]]:
+) -> tuple[YOLO, dict[str, float]]:
     """Convenience function to validate the latest trained detector."""
     validator = DetectionValidator()
     return validator.validate_model(data_yaml)

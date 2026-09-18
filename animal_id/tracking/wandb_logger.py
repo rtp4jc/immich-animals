@@ -6,7 +6,7 @@ Encapsulates Weights & Biases logging logic for the pipeline.
 
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import wandb
 
@@ -21,10 +21,10 @@ class WandBLogger:
     def __init__(
         self,
         project_name: str = "animal-id-benchmark",
-        run_name: Optional[str] = None,
-        group: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None,
-        tags: Optional[List[str]] = None,
+        run_name: str | None = None,
+        group: str | None = None,
+        config: dict[str, Any] | None = None,
+        tags: list[str] | None = None,
         enabled: bool = True,
     ):
         """
@@ -100,10 +100,10 @@ class WandBLogger:
 
     def log_failures(
         self,
-        results: List[EvaluationResult],
+        results: list[EvaluationResult],
         max_failures: int = 20,
-        data_root: Optional[Path] = None,
-        identity_map: Optional[Dict[str, str]] = None,
+        data_root: Path | None = None,
+        identity_map: dict[str, str] | None = None,
     ):
         """
         Log failure cases (missed detections or wrong identities) as images.
@@ -161,11 +161,11 @@ class WandBLogger:
 
     def _log_image_list(
         self,
-        results: List[EvaluationResult],
+        results: list[EvaluationResult],
         key: str,
         caption_prefix: str,
-        data_root: Optional[Path],
-        identity_map: Optional[Dict[str, str]] = None,
+        data_root: Path | None,
+        identity_map: dict[str, str] | None = None,
     ):
         """Helper to log a list of images to WandB."""
         if not results:

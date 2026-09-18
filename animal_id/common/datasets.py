@@ -20,10 +20,13 @@ How to run it:
 """
 
 import json
+import logging
 
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
+
+logger = logging.getLogger(__name__)
 
 
 class IdentityDataset(Dataset):
@@ -32,7 +35,7 @@ class IdentityDataset(Dataset):
     """
 
     def __init__(self, json_path, img_size=224, is_training=True):
-        with open(json_path, "r") as f:
+        with open(json_path) as f:
             self.annotations = json.load(f)
 
         # Get max label value for ArcFace (not just unique count)
@@ -82,7 +85,7 @@ class IdentityDataset(Dataset):
         try:
             image = Image.open(img_path).convert("RGB")
         except Exception as e:
-            print(f"Warning: Error loading image {img_path}: {e}. Skipping.")
+            logger.warning(f"Error loading image {img_path}: {e}. Skipping.")
             return self.__getitem__((idx + 1) % len(self))
 
         image = self.transform(image)

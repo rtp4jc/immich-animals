@@ -5,7 +5,7 @@ Defines interfaces for detection, keypoint, and embedding models.
 """
 
 from enum import Enum
-from typing import Any, Dict, List, Optional, Protocol
+from typing import Any, Protocol
 
 import numpy as np
 
@@ -23,7 +23,7 @@ class AnimalClass(Enum):
 class DetectionModel(Protocol):
     """Protocol for animal detection models."""
 
-    def predict(self, image: np.ndarray) -> List[Dict[str, Any]]:
+    def predict(self, image: np.ndarray) -> list[dict[str, Any]]:
         """
         Detect animals in image.
 
@@ -39,7 +39,7 @@ class DetectionModel(Protocol):
 class KeypointModel(Protocol):
     """Protocol for animal keypoint models."""
 
-    def predict(self, image: np.ndarray) -> List[Dict[str, Any]]:
+    def predict(self, image: np.ndarray) -> list[dict[str, Any]]:
         """
         Detect keypoints in cropped animal image.
 
@@ -55,7 +55,7 @@ class KeypointModel(Protocol):
 class EmbeddingPipeline(Protocol):
     """Protocol for end-to-end pipelines that embed an image file."""
 
-    def generate_embedding(self, image_path: str) -> Optional[np.ndarray]:
+    def generate_embedding(self, image_path: str) -> np.ndarray | None:
         """
         Generate an embedding for the image at image_path.
 

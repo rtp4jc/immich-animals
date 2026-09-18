@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Tuple
+from typing import Any
 
 import cv2
 import numpy as np
@@ -14,7 +14,7 @@ class ONNXDetector(DetectionModel):
         self.session = ort.InferenceSession(model_path)
         self.input_size = self.session.get_inputs()[0].shape[2:]
 
-    def predict(self, image: np.ndarray) -> List[Dict[str, Any]]:
+    def predict(self, image: np.ndarray) -> list[dict[str, Any]]:
         """Detect animals in image."""
         detector_input, original_shape = self._preprocess(image)
         detections = self.session.run(
@@ -44,7 +44,7 @@ class ONNXDetector(DetectionModel):
 
         return results
 
-    def _preprocess(self, image: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int]]:
+    def _preprocess(self, image: np.ndarray) -> tuple[np.ndarray, tuple[int, int]]:
         """Preprocess image for detection."""
         original_shape = image.shape[:2]
         resized = cv2.resize(image, self.input_size, interpolation=cv2.INTER_LINEAR)
@@ -60,7 +60,7 @@ class ONNXKeypoint(KeypointModel):
         self.session = ort.InferenceSession(model_path)
         self.input_size = self.session.get_inputs()[0].shape[2:]
 
-    def predict(self, image: np.ndarray) -> List[Dict[str, Any]]:
+    def predict(self, image: np.ndarray) -> list[dict[str, Any]]:
         """Detect keypoints in image."""
         keypoint_input, crop_shape = self._preprocess(image)
         detections = self.session.run(
@@ -83,7 +83,7 @@ class ONNXKeypoint(KeypointModel):
 
         return results
 
-    def _preprocess(self, image: np.ndarray) -> Tuple[np.ndarray, Tuple[int, int]]:
+    def _preprocess(self, image: np.ndarray) -> tuple[np.ndarray, tuple[int, int]]:
         """Preprocess image for keypoint detection."""
         crop_shape = image.shape[:2]
         resized = cv2.resize(image, self.input_size, interpolation=cv2.INTER_LINEAR)

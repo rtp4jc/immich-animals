@@ -30,15 +30,12 @@ from animal_id.common.constants import (
     PROJECT_ROOT,
 )
 from animal_id.common.identity_loader import IdentityLoader
+from animal_id.common.logging_config import setup_logging
 from animal_id.identification import cluster, cluster_quality, embed_gallery
 from animal_id.pipeline.animal_pipeline import AnimalPipeline
 from animal_id.pipeline.onnx_models import ONNXDetector, ONNXEmbedding
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],
-)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 _SPLIT_TO_JSON = {

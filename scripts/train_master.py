@@ -44,6 +44,7 @@ from animal_id.common.constants import (
 # --- Imports for Common/Utils ---
 from animal_id.common.datasets import IdentityDataset
 from animal_id.common.identity_loader import IdentityLoader
+from animal_id.common.logging_config import setup_logging
 from animal_id.common.seed import set_seed, worker_init_fn
 
 # --- Imports for Detection ---
@@ -75,12 +76,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SEED = 42
 
 
-# --- Logging Setup ---
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[logging.StreamHandler()],
-)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 

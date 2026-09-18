@@ -54,7 +54,7 @@ target-version = "py312"
 exclude = ["immich-clone", ".gemini"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "UP"]
 ignore = ["E501"]
 
 [tool.pytest.ini_options]

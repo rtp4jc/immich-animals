@@ -6,32 +6,35 @@ dataset in COCO format for dog detection training.
 """
 
 import json
+import logging
 import os
 import random
 import shutil
 import xml.etree.ElementTree as ET
 from pathlib import Path
-from typing import Any, Dict, List, Set, Tuple
+from typing import Any
 
 from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 
 class CocoDetectorDatasetConverter:
     """Convert various dog datasets to COCO format for detection."""
 
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, config: dict[str, Any]):
         """Initialize converter with configuration."""
         self.config = config
         self.output_dir = Path(config["output_dir"])
 
         if self.output_dir.exists():
-            print(f"Clearing existing COCO detector directory: {self.output_dir}")
+            logger.info(f"Clearing existing COCO detector directory: {self.output_dir}")
             shutil.rmtree(self.output_dir)
         self.output_dir.mkdir(parents=True)
 
     def _load_stanford_base_bboxes(
-        self, base_dir: str, existing_files: Set[str], image_id_counter: int
-    ) -> Tuple[List[Dict], List[Dict], int]:
+        self, base_dir: str, existing_files: set[str], image_id_counter: int
+    ) -> tuple[list[dict], list[dict], int]:
         """Loads images and annotations from Stanford Dogs base XMLs."""
         annotation_dir = Path(base_dir) / "annotation"
         if not annotation_dir.exists():
@@ -112,12 +115,12 @@ class CocoDetectorDatasetConverter:
 
     def _load_coco_bbox_only(
         self, json_path: str, split_name: str, num_negatives: int, image_id_counter: int
-    ) -> Tuple[List[Dict], List[Dict], List[Dict], int]:
+    ) -> tuple[list[dict], list[dict], list[dict], int]:
         """Loads positive and negative samples from a COCO JSON split."""
         if not os.path.exists(json_path):
             return [], [], [], image_id_counter
 
-        with open(json_path, "r") as f:
+        with open(json_path) as f:
             data = json.load(f)
 
         all_images_map = {img["id"]: img for img in data.get("images", [])}
@@ -202,7 +205,7 @@ class CocoDetectorDatasetConverter:
 
     def _load_oxford_pets_negatives(
         self, xml_dir: str, image_id_counter: int
-    ) -> Tuple[List[Dict], List[Dict], int]:
+    ) -> tuple[list[dict], list[dict], int]:
         """Loads non-dog images from Oxford-IIIT Pets."""
         if not os.path.exists(xml_dir):
             return [], [], image_id_counter
@@ -232,8 +235,8 @@ class CocoDetectorDatasetConverter:
         return images, [], image_id_counter
 
     def _finalize_annotations(
-        self, annotations: List[Dict], annotation_id_counter: int
-    ) -> Tuple[List[Dict], int]:
+        self, annotations: list[dict], annotation_id_counter: int
+    ) -> tuple[list[dict], int]:
         """Assign final annotation IDs."""
         for ann in annotations:
             ann["id"] = annotation_id_counter
@@ -250,19 +253,19 @@ class CocoDetectorDatasetConverter:
         # --- 1. Load and split Stanford & Oxford data ---
         datasets_to_split = []
 
-        print("Loading Stanford Base...")
+        logger.info("Loading Stanford Base...")
         sb_images, sb_annotations, image_id_counter = self._load_stanford_base_bboxes(
             self.config["stanford_base_dir"], set(), image_id_counter
         )
         datasets_to_split.append(("Stanford Base", sb_images, sb_annotations))
 
-        print("Loading Oxford Pets Negatives...")
+        logger.info("Loading Oxford Pets Negatives...")
         op_images, op_annotations, image_id_counter = self._load_oxford_pets_negatives(
             self.config["oxford_xml_dir"], image_id_counter
         )
         datasets_to_split.append(("Oxford Pets (Negatives)", op_images, op_annotations))
 
-        print("\nSplitting non-COCO datasets...")
+        logger.info("\nSplitting non-COCO datasets...")
         for name, images, annotations in datasets_to_split:
             if not images:
                 continue
@@ -284,11 +287,13 @@ class CocoDetectorDatasetConverter:
             train_annotations.extend(d_train_anns)
             val_images.extend(d_val_imgs)
             val_annotations.extend(d_val_anns)
-            print(f"Split {name}: {len(d_train_imgs)} train, {len(d_val_imgs)} val")
+            logger.info(
+                f"Split {name}: {len(d_train_imgs)} train, {len(d_val_imgs)} val"
+            )
 
         # --- 2. Add COCO datasets to their respective splits ---
-        print("\nLoading COCO datasets...")
-        print("Loading COCO Train...")
+        logger.info("\nLoading COCO datasets...")
+        logger.info("Loading COCO Train...")
         (
             coco_train_pos_imgs,
             coco_train_pos_anns,
@@ -300,11 +305,11 @@ class CocoDetectorDatasetConverter:
         train_images.extend(coco_train_pos_imgs)
         train_images.extend(coco_train_neg_imgs)
         train_annotations.extend(coco_train_pos_anns)
-        print(
+        logger.info(
             f"Added {len(coco_train_pos_imgs) + len(coco_train_neg_imgs)} images from COCO Train"
         )
 
-        print("Loading COCO Val...")
+        logger.info("Loading COCO Val...")
         coco_val_pos_imgs, coco_val_pos_anns, coco_val_neg_imgs, image_id_counter = (
             self._load_coco_bbox_only(
                 self.config["coco_val_json"], "val2017", 2000, image_id_counter
@@ -313,12 +318,12 @@ class CocoDetectorDatasetConverter:
         val_images.extend(coco_val_pos_imgs)
         val_images.extend(coco_val_neg_imgs)
         val_annotations.extend(coco_val_pos_anns)
-        print(
+        logger.info(
             f"Added {len(coco_val_pos_imgs) + len(coco_val_pos_anns)} images from COCO Val"
         )
 
         # --- 3. Finalize annotation IDs and save ---
-        print("\nFinalizing datasets...")
+        logger.info("\nFinalizing datasets...")
         train_annotations, annotation_id_counter = self._finalize_annotations(
             train_annotations, annotation_id_counter
         )
@@ -345,17 +350,17 @@ class CocoDetectorDatasetConverter:
         with open(val_path, "w") as f:
             json.dump(val_coco, f, indent=2)
 
-        print(
+        logger.info(
             f"\nFinal training set: {len(train_images)} images, {len(train_annotations)} annotations."
         )
-        print(
+        logger.info(
             f"Final validation set: {len(val_images)} images, {len(val_annotations)} annotations."
         )
-        print(f"Saved train annotations to {train_path}")
-        print(f"Saved val annotations to {val_path}")
+        logger.info(f"Saved train annotations to {train_path}")
+        logger.info(f"Saved val annotations to {val_path}")
 
 
-def create_default_config() -> Dict[str, str]:
+def create_default_config() -> dict[str, str]:
     """Create default configuration for dataset conversion."""
     return {
         "stanford_base_dir": "data/stanford_dogs",

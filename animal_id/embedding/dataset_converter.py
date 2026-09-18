@@ -1,7 +1,10 @@
 import json
+import logging
 import os
 import random
 from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 
 class EmbeddingDatasetConverter:
@@ -36,14 +39,14 @@ class EmbeddingDatasetConverter:
         is used for model selection / early-stopping, while the held-out test set
         is reserved for the reported retrieval metrics (MRR / top-k / TAR@FAR).
         """
-        print("--- Embedding Data Preparation ---")
+        logger.info("--- Embedding Data Preparation ---")
 
         if not os.path.exists(self.source_path):
-            print(f"[ERROR] DogFaceNet path not found: {self.source_path}")
-            print("Please download the DogFaceNet dataset.")
+            logger.error(f"DogFaceNet path not found: {self.source_path}")
+            logger.info("Please download the DogFaceNet dataset.")
             return
 
-        print("Scanning DogFaceNet for dog identities...")
+        logger.info("Scanning DogFaceNet for dog identities...")
 
         # Scan DogFaceNet directory structure
         filtered_identities = {}
@@ -60,7 +63,7 @@ class EmbeddingDatasetConverter:
                         os.path.join(identity_path, img) for img in image_files
                     ]
 
-        print(
+        logger.info(
             f"Found {len(filtered_identities)} identities with >= {self.min_images_per_identity} images."
         )
 
@@ -82,7 +85,7 @@ class EmbeddingDatasetConverter:
                 )
 
         # Split data by identity to prevent data leakage
-        print("\nSplitting data by identity to prevent leakage...")
+        logger.info("\nSplitting data by identity to prevent leakage...")
         all_identity_ids = list(data_by_identity.keys())
         random.seed(42)  # Ensure reproducible splits
         random.shuffle(all_identity_ids)
@@ -104,9 +107,9 @@ class EmbeddingDatasetConverter:
             else:
                 train_data.extend(data_by_identity[identity_id])
 
-        print(f"Total images: {total_images}")
-        print(f"Target validation images: ~{val_target_count}")
-        print(f"Target test images: ~{test_target_count}")
+        logger.info(f"Total images: {total_images}")
+        logger.info(f"Target validation images: ~{val_target_count}")
+        logger.info(f"Target test images: ~{test_target_count}")
 
         # Ensure output directories exist
         os.makedirs(os.path.dirname(self.output_train_json), exist_ok=True)
@@ -114,23 +117,29 @@ class EmbeddingDatasetConverter:
         os.makedirs(os.path.dirname(self.output_test_json), exist_ok=True)
 
         # Save to JSON
-        print(f"Writing {len(train_data)} training samples to {self.output_train_json}")
+        logger.info(
+            f"Writing {len(train_data)} training samples to {self.output_train_json}"
+        )
         with open(self.output_train_json, "w") as f:
             json.dump(train_data, f, indent=2)
 
-        print(f"Writing {len(val_data)} validation samples to {self.output_val_json}")
+        logger.info(
+            f"Writing {len(val_data)} validation samples to {self.output_val_json}"
+        )
         with open(self.output_val_json, "w") as f:
             json.dump(val_data, f, indent=2)
 
-        print(f"Writing {len(test_data)} test samples to {self.output_test_json}")
+        logger.info(f"Writing {len(test_data)} test samples to {self.output_test_json}")
         with open(self.output_test_json, "w") as f:
             json.dump(test_data, f, indent=2)
 
-        print("Dataset preparation complete!")
-        print(
+        logger.info("Dataset preparation complete!")
+        logger.info(
             f"Training identities: {len({item['identity_label'] for item in train_data})}"
         )
-        print(
+        logger.info(
             f"Validation identities: {len({item['identity_label'] for item in val_data})}"
         )
-        print(f"Test identities: {len({item['identity_label'] for item in test_data})}")
+        logger.info(
+            f"Test identities: {len({item['identity_label'] for item in test_data})}"
+        )

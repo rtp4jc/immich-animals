@@ -3,6 +3,7 @@ Trainer class for the embedding model.
 """
 
 import json
+import logging
 import time
 from pathlib import Path
 
@@ -12,6 +13,8 @@ import torch.optim as optim
 from tqdm import tqdm
 
 from animal_id.benchmark.metrics import evaluate_embedding_model
+
+logger = logging.getLogger(__name__)
 
 
 class EmbeddingTrainer:
@@ -147,7 +150,7 @@ class EmbeddingTrainer:
 
         best_indicator = " [BEST]" if is_global_best else ""
 
-        print(
+        logger.info(
             f"Epoch {(epoch % total_epochs) + 1}/{total_epochs}: "
             f"Train Loss: {train_loss:.4f}, "
             f"Val mAP: {current_metric:.4f}, "
@@ -157,7 +160,7 @@ class EmbeddingTrainer:
 
         # Early stopping check (based on phase performance)
         if self.patience_counter >= patience:
-            print(
+            logger.info(
                 f"Early stopping triggered in {phase} phase after {self.patience_counter} epochs without improvement"
             )
             return True  # Signal to stop training
@@ -192,10 +195,12 @@ class EmbeddingTrainer:
         projection + margin head train (``warmup_epochs`` epochs, no fine-tune
         phase) — a per-backbone-LR-free feature-quality probe.
         """
-        print(f"Starting training in run directory: {self.run_dir}")
+        logger.info(f"Starting training in run directory: {self.run_dir}")
 
         if linear_probe:
-            print(f"\n=== Linear probe ({warmup_epochs} epochs, frozen trunk) ===")
+            logger.info(
+                f"\n=== Linear probe ({warmup_epochs} epochs, frozen trunk) ==="
+            )
             self.model.freeze_feature_extractor()
             optimizer = optim.Adam(
                 filter(lambda p: p.requires_grad, self.model.parameters()),
@@ -212,13 +217,13 @@ class EmbeddingTrainer:
                 json.dump(
                     [self._convert_metric(m) for m in self.epoch_metrics], f, indent=2
                 )
-            print(
+            logger.info(
                 f"Linear probe complete. Best validation mAP: {self.best_val_metric:.4f}"
             )
             return self.run_dir / "best_model.pt"
 
         # Phase 1: Warmup (freeze trunk, train projection + margin head)
-        print(f"\n=== Phase 1: Warmup ({warmup_epochs} epochs) ===")
+        logger.info(f"\n=== Phase 1: Warmup ({warmup_epochs} epochs) ===")
         self.model.freeze_feature_extractor()
         optimizer = optim.Adam(self.model.parameters(), lr=head_lr)
 
@@ -230,12 +235,12 @@ class EmbeddingTrainer:
                 break
 
         # Phase 2: Full training (unfreeze backbone)
-        print(f"\n=== Phase 2: Full Training ({full_epochs} epochs) ===")
+        logger.info(f"\n=== Phase 2: Full Training ({full_epochs} epochs) ===")
 
         # Load the best model from Phase 1 before starting Phase 2
         best_phase1_path = self.run_dir / "best_model.pt"
         if best_phase1_path.exists():
-            print(f"Loading best Phase 1 model: {best_phase1_path}")
+            logger.info(f"Loading best Phase 1 model: {best_phase1_path}")
             self.model.load_state_dict(
                 torch.load(best_phase1_path, map_location=self.device)
             )
@@ -283,5 +288,7 @@ class EmbeddingTrainer:
                 [self._convert_metric(m) for m in self.epoch_metrics], f, indent=2
             )
 
-        print(f"Training completed. Best validation mAP: {self.best_val_metric:.4f}")
+        logger.info(
+            f"Training completed. Best validation mAP: {self.best_val_metric:.4f}"
+        )
         return self.run_dir / "best_model.pt"
