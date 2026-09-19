@@ -75,9 +75,9 @@ dogs.
 ## Turning it off
 
 Point the Machine Learning URL back at `http://immich-machine-learning:3003` and
-run **Face Detection → Refresh**. The dog faces and the people behind them go;
-human faces are untouched. Dog names are not kept, so turning it on again gives
-fresh clusters to name.
+run **Face Detection → Refresh**. The dog faces will be removed, but
+human faces will be untouched. Dog names are not kept, so turning it on again requires
+you to apply names again.
 
 ## Settings
 
