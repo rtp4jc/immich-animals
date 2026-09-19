@@ -31,7 +31,7 @@ Then in Immich, **Administration → Settings → Machine Learning**:
 | --- | --- | --- |
 | URL | `http://animal-ml:3003` | replaces the stock ML server |
 | Min Detection Score | `0.3` | 0.7 is tuned for human faces and drops most dogs |
-| Max Distance | `0.35` | best v-measure/purity balance on held-out photos; 0.30 is purer but leaves 41% unclustered |
+| Max Distance | leave as-is | the sidecar moves its own geometry onto yours |
 
 `Min Faces` is a per-user preference in v3 (**Account Settings → Features →
 People**), not an admin setting.
@@ -40,13 +40,31 @@ People**), not an admin setting.
 
 | `KEEP_HUMAN_FACES` | Behaviour |
 | --- | --- |
-| `false` (default) | Only dogs. Human faces stop being detected entirely. |
-| `true` | Dog faces **plus** whatever the stock model finds, in one response. |
+| `true` (default) | Dog faces **plus** whatever the stock model finds. Embeddings rescaled so one Max Distance suits both. |
+| `false` | Only dogs; human faces stop being detected. Set Max Distance to `DOG_MAX_DISTANCE` yourself. |
 
-The cost of `true` is not the code — it is that Immich clusters both with a
-single `Max Distance`, and our 512-d embedding geometry is not ArcFace's. A
-threshold tuned for dogs will over- or under-merge people. Both modes are
-supported so you can measure that rather than guess.
+Immich applies one `Max Distance` to every face, but our 512-d geometry is not
+ArcFace's — ours clusters best at 0.35, Immich defaults to 0.5. Rather than make
+the user reconcile that, we move our side.
+
+Mixing each embedding with an independent random unit vector maps cosine
+distance affinely, because random high-dimensional vectors are near-orthogonal:
+
+```
+d' = (1 - a) + a·d        a = (1 - IMMICH_MAX_DISTANCE) / (1 - DOG_MAX_DISTANCE)
+```
+
+At the defaults `a = 0.769`, so a raw distance of 0.35 lands on 0.5 and Immich's
+own threshold does the right thing for both. It is not a hack: the target Gram
+matrix `a·G + (1-a)I` is positive semi-definite, so this geometry exists — the
+random vectors are how you approximate its exact realisation in 512 dimensions.
+Measured on the shipped container, `d' = 0.79·d + 0.22` with a residual of 0.03,
+and the transform is deterministic per face.
+
+The cost is that residual: clustering v-measure held at 0.729 (Commons) and rose
+to 0.838 (real personal photos), but fell from 0.777 to 0.707 on MPDD's tight
+crops. Human embeddings are never touched, so disabling the sidecar leaves them
+valid.
 
 ## Validate
 

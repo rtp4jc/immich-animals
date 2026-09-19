@@ -1,8 +1,6 @@
-# Build the image from this repo's root:
-#   docker build -f sidecar/Dockerfile -t animal-ml .
-# then copy this file next to Immich's docker-compose.yml as
-# docker-compose.override.yml and point Administration -> Settings ->
-# Machine Learning -> URL at http://animal-ml:3003.
+# Copy this next to Immich's docker-compose.yml as docker-compose.override.yml,
+# then point Administration -> Settings -> Machine Learning -> URL at
+# http://animal-ml:3003.
 services:
   animal-ml:
     container_name: animal_ml
@@ -10,6 +8,12 @@ services:
     environment:
       # Everything that isn't facial-recognition is forwarded here.
       UPSTREAM_ML_URL: http://immich-machine-learning:3003
-      # true also returns upstream's human faces alongside the dogs.
-      KEEP_HUMAN_FACES: "false"
+      # Keep finding human faces too, and rescale our embeddings so one
+      # Max Distance suits both. Set false to serve dogs only, in which case
+      # set Max Distance to DOG_MAX_DISTANCE yourself.
+      KEEP_HUMAN_FACES: "true"
+      # Where our embeddings actually cluster best, and the Max Distance in
+      # your Immich settings. Only change the second if you changed the first.
+      DOG_MAX_DISTANCE: "0.35"
+      IMMICH_MAX_DISTANCE: "0.5"
     restart: always

@@ -5,11 +5,14 @@ forwarded verbatim to the stock immich-machine-learning container, because
 Immich's `urls` list is failover, not routing: whichever server answers has to
 answer everything.
 
-Set KEEP_HUMAN_FACES=true to return upstream's human faces alongside the dogs
-instead of replacing them.
+KEEP_HUMAN_FACES (on by default) returns upstream's human faces alongside the
+dogs, and rescales our embeddings so Immich's human-tuned Max Distance also
+works for dogs. Set it false to serve dogs only, and set Max Distance yourself.
 """
 
+import hashlib
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -26,13 +29,15 @@ BBOX_PAD = 0.1  # matches AnimalPipeline's crop, which the embedder was tuned on
 
 MODEL_DIR = Path(os.environ.get("MODEL_DIR", "models/onnx"))
 UPSTREAM_URL = os.environ.get("UPSTREAM_ML_URL", "").rstrip("/")
-# Off by default: with it on, Immich clusters humans and dogs under one
-# maxDistance, and those two embedding geometries want different thresholds.
-KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "").lower() in {
+KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
     "1",
     "true",
     "yes",
 }
+# Our embeddings cluster best at DOG_MAX_DISTANCE, Immich's humans at its own
+# default. One setting cannot serve both, so we move ours onto theirs.
+DOG_MAX_DISTANCE = float(os.environ.get("DOG_MAX_DISTANCE", "0.35"))
+IMMICH_MAX_DISTANCE = float(os.environ.get("IMMICH_MAX_DISTANCE", "0.5"))
 
 
 def _load(name: str) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
@@ -78,9 +83,30 @@ def _detect(rgb: np.ndarray, min_score: float) -> list[tuple[float, list[int]]]:
     ]
 
 
+# Mixing a unit vector with an independent random one maps cosine distance
+# affinely: d' = (1 - a) + a*d, since random high-dimensional vectors are nearly
+# orthogonal. Solving d' = IMMICH_MAX_DISTANCE at d = DOG_MAX_DISTANCE gives a.
+_SHIFT = (1 - IMMICH_MAX_DISTANCE) / (1 - DOG_MAX_DISTANCE)
+_RESCALE = KEEP_HUMAN_FACES and 0 < _SHIFT < 1
+
+
+def _unit(vector: np.ndarray) -> np.ndarray:
+    norm = np.linalg.norm(vector)
+    return vector / norm if norm else vector
+
+
+def _rescale(vector: np.ndarray) -> np.ndarray:
+    """Move our distances onto Immich's threshold, deterministically per face."""
+    seed = hashlib.blake2b(vector.tobytes(), digest_size=8).digest()
+    noise = np.random.default_rng(int.from_bytes(seed, "big")).normal(size=vector.shape)
+    mixed = np.sqrt(_SHIFT) * _unit(vector) + np.sqrt(1 - _SHIFT) * _unit(noise)
+    return _unit(mixed).astype(np.float32)
+
+
 def _embed(crop: np.ndarray) -> np.ndarray:
     blob = (_blob(crop, _emb_size, cv2.INTER_AREA) - _MEAN) / _STD
-    return embedder.run(None, {_emb_input: blob})[0][0]
+    vector = embedder.run(None, {_emb_input: blob})[0][0]
+    return _rescale(vector) if _RESCALE else vector
 
 
 def _pad(bbox: list[int], width: int, height: int) -> tuple[int, int, int, int]:
@@ -95,6 +121,14 @@ def _pad(bbox: list[int], width: int, height: int) -> tuple[int, int, int, int]:
 
 
 app = FastAPI()
+logging.getLogger("uvicorn.error").info(
+    "animal-ml: humans=%s rescale=%s (Max Distance %.2f behaves as %.2f) upstream=%s",
+    KEEP_HUMAN_FACES,
+    _RESCALE,
+    IMMICH_MAX_DISTANCE,
+    DOG_MAX_DISTANCE if _RESCALE else IMMICH_MAX_DISTANCE,
+    UPSTREAM_URL or "unset",
+)
 
 
 @app.get("/ping")
@@ -141,7 +175,7 @@ async def predict(request: Request) -> Response:
             }
         )
 
-    if KEEP_HUMAN_FACES:
+    if KEEP_HUMAN_FACES and UPSTREAM_URL:
         upstream = await _post_upstream(body, content_type)
         upstream.raise_for_status()
         faces += orjson.loads(upstream.content).get(TASK, [])
