@@ -178,6 +178,30 @@ def _calculate_map(embeddings: np.ndarray, labels: np.ndarray) -> float:
     return np.mean(aps) if aps else 0.0
 
 
+def retrieval_metrics(
+    embeddings: np.ndarray, labels: np.ndarray, k_values=(1, 5)
+) -> tuple[float, dict[int, float], int]:
+    """Leave-one-out cosine retrieval over the gallery (= the given embeddings).
+
+    Returns (mrr, {k: top_k_accuracy}, num_evaluated_queries). Queries with no
+    same-identity gallery item are skipped (standard open-set practice).
+    """
+    similarities = embeddings @ embeddings.T
+    np.fill_diagonal(similarities, -np.inf)
+    ranked_labels = labels[np.argsort(-similarities, axis=1)]
+    matches = ranked_labels == labels[:, None]
+
+    has_positive = matches.any(axis=1)
+    matches = matches[has_positive]
+    if matches.shape[0] == 0:
+        return 0.0, {k: 0.0 for k in k_values}, 0
+
+    first_match_rank = matches.argmax(axis=1) + 1
+    mrr = float(np.mean(1.0 / first_match_rank))
+    top_k_accuracy = {k: float(np.mean(matches[:, :k].any(axis=1))) for k in k_values}
+    return mrr, top_k_accuracy, int(has_positive.sum())
+
+
 def evaluate_embedding_model(model, dataloader, device) -> dict[str, float]:
     """Evaluate model and return comprehensive metrics."""
     model.eval()

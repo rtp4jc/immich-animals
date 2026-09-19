@@ -34,6 +34,8 @@ Results are appended to ``outputs/ablation/results.csv`` (+ a regenerated
 ``results.md`` table). Cells already recorded there are skipped (``--force``
 re-runs them) and a cell that raises is recorded as failed and does not stop the
 sweep, so an unattended multi-day queue can be resumed by re-running the command.
+``--dry-run`` prints that plan — which cells would run, which are already
+recorded — without training anything.
 """
 
 import argparse
@@ -49,7 +51,7 @@ import onnxruntime as ort
 import torch
 from torch.utils.data import DataLoader
 
-from animal_id.benchmark.metrics import evaluate_embedding_model
+from animal_id.benchmark.metrics import evaluate_embedding_model, retrieval_metrics
 from animal_id.common.constants import DATA_DIR
 from animal_id.common.datasets import IdentityDataset
 from animal_id.common.logging_config import setup_logging
@@ -67,29 +69,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "ablation"
 RESULTS_CSV = OUTPUT_DIR / "results.csv"
 RESULTS_MD = OUTPUT_DIR / "results.md"
-
-
-def retrieval_metrics(embeddings: np.ndarray, labels: np.ndarray, k_values=(1, 5)):
-    """Leave-one-out cosine retrieval over the gallery (= the test embeddings).
-
-    Returns (mrr, {k: top_k_accuracy}, num_evaluated_queries). Queries with no
-    same-identity gallery item are skipped (standard open-set practice).
-    """
-    similarities = embeddings @ embeddings.T
-    np.fill_diagonal(similarities, -np.inf)
-    ranked_order = np.argsort(-similarities, axis=1)
-    ranked_labels = labels[ranked_order]
-    matches = ranked_labels == labels[:, None]
-
-    has_positive = matches.any(axis=1)
-    matches = matches[has_positive]
-    if matches.shape[0] == 0:
-        return 0.0, {k: 0.0 for k in k_values}, 0
-
-    first_match_rank = matches.argmax(axis=1) + 1
-    mrr = float(np.mean(1.0 / first_match_rank))
-    top_k_accuracy = {k: float(np.mean(matches[:, :k].any(axis=1))) for k in k_values}
-    return mrr, top_k_accuracy, int(has_positive.sum())
 
 
 def measure_cpu_latency(model, img_size, num_iters=20):
@@ -317,6 +296,11 @@ def main():
         help="Re-run cells already recorded in results.csv instead of skipping them.",
     )
     parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="List the cells that would run or be skipped, then exit.",
+    )
+    parser.add_argument(
         "--smoke",
         action="store_true",
         help="Quick run: 1 epoch unless --epochs given (for plumbing checks).",
@@ -333,7 +317,7 @@ def main():
         print(f"=== Sweep: {len(cells)} cells, mode={args.mode}, device={device} ===")
 
     recorded = ablation_results.load_rows(RESULTS_CSV)
-    counts = {"done": 0, "failed": 0, "skipped": 0}
+    counts = {"done": 0, "failed": 0, "skipped": 0, "planned": 0}
 
     for i, (seed, backbone) in enumerate(cells):
         img_size = args.img_size or get_backbone_input_size(backbone)
@@ -352,11 +336,17 @@ def main():
         )
         if prior is not None and not args.force:
             status = ablation_results.row_status(prior)
+            verb = "WOULD SKIP" if args.dry_run else "SKIP"
             print(
-                f"=== [{i + 1}/{len(cells)}] SKIP {label}: already recorded "
+                f"=== [{i + 1}/{len(cells)}] {verb} {label}: already recorded "
                 f"({status}, {prior.get('timestamp')}); --force re-runs it ==="
             )
             counts["skipped"] += 1
+            continue
+
+        if args.dry_run:
+            print(f"=== [{i + 1}/{len(cells)}] WOULD RUN {label} ===")
+            counts["planned"] += 1
             continue
 
         print(f"=== [{i + 1}/{len(cells)}] Ablation: {label} device={device} ===")
@@ -389,10 +379,16 @@ def main():
             print(f"  {k}: {v}")
         print(f"\nAppended to {RESULTS_CSV}")
 
-    print(
-        f"\n=== Sweep summary: {counts['done']} run, {counts['failed']} failed, "
-        f"{counts['skipped']} skipped ==="
-    )
+    if args.dry_run:
+        print(
+            f"\n=== Dry run: {counts['planned']} of {len(cells)} cells would run, "
+            f"{counts['skipped']} already recorded. Nothing was trained. ==="
+        )
+    else:
+        print(
+            f"\n=== Sweep summary: {counts['done']} run, {counts['failed']} failed, "
+            f"{counts['skipped']} skipped ==="
+        )
 
 
 if __name__ == "__main__":
