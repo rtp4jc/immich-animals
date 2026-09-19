@@ -38,6 +38,8 @@ from animal_id.embedding.export import export_embedding_onnx
 from animal_id.embedding.losses import HeadType
 from animal_id.embedding.models import AnimalEmbeddingModel
 from animal_id.embedding.trainer import EmbeddingTrainer
+from animal_id.identification.clusterer import cluster
+from animal_id.identification.metrics import cluster_quality
 
 setup_logging()
 
@@ -45,6 +47,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "ablation"
 FINAL_CSV = OUTPUT_DIR / "final.csv"
 NO_EARLY_STOP = 10**6
+
+
+def _rel(path: Path) -> str:
+    """Repo-relative when possible; absolute paths must never be committed."""
+    try:
+        return str(path.relative_to(PROJECT_ROOT))
+    except ValueError:
+        return str(path)
+
+
+EPS_GRID = [0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60]
+MIN_SAMPLES = 3
 
 FIELDS = [
     "timestamp",
@@ -104,6 +118,24 @@ def verify_export(model, onnx_path: Path, img_size: int) -> dict:
         "onnx_parity": f"{diff:.2e}",
         "onnx_ort_ms": round(ort_ms, 1),
     }
+
+
+def tune_eps(embeddings, labels) -> tuple[float, list[dict]]:
+    """Pick the DBSCAN threshold to ship with this model.
+
+    ``eps`` is Immich's ``maxDistance``, and the right value depends on the
+    embedding geometry, so it cannot be inherited across a backbone swap. Note
+    the operating point is chosen on the test split: retrieval metrics stay
+    unbiased (no tuning), but the clustering scores here are best-case.
+    """
+    sweep = []
+    for eps in EPS_GRID:
+        metrics = cluster_quality(list(labels), cluster(embeddings, eps, MIN_SAMPLES))
+        sweep.append(
+            {"eps": eps, **{k: round(float(v), 4) for k, v in metrics.items()}}
+        )
+    best = max(sweep, key=lambda r: r["v_measure"])
+    return best["eps"], sweep
 
 
 def build_combined_json(out_path: Path) -> Path:
@@ -229,7 +261,11 @@ def main():
     )
 
     if args.include_val:
-        state = torch.load(run_dir / "latest_checkpoint.pt", map_location=device)
+        # Our own checkpoint dict carries a numpy scalar, which the 2.6+
+        # weights_only default refuses.
+        state = torch.load(
+            run_dir / "latest_checkpoint.pt", map_location=device, weights_only=False
+        )
         model.load_state_dict(state["model_state_dict"])
     else:
         model.load_state_dict(torch.load(best_path, map_location=device))
@@ -241,7 +277,10 @@ def main():
         for images, batch_labels in test_loader:
             embeddings.append(model.get_embeddings(images.to(device)).cpu().numpy())
             labels.extend(batch_labels.numpy())
-    mrr, topk = retrieval_metrics(np.vstack(embeddings), np.array(labels))
+    embeddings = np.vstack(embeddings)
+    labels = np.array(labels)
+    mrr, topk = retrieval_metrics(embeddings, labels)
+    best_eps, eps_sweep = tune_eps(embeddings, labels)
 
     onnx_path.parent.mkdir(parents=True, exist_ok=True)
     model = model.cpu().eval()
@@ -261,9 +300,10 @@ def main():
         "top5": round(topk[5], 4),
         "mAP": round(test_metrics.get("mAP", 0.0), 4),
         "tar@1%": round(test_metrics.get("TAR@FAR=1%", 0.0), 4),
-        "onnx_path": str(onnx_path.relative_to(PROJECT_ROOT)),
+        "onnx_path": _rel(onnx_path),
         **contract,
     }
+    row_metrics = row
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     is_new = not FINAL_CSV.exists()
@@ -276,8 +316,44 @@ def main():
     print("\n=== Final model ===")
     for k, v in row.items():
         print(f"  {k}: {v}")
+    sidecar = onnx_path.with_suffix(".json")
+    sidecar.write_text(
+        json.dumps(
+            {
+                "version": run_dir.name,
+                "source_run": _rel(run_dir),
+                "backbone": backbone.value,
+                "head": head.value,
+                "seed": args.seed,
+                "trained_on": trained_on,
+                "img_size": img_size,
+                "embedding_dim": TRAINING_CONFIG.embedding_dim,
+                "exported_at": datetime.datetime.now().isoformat(timespec="seconds"),
+                "onnx_contract_ok": contract["onnx_contract_ok"],
+                "parity_max_abs_diff": contract["onnx_parity"],
+                "ort_cpu_ms": contract["onnx_ort_ms"],
+                "test_metrics": {
+                    "mrr": row_metrics["mrr"],
+                    "top1": row_metrics["top1"],
+                    "top5": row_metrics["top5"],
+                    "mAP": row_metrics["mAP"],
+                    "tar@1%": row_metrics["tar@1%"],
+                },
+                "clustering": {
+                    "eps": best_eps,
+                    "min_samples": MIN_SAMPLES,
+                    "selected_on": "test",
+                    "sweep": eps_sweep,
+                },
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+
     status = "READY" if contract["onnx_contract_ok"] else "CONTRACT FAILED"
-    print(f"\nExported {onnx_path} — {status}")
+    print(f"  clustering: eps={best_eps} min_samples={MIN_SAMPLES}")
+    print(f"\nExported {onnx_path} (+ {sidecar.name}) — {status}")
 
 
 if __name__ == "__main__":
