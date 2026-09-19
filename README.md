@@ -84,6 +84,12 @@ Backbone weights carry their own licence, which gates deployment separately from
 accuracy: `BackboneSpec.license_tier` records it and `summarize_ablation.py`
 treats anything non-permissive as a reference ceiling rather than a candidate.
 
+Each exported embedder writes a `.json` sidecar beside it holding the
+preprocessing recipe, test metrics, ONNX parity and the DBSCAN `eps` to cluster
+at. That `eps` is swept per model (it depends on embedding geometry, so it
+cannot be inherited across a backbone swap) and is selected on the test split,
+so the clustering scores are best-case; retrieval metrics involve no tuning.
+
 Benchmarks log to Weights & Biases by default; pass `--no-wandb` to disable. In the W&B dashboard, plot metrics like `top_5_accuracy` or `tar_at_far_0_01` against wall time and group by `use_keypoints`. Missed detections and wrong matches show up under Media.
 
 ### Helper scripts
