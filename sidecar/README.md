@@ -51,7 +51,8 @@ Immich records neither, so no tool can count them. They go the same way.
 Everything under **Lost** is deleted when you re-run Face Detection, whether you are
 turning the sidecar on or off.
 
-If your Postgres container is not named `immich_postgres`, pass `--container`.
+If your Postgres container is not named `immich_postgres`,
+pass `--container`.
 Run it again before you turn the sidecar off — by then the numbers describe the
 dog work you have done.
 

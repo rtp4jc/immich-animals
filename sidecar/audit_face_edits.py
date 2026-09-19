@@ -9,6 +9,16 @@ import argparse
 import subprocess
 import sys
 
+# Immich v3 keys people by personGroupId; every version before it keys them by
+# person.id, and only v3 can hide an individual face.
+PROBE = """
+select
+  (select count(*) from information_schema.columns
+    where table_name = 'person' and column_name = 'personGroupId'),
+  (select count(*) from information_schema.columns
+    where table_name = 'asset_face' and column_name = 'isVisible')
+"""
+
 # Every count here is a column, never an inference. Merges and reassignments are
 # left out because Immich stores no evidence of them: a merge deletes the losing
 # person and a reassignment only moves a face to another group.
@@ -16,17 +26,21 @@ QUERY = """
 select
   (select count(*) from person where name <> ''),
   (select count(*) from asset_face af
-     join person p on p."personGroupId" = af."personGroupId"
-    where p.name <> '' and af."deletedAt" is null),
+     join person p on p."{person_key}" = af."{face_key}"
+    where p.name <> '' and af."deletedAt" is null
+      and not exists (
+        select 1 from asset_face k
+         where k."{face_key}" = p."{person_key}"
+           and k."sourceType" <> 'machine-learning')),
   (select count(*) from person p
     where p.name <> '' and exists (
       select 1 from asset_face af
-       where af."personGroupId" = p."personGroupId"
+       where af."{face_key}" = p."{person_key}"
          and af."sourceType" <> 'machine-learning')),
   (select count(*) from person where "isHidden"),
   (select count(*) from person where "isFavorite"),
   (select count(*) from person where "birthDate" is not null),
-  (select count(*) from asset_face where not "isVisible"),
+  {hidden_faces},
   (select count(*) from asset_face where "deletedAt" is not null),
   (select count(*) from asset_face where "sourceType" <> 'machine-learning'),
   (select count(*) from person),
@@ -42,36 +56,35 @@ UNCOUNTED = """Merges and faces moved between people are missing from this list:
 Immich records neither, so no tool can count them. They go the same way."""
 
 
-def run(container: str, user: str, database: str) -> dict[str, int]:
+def psql(container: str, user: str, database: str, sql: str) -> list[str]:
+    command = ["docker", "exec", "-i", container, "psql", "-U", user, "-d", database]
     result = subprocess.run(
-        [
-            "docker",
-            "exec",
-            "-i",
-            container,
-            "psql",
-            "-U",
-            user,
-            "-d",
-            database,
-            "-At",
-            "-F",
-            "\t",
-            "-c",
-            QUERY,
-        ],
-        capture_output=True,
-        text=True,
+        [*command, "-At", "-F", "\t", "-c", sql], capture_output=True, text=True
     )
     if result.returncode != 0:
         sys.exit(result.stderr.strip() or f"could not query {container}")
-    return {
-        k: int(v)
-        for k, v in zip(FIELDS, result.stdout.strip().split("\t"), strict=True)
-    }
+    return result.stdout.strip().split("\t")
 
 
-def report(c: dict[str, int]) -> None:
+def build_query(container: str, user: str, database: str) -> str:
+    groups, visible = psql(container, user, database, PROBE)
+    return QUERY.format(
+        person_key="personGroupId" if groups == "1" else "id",
+        face_key="personGroupId" if groups == "1" else "personId",
+        hidden_faces=(
+            '(select count(*) from asset_face where not "isVisible")'
+            if visible == "1"
+            else "null"
+        ),
+    )
+
+
+def run(container: str, user: str, database: str) -> dict[str, int | None]:
+    values = psql(container, user, database, build_query(container, user, database))
+    return {k: int(v) if v else None for k, v in zip(FIELDS, values, strict=True)}
+
+
+def report(c: dict[str, int | None]) -> None:
     lost = [
         (
             "named people",
@@ -92,6 +105,9 @@ def report(c: dict[str, int]) -> None:
             "they keep the name, but lose every detected face",
         ),
     ]
+
+    # A count is None where this Immich version has no such column to read.
+    lost = [row for row in lost if row[1] is not None]
 
     print(f"\n{c['people']} people, {c['faces']} faces.\n")
     if not any(n for _, n, _ in lost + kept):
@@ -118,7 +134,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.sql:
-        print(QUERY.strip())
+        print(build_query(args.container, args.user, args.database).strip())
         return
     report(run(args.container, args.user, args.database))
 
