@@ -18,6 +18,53 @@ section.
 > Turning it back off means another re-run and another reset. If you have spent
 > time naming people, use a test instance or a library you do not mind re-editing.
 
+## Check what you would lose
+
+`audit_face_edits.py` counts the face work in your library before you change
+anything. It only reads, and it needs nothing but Python 3 and the `docker`
+command:
+
+```bash
+curl -O https://raw.githubusercontent.com/rtp4jc/immich-animals/main/sidecar/audit_face_edits.py
+python3 audit_face_edits.py
+```
+
+```
+1630 people, 4223 faces.
+
+Lost when you re-run Face Detection
+      12  named people  (486 faces between them)
+       1  hidden people
+       0  favourited people
+       0  birth dates
+       2  hidden faces
+       3  merges  (estimated, last 31 days)
+      27  hand edits to faces  (estimated: moved, hidden or deleted)
+
+Kept
+       4  manually added faces
+       2  named people holding one  (they keep the name, but lose every detected face)
+```
+
+Everything under **Lost** goes when you re-run Face Detection, whether you are
+turning the sidecar on or off. Read the top line as the real cost: those people
+go back to being unnamed clusters, and you name them again by hand.
+
+The two estimated lines are counted by looking for minutes where only a handful
+of rows changed, since Immich does not record who changed what. Job runs rewrite
+thousands of rows a minute and are excluded, and so is anything from before your
+last full Face Detection, because that already discarded it. Merges older than
+31 days cannot be counted at all — Immich has deleted the evidence by then.
+
+**Kept** is the exception worth knowing. A face you added by hand is not machine
+learning output, so a re-run leaves it alone. A person whose only face is a
+manual one comes through intact; a person with a manual face *and* detected ones
+keeps its name but loses the detected faces, so it comes back holding one photo.
+
+If your Postgres container is not named `immich_postgres`, pass `--container`.
+Run it again before you turn the sidecar off — by then the numbers describe the
+dog work you have done.
+
 ## What you need
 
 - Immich running under `docker compose` (v3.0 or newer)
