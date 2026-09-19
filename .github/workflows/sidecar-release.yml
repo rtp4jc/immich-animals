@@ -1,0 +1,131 @@
+# Publishing a release named sidecar-v* builds and pushes the sidecar image.
+# The models are uploaded to that release by hand; CI only verifies them against
+# the committed sidecar/SHA256SUMS, so a wrong or truncated upload fails here
+# rather than in a tester's install.
+name: sidecar release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag holding the model assets
+        required: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/animal-ml
+
+jobs:
+  build:
+    if: startsWith(github.event.release.tag_name || inputs.tag, 'sidecar-v')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+    runs-on: ${{ matrix.runner }}
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        run: |
+          tag="${{ github.event.release.tag_name || inputs.tag }}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#sidecar-v}" >> "$GITHUB_OUTPUT"
+          echo "arch=${{ matrix.platform }}" | tr '/' '-' >> "$GITHUB_OUTPUT"
+
+      # Fail loudly and early if the uploaded assets are not the expected bytes.
+      - name: Verify model assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "${{ steps.meta.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern 'detector.onnx' --pattern 'embedding.onnx' --pattern 'embedding.json' \
+            --dir /tmp/models
+          cd /tmp/models && sha256sum -c "$GITHUB_WORKSPACE/sidecar/SHA256SUMS"
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: sidecar/Dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: MODEL_TAG=${{ steps.meta.outputs.tag }}
+          load: true
+          tags: animal-ml:ci
+
+      # B6: arm64 was never exercised before this. Both arches run the contract
+      # test on their own native runner, so "supports arm64" is a measurement.
+      - name: Smoke test
+        run: |
+          docker run -d --rm --name smoke -p 3003:3003 animal-ml:ci
+          for _ in $(seq 60); do curl -sf -o /dev/null http://localhost:3003/ping && break; sleep 2; done
+          sudo apt-get install -y --no-install-recommends imagemagick
+          convert -size 320x240 xc:gray /tmp/blank.jpg
+          pip install --quiet httpx
+          python sidecar/smoke_test.py /tmp/blank.jpg --url http://localhost:3003
+          docker logs smoke
+          docker rm -f smoke
+
+      - name: Push by digest
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: sidecar/Dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: MODEL_TAG=${{ steps.meta.outputs.tag }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Save digest
+        run: |
+          mkdir -p /tmp/digests
+          touch "/tmp/digests/${{ steps.push.outputs.digest }}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ steps.meta.outputs.arch }}
+          path: /tmp/digests/*
+          retention-days: 1
+
+  manifest:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          merge-multiple: true
+          path: /tmp/digests
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create manifest list
+        run: |
+          version="${{ needs.build.outputs.tag }}"
+          version="${version#sidecar-v}"
+          docker buildx imagetools create \
+            -t "${{ env.IMAGE }}:${version}" \
+            -t "${{ env.IMAGE }}:latest" \
+            $(printf "${{ env.IMAGE }}@sha256:%s " $(ls /tmp/digests | sed 's/^sha256://'))
+          docker buildx imagetools inspect "${{ env.IMAGE }}:${version}"

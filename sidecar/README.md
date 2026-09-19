@@ -18,12 +18,23 @@ nothing else, with no path to torch.
 
 ## Run it
 
+Testers pull the published image — see [GETTING_STARTED.md](GETTING_STARTED.md).
+To build it yourself (needs BuildKit, i.e. `docker buildx`):
+
 ```bash
-docker build -f sidecar/Dockerfile -t animal-ml .          # from the repo root
-cp sidecar/docker-compose.yml \
-   <immich>/docker/docker-compose.override.yml
+# from the repo root; downloads the models and checks them against SHA256SUMS
+docker buildx build -f sidecar/Dockerfile --load -t animal-ml .
+
+# with the models already on disk
+docker buildx build -f sidecar/Dockerfile --build-arg MODEL_SOURCE=local --load -t animal-ml .
+
+cp sidecar/docker-compose.yml <immich>/docker/docker-compose.override.yml
 docker compose up -d animal-ml
 ```
+
+`models/onnx/` is not in git. The default build fetches the three files from the
+release named by `MODEL_TAG` and verifies them against `sidecar/SHA256SUMS`, so
+a truncated or tampered download fails the build rather than shipping quietly.
 
 Then in Immich, **Administration → Settings → Machine Learning**:
 
