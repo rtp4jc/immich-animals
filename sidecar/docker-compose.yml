@@ -4,7 +4,7 @@
 services:
   animal-ml:
     container_name: animal_ml
-    image: animal-ml
+    image: ghcr.io/rtp4jc/animal-ml:0.1.0
     environment:
       # Everything that isn't facial-recognition is forwarded here.
       UPSTREAM_ML_URL: http://immich-machine-learning:3003
