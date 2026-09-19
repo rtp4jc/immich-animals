@@ -18,6 +18,43 @@ section.
 > Turning it back off means another re-run and another reset. If you have spent
 > time naming people, use a test instance or a library you do not mind re-editing.
 
+## Check what you would lose
+
+`audit_face_edits.py` counts the face work in your library before you change
+anything. It only reads, and it needs nothing but Python 3 and the `docker`
+command:
+
+```bash
+curl -O https://raw.githubusercontent.com/rtp4jc/immich-animals/main/sidecar/audit_face_edits.py
+python3 audit_face_edits.py
+```
+
+```
+1630 people, 4223 faces.
+
+Lost when you re-run Face Detection
+      12  named people  (486 faces between them)
+       1  hidden people
+       0  favourited people
+       0  birth dates
+       2  hidden faces
+       3  deleted faces  (these come back)
+
+Kept
+       4  manually added faces
+       2  named people holding one  (they keep the name, but lose every detected face)
+
+Merges and faces moved between people are missing from this list:
+Immich records neither, so no tool can count them. They go the same way.
+```
+
+Everything under **Lost** is deleted when you re-run Face Detection, whether you are
+turning the sidecar on or off.
+
+If your Postgres container is not named `immich_postgres`, pass `--container`.
+Run it again before you turn the sidecar off — by then the numbers describe the
+dog work you have done.
+
 ## What you need
 
 - Immich running under `docker compose` (v3.0 or newer)
