@@ -1,0 +1,27 @@
+[project]
+# Standalone on purpose: the sidecar ships as a container and must not drag in
+# torch or anything else from the training project.
+name = "animal-ml-sidecar"
+version = "0.1.0"
+description = "Serves Immich's machine-learning HTTP contract with our dog models"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "httpx>=0.27.0",
+    "numpy>=1.24.0",
+    "onnxruntime>=1.15.0",
+    "opencv-python-headless>=4.8.0",
+    "orjson>=3.10.0",
+    "python-multipart>=0.0.9",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
