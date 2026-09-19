@@ -73,8 +73,16 @@ uv run python scripts/18_run_identification.py --split val --num-images 200
 uv run python scripts/19_explore_fiftyone.py --split val --num-images 200
 
 # Backbone ablation (see .planning/6-25-2026-embedding-backbone-ablation/plan.md)
-uv run python scripts/run_ablation.py --backbone convnextv2_tiny --mode probe
+uv run python scripts/run_ablation.py --backbone convnext_tiny --mode probe
+uv run python scripts/summarize_ablation.py --mode finetune   # apply the decision rule
+
+# Train and export the production model (folds val in; writes models/onnx/embedding.onnx)
+uv run python scripts/train_final.py --backbone convnext_tiny --include-val
 ```
+
+Backbone weights carry their own licence, which gates deployment separately from
+accuracy: `BackboneSpec.license_tier` records it and `summarize_ablation.py`
+treats anything non-permissive as a reference ceiling rather than a candidate.
 
 Benchmarks log to Weights & Biases by default; pass `--no-wandb` to disable. In the W&B dashboard, plot metrics like `top_5_accuracy` or `tar_at_far_0_01` against wall time and group by `use_keypoints`. Missed detections and wrong matches show up under Media.
 
@@ -88,9 +96,18 @@ Benchmarks log to Weights & Biases by default; pass `--no-wandb` to disable. In 
 | 14, 15 | Model I/O inspection, two-stage inference |
 | 16, 17 | Immich container integration (needs a local Immich fork at `immich-clone/`, not included) |
 | 18, 19 | Identification clustering and FiftyOne explorer |
-| `run_ablation.py` | Embedding backbone ablation harness |
+| `run_ablation.py` | Embedding backbone ablation harness (resumable; `--force` re-runs a cell) |
+| `ablation_status.py` | Regenerates `outputs/ablation/STATUS.md` from the result CSVs |
+| `summarize_ablation.py` | Aggregates seeds and applies the licence/ONNX/latency decision rule |
+| `measure_latency.py` | Cost axis for every backbone on one instrument (torch + ONNX Runtime) |
+| `stage_d_validate.py` | Deploy gate: exports each finalist and checks the 512-d L2 contract |
+| `train_final.py` | Trains and exports the production model, with eps sweep and provenance sidecar |
 
-Exported models land in `models/onnx/` as `detector.onnx`, `keypoint.onnx`, and `embedding.onnx`. `copy_models.sh` and `reload_immich.sh` push them into the `immich-clone/` fork.
+Exported models land in `models/onnx/` as `detector.onnx`, `keypoint.onnx`, and
+`embedding.onnx`, each embedder alongside a `.json` sidecar recording its
+backbone, preprocessing recipe, test metrics and DBSCAN `eps`. The embedder is
+trained on ImageNet-normalised input while the YOLO stages take raw `[0, 1]`, so
+`ONNXEmbedding` normalises and the others do not. `copy_models.sh` and `reload_immich.sh` push them into the `immich-clone/` fork.
 
 ## Testing and CI
 
