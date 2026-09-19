@@ -95,6 +95,32 @@ open-set dog faces.
 - All candidates are timed on **one** instrument. A budget is a comparison, so
   mixing a torch number with an ORT one is not a comparison at all.
 
+## Train/serve skew (found 2026-09-18, fixed)
+
+`IdentityDataset` trains on ImageNet-normalised input; `ONNXEmbedding` served
+raw `[0, 1]`. Nothing errored — the model simply received a distribution it was
+never trained on. Measured on the test split with the deployed model:
+
+| preprocessing | MRR | Top-1 |
+|---|---|---|
+| as served (`[0,1]` only) | 0.9474 | 0.9249 |
+| as trained (ImageNet mean/std) | **0.9602** | **0.9416** |
+
+The normalised path reproduces the recorded benchmark (0.9602) exactly, which
+is the proof: the model was fine, the serving code was wrong. That 1.3pp is
+roughly 18% of the entire backbone-swap gain, recovered for zero compute.
+
+The YOLO detector and keypoint stages genuinely do take `[0, 1]`, so the
+normalisation is overridden on the embedder alone rather than moved into the
+shared preprocessing. Regression test:
+`tests/unit/test_serving_preprocessing.py`. The exported sidecar now records
+the full preprocessing recipe so no consumer has to guess it.
+
+This is the general hazard worth remembering: every offline number in this
+ablation was computed through `IdentityDataset`, so the benchmark was blind to
+a bug that only existed on the serving path. An accuracy ablation cannot see a
+deployment bug.
+
 ## Known issues found along the way
 
 - `trainer.py` hardcodes `CrossEntropyLoss(label_smoothing=0.1)` while
@@ -106,3 +132,10 @@ open-set dog faces.
   resolution. Not hit here (every other backbone is 224).
 - Results live in gitignored `outputs/`, so a `git clean` would destroy a
   multi-day sweep.
+- `models/onnx/embedding.onnx` was, before this work, an exported
+  **ConvNeXt-V2** — i.e. the CC-BY-NC licence problem was already shipped, not
+  merely planned. Backed up to `embedding.pre-ablation.onnx`.
+- `IdentityDataset.num_classes` is `max(identity_label) + 1`, not the unique
+  count, so the margin head allocates 1001 prototypes for 705 identities. The
+  296 phantom classes only ever act as negatives. Left alone deliberately:
+  changing it would make the final model incomparable to every measured cell.
