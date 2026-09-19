@@ -89,9 +89,7 @@ them. Dogs need different values, so the sidecar uses its own thresholds.
 
 ## 3. Find the dogs
 
-**Administration → Job Queues → Face Detection → All**, then when it finishes,
-**Facial Recognition → All**. Expect roughly ten photos a second; the People tab
-fills in as it goes.
+**Administration → Job Queues → Face Detection → All**.
 
 Seeing only a handful of people afterwards is Immich hiding anyone with fewer
 than three photos — **Account Settings → Features → People** lowers that.
