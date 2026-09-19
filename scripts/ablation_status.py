@@ -44,6 +44,16 @@ STAGE_B_CELLS = [
     ("megadescriptor_t_224", 42),
 ]
 
+# Stage C head A/B, on both deploy candidates so selection keeps two options.
+STAGE_C_CELLS = [
+    ("convnext_tiny", 42),
+    ("convnext_tiny", 1),
+    ("convnext_tiny", 2),
+    ("resnet50", 42),
+    ("resnet50", 1),
+    ("resnet50", 2),
+]
+
 
 def _tail_text(path: Path, num_bytes: int) -> str:
     if not path.exists():
@@ -92,13 +102,13 @@ def queue_state() -> list[str]:
     return lines
 
 
-def stage_b_progress() -> list[str]:
-    """Tick off the expected cells; FINISHED is a count, not an impression."""
+def _progress(cells: list[tuple[str, int]], head: str, label: str) -> list[str]:
+    """Tick off expected cells; completion is a count, not an impression."""
     done = {}
     if RESULTS_CSV.exists():
         with open(RESULTS_CSV, newline="") as f:
             for row in csv.DictReader(f):
-                if row.get("mode") != "finetune":
+                if row.get("mode") != "finetune" or row.get("head") != head:
                     continue
                 try:
                     key = (row["backbone"], int(row["seed"]))
@@ -107,7 +117,7 @@ def stage_b_progress() -> list[str]:
                 done[key] = row
 
     lines, complete = [], 0
-    for backbone, seed in STAGE_B_CELLS:
+    for backbone, seed in cells:
         row = done.get((backbone, seed))
         if row is None:
             lines.append(f"- [ ] {backbone} seed {seed}")
@@ -120,10 +130,18 @@ def stage_b_progress() -> list[str]:
                 f"top1 {row.get('top1')}"
             )
             complete += 1
-    header = f"**{complete}/{len(STAGE_B_CELLS)} cells recorded**"
-    if complete == len(STAGE_B_CELLS):
-        header += " — Stage B COMPLETE"
+    header = f"**{complete}/{len(cells)} cells recorded**"
+    if complete == len(cells):
+        header += f" — {label} COMPLETE"
     return [header, ""] + lines
+
+
+def stage_b_progress() -> list[str]:
+    return _progress(STAGE_B_CELLS, "arcface", "Stage B")
+
+
+def stage_c_progress() -> list[str]:
+    return _progress(STAGE_C_CELLS, "subcenter_arcface", "Stage C")
 
 
 def _table(path: Path, columns: list[str], where=None) -> list[str]:
@@ -171,6 +189,10 @@ def build() -> str:
         "## Stage B — progress",
         "",
         *stage_b_progress(),
+        "",
+        "## Stage C — progress (head A/B: sub-center ArcFace)",
+        "",
+        *stage_c_progress(),
         "",
         "## Stage B — decision (fine-tuned, the numbers that ship)",
         "",
