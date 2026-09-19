@@ -339,6 +339,15 @@ def main():
                     "mAP": row_metrics["mAP"],
                     "tar@1%": row_metrics["tar@1%"],
                 },
+                "preprocessing": {
+                    "resize": [img_size, img_size],
+                    "scale": "pixels / 255",
+                    "mean": [0.485, 0.456, 0.406],
+                    "std": [0.229, 0.224, 0.225],
+                    "layout": "NCHW",
+                    "colour": "RGB",
+                    "note": "ImageNet normalisation is required; serving raw [0,1] costs ~1.3pp MRR silently.",
+                },
                 "clustering": {
                     "eps": best_eps,
                     "min_samples": MIN_SAMPLES,
