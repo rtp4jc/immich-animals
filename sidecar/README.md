@@ -12,48 +12,9 @@ section.
 > yet. A cat will occasionally be detected, but that is not the goal of this
 > release or a focus in this round of model training.
 
-> **Use Refresh, not Reset.** The Face Detection queue has three buttons.
-> **Refresh** leaves every face that is already there exactly where it is, so your
-> names, merges, hidden people and birth dates all survive — turning the sidecar
-> on, and turning it off again. **Reset** deletes every detected face first and
-> does discard that work. The only thing you lose on the way out is the names you
-> gave the dogs themselves.
-
-## Check what you would lose
-
-`audit_face_edits.py` counts the face work in your library before you change
-anything. It only reads, and it needs nothing but Python 3 and the `docker`
-command:
-
-```bash
-curl -O https://raw.githubusercontent.com/rtp4jc/immich-animals/main/sidecar/audit_face_edits.py
-python3 audit_face_edits.py
-```
-
-```
-1630 people, 4223 faces.
-
-Lost if you Reset Face Detection
-      12  named people  (486 faces between them)
-       1  hidden people
-       0  favourited people
-       0  birth dates
-       2  hidden faces
-       3  deleted faces  (these come back)
-
-Kept
-       4  manually added faces
-       2  named people holding one  (they keep the name, but lose every detected face)
-
-Merges and faces moved between people are missing from this list:
-Immich records neither, so no tool can count them. They go the same way.
-```
-
-Nothing here is at risk if you stick to **Refresh**. This is what **Reset** on
-the Face Detection queue would delete, and it is worth knowing the number before
-you ever press it.
-
-If your Postgres container is not named `immich_postgres`, pass `--container`.
+> **Use Refresh, not Reset** on the Face Detection queue. Refresh keeps every
+> face already in your library, so names, merges and hidden people survive both
+> adding the sidecar and removing it. Reset deletes every detected face first.
 
 ## What you need
 
@@ -89,8 +50,7 @@ them. Dogs need different values, so the sidecar uses its own thresholds.
 
 ## 3. Find the dogs
 
-**Administration → Job Queues → Face Detection → Refresh**. Not **Reset**: that
-one deletes every face in the library first, and the dogs do not need it.
+**Administration → Job Queues → Face Detection → Refresh**.
 
 Seeing only a handful of people afterwards is Immich hiding anyone with fewer
 than three photos — **Account Settings → Features → People** lowers that.
@@ -115,13 +75,9 @@ dogs.
 ## Turning it off
 
 Point the Machine Learning URL back at `http://immich-machine-learning:3003` and
-run **Face Detection → Refresh** again. The dog faces are removed, the people
-behind them disappear, and every human face stays exactly as it was — same
-photos, same names, same merges.
-
-Dog names are the one thing that does not come back. A dog person has nothing
-left once its faces are gone, so it is cleaned up, and turning the sidecar on
-again produces fresh clusters for you to name. Nothing else needs tidying up.
+run **Face Detection → Refresh**. The dog faces and the people behind them go;
+human faces are untouched. Dog names are not kept, so turning it on again gives
+fresh clusters to name.
 
 ## Settings
 
@@ -131,9 +87,8 @@ These are the sidecar's own settings, not Immich's. Add them under
 `UPSTREAM_ML_URL` means re-running Facial Recognition, and changing
 `DOG_MIN_SCORE` means **Face Detection → Refresh** as well.
 
-Facial Recognition has no Refresh, only **Reset**, which re-clusters every face
-in the library and drops the names along with the clusters. Change
-`DOG_MAX_DISTANCE` while you are still naming dogs, not after.
+Facial Recognition has no Refresh: its **Reset** re-clusters everything and drops
+names, so set `DOG_MAX_DISTANCE` before you start naming.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
@@ -146,7 +101,7 @@ in the library and drops the names along with the clusters. Change
 Immich's face-model setting picks the embedder too: `buffalo_l` and anything
 larger or unrecognised uses the more accurate ConvNeXt model, `buffalo_m` and
 `buffalo_s` use a faster ResNet50. Changing it means **Face Detection → Reset**,
-since embeddings from the two are not comparable and the old ones have to go.
+since embeddings from the two are not comparable.
 
 ## Trouble
 
@@ -160,8 +115,8 @@ forwarded to Immich's own ML container.
 looks at photos that have never been scanned. Run it as **Refresh**.
 
 **Too many near-duplicate people** — merge them, or raise `DOG_MAX_DISTANCE` to
-`0.4` and run Facial Recognition → Reset, which re-clusters the whole library and
-costs you the names you have given so far.
+`0.4` and run Facial Recognition → Reset, which re-clusters everything and drops
+names.
 
 ---
 
