@@ -84,7 +84,11 @@ above — this second re-run resets face names and merges again.
 
 ## Settings
 
-TODO: settings where? This section doesn't say where you can configure these
+These are the sidecar's own settings, not Immich's. Add them under
+`environment:` in the `docker-compose.override.yml` from step 1, then
+`docker compose up -d animal-ml` to apply. Changing anything but
+`UPSTREAM_ML_URL` means re-running Facial Recognition, and changing
+`DOG_MIN_SCORE` means re-running Face Detection as well.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
@@ -168,21 +172,14 @@ both are tuned for people. Rather than make users retune them:
   re-filters, so dogs use `DOG_MIN_SCORE` and the user's setting continues to
   govern human faces upstream. At Immich's 0.7 default we would lose about half
   the dogs; at 0.3 we find ~80% of them.
-- **Max Distance.** Mixing each embedding with an independent random unit vector
-  maps cosine distance affinely, since random high-dimensional vectors are
-  near-orthogonal:
-
-  ```
-  d' = (1 - a) + a·d     a = (1 - IMMICH_MAX_DISTANCE) / (1 - DOG_MAX_DISTANCE)
-  ```
-
-  At the defaults `a = 0.769`, so a raw distance of 0.35 lands on 0.5. The target
-  Gram matrix `a·G + (1-a)I` is positive semi-definite, so this geometry exists;
-  the random vectors approximate its exact realisation in 512 dimensions.
-  Measured on the built image: `d' = 0.79·d + 0.22`, deterministic per face.
-
-  The cost is a 0.03 residual. Clustering v-measure held at 0.729 on held-out
-  internet photos and rose to 0.838 on real personal ones, but fell from 0.777 to
-  0.707 on tightly-cropped dataset images. Human embeddings are never touched, so
+- **Max Distance.** Our embeddings cluster best around 0.35, so the sidecar
+  stretches its own vector space to spread those distances out and land on
+  Immich's 0.5 default. `DOG_MAX_DISTANCE` and `IMMICH_MAX_DISTANCE` set the two
+  ends of that mapping. Human embeddings are passed through untouched, so
   disabling the sidecar leaves them valid.
+
+  Unlike the detection score, Max Distance is still a live knob for dogs: the
+  stretch is fixed, so lowering it in Immich splits dogs more and raising it
+  merges more, exactly as it does for people. It just stops being calibrated —
+  set `IMMICH_MAX_DISTANCE` to match if you move it far.
 
