@@ -72,10 +72,13 @@ own constant, so a fresh install does not silently behave badly at the 0.7
 default. Leaning no — the knob belongs where a user expects it — but the
 false-positive numbers should decide.
 
-## 3. Max Distance — RESOLVED: 0.30, but the basis is shakier than it looked
+## 3. Max Distance — RESOLVED: 0.35
 
-The decision stands: Immich can merge two people into one and has no equivalent
-for splitting one, so the cheap error is the one to prefer.
+Revised up from 0.30 once the held-out numbers were in. 0.30's purity (0.904) is
+attractive, but leaving 41% of detections unclustered is its own kind of bad
+result: at `minFaces=1` every one becomes a junk singleton person, and the user
+is doing the clustering by hand. 0.35 keeps purity at 0.817, cuts unassigned to
+26%, and sits much closer to the v-measure peak.
 
 What is worth knowing is that **`eps=0.35` in `embedding.json` was swept on
 DogFaceNet's test split** — 149 identities of tight, mostly frontal face crops —
@@ -101,10 +104,10 @@ up. The `eps=0.35` shipped in `embedding.json` — swept on the DogFaceNet
 training split — lands in a sensible zone on held-out internet photos too, which
 is a better generalisation result than expected.
 
-`0.30` is the chosen setting because purity `0.904` is the property that matters
-when the recovery path is asymmetric. The price is that **41% of detections
-cluster with nothing** and, at `minFaces=1`, each becomes its own person. That is
-the manual merging being signed up for.
+`0.35` is the chosen setting: purity `0.817` with **26% unassigned**, against
+`0.904` purity and **41% unassigned** at 0.30. Both errors cost the user manual
+work — merging two people, or naming the same dog four times — and 0.35 is the
+better trade between them.
 
 MPDD peaks earlier (v-measure 0.787 at 0.30, collapsing to purity 0.37 by 0.40)
 because its images are tight Market-1501-style crops, not snapshots — weight the

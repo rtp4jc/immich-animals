@@ -31,7 +31,7 @@ Then in Immich, **Administration → Settings → Machine Learning**:
 | --- | --- | --- |
 | URL | `http://animal-ml:3003` | replaces the stock ML server |
 | Min Detection Score | `0.3` | 0.7 is tuned for human faces and drops most dogs |
-| Max Distance | `0.30` | splits rather than merges; Immich can merge people, it cannot split them |
+| Max Distance | `0.35` | best v-measure/purity balance on held-out photos; 0.30 is purer but leaves 41% unclustered |
 
 `Min Faces` is a per-user preference in v3 (**Account Settings → Features →
 People**), not an admin setting.
