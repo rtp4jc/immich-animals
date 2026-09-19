@@ -48,15 +48,8 @@ Merges and faces moved between people are missing from this list:
 Immich records neither, so no tool can count them. They go the same way.
 ```
 
-Everything under **Lost** goes when you re-run Face Detection, whether you are
-turning the sidecar on or off. Read the top line as the real cost: those people
-go back to being unnamed clusters, and you name them again by hand. Every number
-is a column read straight out of the database, not an estimate.
-
-**Kept** is the exception worth knowing. A face you added by hand is not machine
-learning output, so a re-run leaves it alone. A person whose only face is a
-manual one comes through intact; a person with a manual face *and* detected ones
-keeps its name but loses the detected faces, so it comes back holding one photo.
+Everything under **Lost** is deleted when you re-run Face Detection, whether you are
+turning the sidecar on or off.
 
 If your Postgres container is not named `immich_postgres`, pass `--container`.
 Run it again before you turn the sidecar off — by then the numbers describe the
