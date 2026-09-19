@@ -1,7 +1,5 @@
 """ONNX runtime wrappers for the three pipeline stages."""
 
-import json
-from pathlib import Path
 from typing import Any
 
 import cv2
@@ -11,13 +9,6 @@ import onnxruntime as ort
 from .models import AnimalClass, DetectionModel, EmbeddingModel, KeypointModel
 
 DETECTION_CONF_THRESHOLD = 0.1
-IMAGENET_MEAN = [0.485, 0.456, 0.406]
-IMAGENET_STD = [0.229, 0.224, 0.225]
-
-
-def _chw_constant(values: list[float]) -> np.ndarray:
-    """Per-channel constant shaped to broadcast over NCHW batches."""
-    return np.array(values, dtype=np.float32).reshape(3, 1, 1)
 
 
 class _ONNXModel:
@@ -98,22 +89,6 @@ class ONNXEmbedding(_ONNXModel, EmbeddingModel):
     """ONNX embedding model wrapper."""
 
     interpolation = cv2.INTER_AREA
-
-    def __init__(self, model_path: str):
-        super().__init__(model_path)
-        sidecar = Path(model_path).with_suffix(".json")
-        preprocessing = (
-            json.loads(sidecar.read_text()).get("preprocessing", {})
-            if sidecar.exists()
-            else {}
-        )
-        self.mean = _chw_constant(preprocessing.get("mean", IMAGENET_MEAN))
-        self.std = _chw_constant(preprocessing.get("std", IMAGENET_STD))
-
-    def _preprocess(self, image: np.ndarray) -> tuple[np.ndarray, tuple[int, int]]:
-        """The embedder was trained on ImageNet-normalised input, not raw [0, 1]."""
-        batch, source_shape = super()._preprocess(image)
-        return (batch - self.mean) / self.std, source_shape
 
     def predict(self, image: np.ndarray) -> np.ndarray:
         """Generate embedding for image."""

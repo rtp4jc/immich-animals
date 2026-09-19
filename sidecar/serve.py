@@ -4,6 +4,9 @@ Immich asks for human faces and gets dogs. Every other task (CLIP, OCR) is
 forwarded verbatim to the stock immich-machine-learning container, because
 Immich's `urls` list is failover, not routing: whichever server answers has to
 answer everything.
+
+Set KEEP_HUMAN_FACES=true to return upstream's human faces alongside the dogs
+instead of replacing them.
 """
 
 import json
@@ -23,6 +26,13 @@ BBOX_PAD = 0.1  # matches AnimalPipeline's crop, which the embedder was tuned on
 
 MODEL_DIR = Path(os.environ.get("MODEL_DIR", "models/onnx"))
 UPSTREAM_URL = os.environ.get("UPSTREAM_ML_URL", "").rstrip("/")
+# Off by default: with it on, Immich clusters humans and dogs under one
+# maxDistance, and those two embedding geometries want different thresholds.
+KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "").lower() in {
+    "1",
+    "true",
+    "yes",
+}
 
 
 def _load(name: str) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
@@ -96,9 +106,15 @@ def ping() -> PlainTextResponse:
 async def predict(request: Request) -> Response:
     body = await request.body()  # cached, so form() below can still parse it
     form = await request.form()
+    content_type = request.headers["content-type"]
     entries = orjson.loads(form["entries"])
     if TASK not in entries:
-        return await _proxy(body, request.headers["content-type"])
+        upstream = await _post_upstream(body, content_type)
+        return Response(
+            upstream.content,
+            upstream.status_code,
+            media_type=upstream.headers.get("content-type"),
+        )
 
     min_score = entries[TASK]["detection"]["options"]["minScore"]
     buffer = np.frombuffer(await form["image"].read(), np.uint8)
@@ -125,20 +141,20 @@ async def predict(request: Request) -> Response:
             }
         )
 
+    if KEEP_HUMAN_FACES:
+        upstream = await _post_upstream(body, content_type)
+        upstream.raise_for_status()
+        faces += orjson.loads(upstream.content).get(TASK, [])
+
     return ORJSONResponse({TASK: faces, "imageHeight": height, "imageWidth": width})
 
 
-async def _proxy(body: bytes, content_type: str) -> Response:
+async def _post_upstream(body: bytes, content_type: str) -> httpx.Response:
     if not UPSTREAM_URL:
         raise HTTPException(503, "UPSTREAM_ML_URL is not set")
     async with httpx.AsyncClient(timeout=120) as client:
-        upstream = await client.post(
+        return await client.post(
             f"{UPSTREAM_URL}/predict",
             content=body,
             headers={"content-type": content_type},
         )
-    return Response(
-        upstream.content,
-        upstream.status_code,
-        media_type=upstream.headers.get("content-type"),
-    )

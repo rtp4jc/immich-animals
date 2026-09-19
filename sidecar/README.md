@@ -12,6 +12,10 @@ immich-server ──▶ animal-ml (this) ──facial-recognition──▶ our O
 The proxy is not optional — Immich's `urls` list is failover, not routing, so
 whichever server answers has to answer every task.
 
+This is its own uv project, deliberately separate from the training project at
+the repo root: the container installs `fastapi`/`onnxruntime`/`opencv` and
+nothing else, with no path to torch.
+
 ## Run it
 
 ```bash
@@ -26,11 +30,37 @@ Then in Immich, **Administration → Settings → Machine Learning**:
 | Setting | Value | Why |
 | --- | --- | --- |
 | URL | `http://animal-ml:3003` | replaces the stock ML server |
-| Max Distance | `0.35` | `clustering.eps` from `models/onnx/embedding.json` |
 | Min Detection Score | `0.3` | 0.7 is tuned for human faces and drops most dogs |
+| Max Distance | `0.30` | splits rather than merges; Immich can merge people, it cannot split them |
 
 `Min Faces` is a per-user preference in v3 (**Account Settings → Features →
 People**), not an admin setting.
+
+## Dogs only, or dogs and humans?
+
+| `KEEP_HUMAN_FACES` | Behaviour |
+| --- | --- |
+| `false` (default) | Only dogs. Human faces stop being detected entirely. |
+| `true` | Dog faces **plus** whatever the stock model finds, in one response. |
+
+The cost of `true` is not the code — it is that Immich clusters both with a
+single `Max Distance`, and our 512-d embedding geometry is not ArcFace's. A
+threshold tuned for dogs will over- or under-merge people. Both modes are
+supported so you can measure that rather than guess.
+
+## Validate
+
+`smoke_test.py` posts images exactly as Immich does and asserts the reply shape,
+including that `embedding` is a JSON *string* (Immich casts it to a pgvector):
+
+```bash
+uv run --project sidecar python sidecar/smoke_test.py path/to/dog.jpg \
+  --url http://localhost:3003
+```
+
+For threshold tuning use `scripts/fetch_validation_set.py` and
+`scripts/evaluate_sidecar.py`, which sweep Min Detection Score against detection
+recall and the false-positive rate on dog-free photos.
 
 ## Verified
 
@@ -41,14 +71,7 @@ detections from 20 faces across 18 photos to 28 across 25.
 
 ## Notes
 
-- Real human faces stop being detected while Immich points here. Use a test
-  instance or a library you do not mind mixing.
+- With `KEEP_HUMAN_FACES=false`, use a test instance or a library you do not
+  mind mixing.
 - Upgrade exposure is one JSON shape; the contract was unchanged from v3.0 to
   v3.2.2.
-- `smoke_test.py` posts images exactly as Immich does and asserts the reply
-  shape, including that `embedding` is a JSON *string* (Immich casts it to a
-  pgvector).
-
-```bash
-python sidecar/smoke_test.py path/to/dog.jpg --url http://localhost:3003
-```
