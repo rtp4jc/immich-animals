@@ -116,6 +116,41 @@ dog faces. A reported delta is a measurement on someone else's distribution.
 - All candidates are timed on **one** instrument. A budget is a comparison, so
   mixing a torch number with an ORT one is not a comparison at all.
 
+## Shipped model
+
+Two artifacts, so selection keeps a choice the way Immich does for faces.
+Both verified: 512-d, L2-normalised, PyTorch/ORT parity, and loadable through
+`ONNXEmbedding`.
+
+| artifact | backbone | test MRR | Top-1 | ORT CPU | licence |
+|---|---|---|---|---|---|
+| `models/onnx/embedding.onnx` | convnext_tiny | **0.9668** | 0.9527 | 39.3 ms | Apache-2.0 |
+| `models/onnx/embedding_resnet50.onnx` | resnet50 | 0.8960 | 0.8571 | 19.9 ms | Apache-2.0 |
+
+Each ships a `.json` sidecar with backbone, seed, source run, parity, test
+metrics, the tuned DBSCAN `eps` (0.35, `min_samples` 3) and the full
+preprocessing recipe. The previous `embedding.onnx` was a CC-BY-NC
+ConvNeXt-V2; it is preserved as `embedding.pre-ablation.onnx`.
+
+Regenerate either from its checkpoint:
+
+```bash
+uv run python scripts/train_final.py --backbone convnext_tiny --head arcface \
+    --seed 42 --checkpoint runs/<run>/best_model.pt --output models/onnx/embedding.onnx
+```
+
+Or retrain on train+val (folds in 147 more identities; test stays held out):
+
+```bash
+uv run python scripts/train_final.py --backbone convnext_tiny --include-val
+```
+
+**Open decision.** Under the locked rule (maximise MRR subject to permissive
+licence, ONNX-exportable, latency <= 1.5x the ResNet50 baseline) the ORT budget
+is 33.6 ms and convnext_tiny's 39.3 ms fails it at 1.70x. The trade is
+**+7.3pp MRR for +19.4 ms per crop on CPU**. Both artifacts are built so this
+can be decided without re-running anything.
+
 ## Train/serve skew (found 2026-09-18, fixed)
 
 `IdentityDataset` trains on ImageNet-normalised input; `ONNXEmbedding` served
