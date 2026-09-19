@@ -21,6 +21,7 @@ import argparse
 import csv
 import datetime
 import json
+import re
 from pathlib import Path
 
 import numpy as np
@@ -212,12 +213,24 @@ def main():
     run_dir = PROJECT_ROOT / "runs" / f"{timestamp}_{backbone.value}_final"
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.include_val and not args.checkpoint:
+    if args.checkpoint:
+        # The flag seeds RNG; it says nothing about weights we did not train.
+        # Record what the checkpoint path can substantiate, and nothing more.
+        source = Path(args.checkpoint).parent.name
+        trained_on = f"checkpoint:{source}"
+        train_json = DATA_DIR / "identity_train.json"
+        match = re.search(r"_s(\d+)$", source)
+        recorded_seed = match.group(1) if match else ""
+        if args.include_val:
+            print("--include-val ignored: --checkpoint does not retrain.")
+    elif args.include_val:
         train_json = build_combined_json(run_dir / "identity_trainval.json")
         trained_on = "train+val"
+        recorded_seed = args.seed
     else:
         train_json = DATA_DIR / "identity_train.json"
         trained_on = "train"
+        recorded_seed = args.seed
 
     if args.checkpoint:
         # Only the head size is needed; no training pass will run.
@@ -312,7 +325,7 @@ def main():
         "timestamp": timestamp,
         "backbone": backbone.value,
         "head": head.value,
-        "seed": args.seed,
+        "seed": recorded_seed,
         "trained_on": trained_on,
         "epochs": f"{warmup}+{full}",
         "num_classes": train_dataset.num_classes,
@@ -345,7 +358,7 @@ def main():
                 "source_run": _rel(run_dir),
                 "backbone": backbone.value,
                 "head": head.value,
-                "seed": args.seed,
+                "seed": recorded_seed,
                 "trained_on": trained_on,
                 "img_size": img_size,
                 "embedding_dim": TRAINING_CONFIG.embedding_dim,

@@ -133,10 +133,18 @@ def main():
         )
         rows.append(row)
 
+    # Merge, never truncate: a partial re-measure that dropped rows would make
+    # summarize_ablation fall back from ORT to torch timings, and the torch
+    # ratio passes the latency gate where the ORT one fails it.
+    merged = {}
+    if LATENCY_CSV.exists():
+        with open(LATENCY_CSV, newline="") as f:
+            merged = {r["backbone"]: r for r in csv.DictReader(f)}
+    merged.update({row["backbone"]: row for row in rows})
     with open(LATENCY_CSV, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(merged.values())
     print(f"\nWrote {LATENCY_CSV}")
 
 

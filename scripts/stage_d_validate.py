@@ -64,8 +64,15 @@ FIELDS = [
 ]
 
 
+CANONICAL_SEED = "42"
+
+
 def best_cells(rows, backbones=None, heads=None):
-    """The highest-MRR seed of each (backbone, head) fine-tuned finalist."""
+    """One representative cell per (backbone, head) finalist.
+
+    Prefers the canonical seed over the highest-scoring one: max-over-seeds on
+    the split you report is an optimistic bias.
+    """
     best = {}
     for row in rows:
         if row.get("mode") != "finetune" or (row.get("status") or "ok") != "ok":
@@ -79,7 +86,12 @@ def best_cells(rows, backbones=None, heads=None):
         except (TypeError, ValueError):
             continue
         key = (row["backbone"], row["head"])
-        if key not in best or mrr > float(best[key]["mrr"]):
+        incumbent = best.get(key)
+        if incumbent is None:
+            best[key] = row
+        elif row["seed"] == CANONICAL_SEED:
+            best[key] = row
+        elif incumbent["seed"] != CANONICAL_SEED and mrr > float(incumbent["mrr"]):
             best[key] = row
     return best
 
@@ -197,6 +209,14 @@ def main():
         results.append(result)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    # Merge rather than truncate, so a partial re-run cannot drop finalists.
+    existing = {}
+    if STAGE_D_CSV.exists():
+        with open(STAGE_D_CSV, newline="") as f:
+            existing = {(r["backbone"], r["head"]): r for r in csv.DictReader(f)}
+    existing.update({(r["backbone"], r["head"]): r for r in results})
+    results = list(existing.values())
+
     with open(STAGE_D_CSV, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
         writer.writeheader()

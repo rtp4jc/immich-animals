@@ -45,7 +45,7 @@ def test_license_gate_rejects_noncommercial_leader():
     best = make("nc", 0.99, 10.0, tier=LicenseTier.NONCOMMERCIAL)
     winner, reasons = select_winner([best, make("ok", 0.8, 10.0)], 30.0)
     assert winner.backbone == "ok"
-    assert "license" in reasons["nc"]
+    assert "license" in reasons[("nc", "arcface")]
 
 
 def test_latency_gate_rejects_over_budget():
@@ -53,7 +53,7 @@ def test_latency_gate_rejects_over_budget():
         [make("slow", 0.99, 50.0), make("ok", 0.8, 10.0)], 30.0
     )
     assert winner.backbone == "ok"
-    assert "latency" in reasons["slow"]
+    assert "latency" in reasons[("slow", "arcface")]
 
 
 def test_onnx_gate_rejects_unexportable():
@@ -61,15 +61,15 @@ def test_onnx_gate_rejects_unexportable():
         [make("bad", 0.99, 10.0, onnx=False), make("ok", 0.8, 10.0)], 30.0
     )
     assert winner.backbone == "ok"
-    assert reasons["bad"] == "ONNX export failed"
+    assert reasons[("bad", "arcface")] == "ONNX export failed"
 
 
 def test_only_first_failed_gate_is_reported():
     # Non-permissive AND over budget: license is checked first.
     c = make("both", 0.99, 99.0, tier=LicenseTier.NONCOMMERCIAL)
     _, reasons = select_winner([c, make("ok", 0.8, 10.0)], 30.0)
-    assert "license" in reasons["both"]
-    assert "latency" not in reasons["both"]
+    assert "license" in reasons[("both", "arcface")]
+    assert "latency" not in reasons[("both", "arcface")]
 
 
 def test_missing_baseline_skips_latency_gate():
@@ -84,14 +84,14 @@ def test_overlapping_error_bars_still_pick_a_winner_but_say_so():
         [make("a", 0.960, 10.0, std=0.01), make("b", 0.955, 10.0, std=0.01)], 30.0
     )
     assert winner.backbone == "a"
-    assert "not a decisive loss" in reasons["b"]
+    assert "not a decisive loss" in reasons[("b", "arcface")]
 
 
 def test_clear_win_is_not_flagged_as_noise():
     _, reasons = select_winner(
         [make("a", 0.96, 10.0, std=0.001), make("b", 0.80, 10.0, std=0.001)], 30.0
     )
-    assert "not a decisive loss" not in reasons["b"]
+    assert "not a decisive loss" not in reasons[("b", "arcface")]
 
 
 def test_no_eligible_candidate_returns_none():
@@ -99,11 +99,12 @@ def test_no_eligible_candidate_returns_none():
         [make("nc", 0.9, 10.0, tier=LicenseTier.NONCOMMERCIAL)], 30.0
     )
     assert winner is None
-    assert "license" in reasons["nc"]
+    assert "license" in reasons[("nc", "arcface")]
 
 
 def test_budget_is_a_multiple_of_the_baseline():
-    assert latency_budget([make("resnet50", 0.8, 22.4)], 1.5) == pytest.approx(33.6)
+    # Synthetic values: this pins the arithmetic, not any measured latency.
+    assert latency_budget([make("resnet50", 0.8, 100.0)], 1.5) == pytest.approx(150.0)
 
 
 @pytest.mark.parametrize(

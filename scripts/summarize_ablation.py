@@ -24,6 +24,7 @@ from animal_id.embedding.backbones import (
     LicenseTier,
     get_backbone_license,
 )
+from animal_id.embedding.losses import HeadType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RESULTS_CSV = PROJECT_ROOT / "outputs" / "ablation" / "results.csv"
@@ -48,6 +49,11 @@ class Candidate:
     latency_source: str
     onnx_ok: bool
     license_tier: LicenseTier
+
+    @property
+    def key(self) -> tuple[str, str]:
+        """Backbone AND head: the plan keeps those two questions separate."""
+        return (self.backbone, self.head)
 
     @property
     def is_permissive(self) -> bool:
@@ -128,6 +134,28 @@ def build_candidates(rows: list[dict], mode: str, latency=None) -> list[Candidat
     return sorted(candidates, key=lambda c: -c.mrr_mean)
 
 
+def best_head(candidates: list[Candidate], backbone: str) -> str:
+    """The head to ship for one backbone, preferring the simpler one on a tie.
+
+    A plain max() always returns a winner even when the gap is noise, so an
+    improvement must clear the combined seed spread to displace arcface.
+    """
+    for_backbone = [c for c in candidates if c.backbone == backbone]
+    if not for_backbone:
+        return HeadType.ARCFACE.value
+    baseline = next((c for c in for_backbone if c.head == HeadType.ARCFACE.value), None)
+    if baseline is None:
+        return max(for_backbone, key=lambda c: c.mrr_mean).head
+    best = max(for_backbone, key=lambda c: c.mrr_mean)
+    if best is baseline:
+        return baseline.head
+    return (
+        best.head
+        if best.mrr_mean - baseline.mrr_mean > best.mrr_std + baseline.mrr_std
+        else baseline.head
+    )
+
+
 def latency_budget(candidates: list[Candidate], multiple: float) -> float | None:
     """Budget = ``multiple`` x the ResNet50 baseline's measured latency."""
     for candidate in candidates:
@@ -145,18 +173,16 @@ def select_winner(
     is what lands in the findings doc, so it must say *which* gate rejected a
     candidate, not merely that it lost.
     """
-    reasons: dict[str, str] = {}
+    reasons: dict[tuple[str, str], str] = {}
     eligible = []
     for c in candidates:
         # Gates in plan order; only the first failure is reported.
         if not c.is_permissive:
-            reasons[c.backbone] = f"license {c.license_tier.value} - ceiling only"
+            reasons[c.key] = f"license {c.license_tier.value} - ceiling only"
         elif not c.onnx_ok:
-            reasons[c.backbone] = "ONNX export failed"
+            reasons[c.key] = "ONNX export failed"
         elif budget_ms is not None and c.latency_ms > budget_ms:
-            reasons[c.backbone] = (
-                f"latency {c.latency_ms:.1f}ms > {budget_ms:.1f}ms budget"
-            )
+            reasons[c.key] = f"latency {c.latency_ms:.1f}ms > {budget_ms:.1f}ms budget"
         else:
             eligible.append(c)
 
@@ -169,11 +195,11 @@ def select_winner(
             continue
         gap = winner.mrr_mean - c.mrr_mean
         noise = winner.mrr_std + c.mrr_std
-        reason = f"MRR {gap:.3f} below {winner.backbone}"
+        reason = f"MRR {gap:.3f} below {winner.backbone}/{winner.head}"
         # A gap inside the seed spread ranks but does not separate.
         if gap <= noise:
             reason += f" (within seed noise +/-{noise:.3f}; not a decisive loss)"
-        reasons[c.backbone] = reason
+        reasons[c.key] = reason
     return winner, reasons
 
 
@@ -185,9 +211,9 @@ def render(candidates: list[Candidate], budget_ms, winner, reasons) -> str:
     ]
     for c in candidates:
         err = f" ± {c.mrr_std:.3f}" if c.mrr_std else ""
-        verdict = "🏆 winner" if winner and c is winner else reasons.get(c.backbone, "")
+        verdict = "🏆 winner" if winner and c is winner else reasons.get(c.key, "")
         lines.append(
-            f"| {c.backbone} | {c.license_tier.value} | {len(c.seeds)} | "
+            f"| {c.backbone} | {c.head} | {c.license_tier.value} | {len(c.seeds)} | "
             f"{c.mrr_mean:.3f}{err} | {c.top1_mean:.3f} | {c.params_m:.1f} | "
             f"{c.latency_ms:.1f} | {'✅' if c.onnx_ok else '❌'} | {verdict} |"
         )
@@ -203,6 +229,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", default="finetune", choices=["probe", "finetune"])
     parser.add_argument(
+        "--best-head",
+        metavar="BACKBONE",
+        help="Print the head to ship for one backbone, then exit.",
+    )
+    parser.add_argument(
         "--latency-multiple",
         type=float,
         default=1.5,
@@ -212,6 +243,11 @@ def main():
 
     rows = load_rows(RESULTS_CSV)
     candidates = build_candidates(rows, args.mode)
+
+    if args.best_head:
+        print(best_head(candidates, args.best_head))
+        return
+
     if not candidates:
         print(f"No completed {args.mode} cells in {RESULTS_CSV}")
         return

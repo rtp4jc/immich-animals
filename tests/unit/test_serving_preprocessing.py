@@ -5,7 +5,12 @@ import numpy as np
 from PIL import Image
 from torchvision import transforms
 
-from animal_id.pipeline.onnx_models import ONNXEmbedding, _ONNXModel
+from animal_id.pipeline.onnx_models import (
+    ONNXDetector,
+    ONNXEmbedding,
+    ONNXKeypoint,
+    _ONNXModel,
+)
 
 # IdentityDataset's eval transform.
 TRAINING_TRANSFORM = transforms.Compose(
@@ -58,4 +63,6 @@ def test_serving_preprocessing_matches_training(tmp_path):
 
 def test_yolo_stages_stay_unnormalised():
     """Detector and keypoint are YOLO: they expect [0, 1], not ImageNet stats."""
-    assert not hasattr(_ONNXModel, "mean")
+    assert ONNXDetector._preprocess is _ONNXModel._preprocess
+    assert ONNXKeypoint._preprocess is _ONNXModel._preprocess
+    assert ONNXEmbedding._preprocess is not _ONNXModel._preprocess
