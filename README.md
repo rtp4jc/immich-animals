@@ -108,7 +108,7 @@ Benchmarks log to Weights & Biases by default; pass `--no-wandb` to disable. In 
 | 14, 15 | Model I/O inspection, two-stage inference |
 | 16, 17 | Immich container integration (needs a local Immich fork at `immich-clone/`, not included) |
 | 18, 19 | Identification clustering and FiftyOne explorer |
-| `run_ablation.py` | Embedding backbone ablation harness (resumable; `--force` re-runs a cell) |
+| `run_ablation.py` | Embedding backbone ablation harness (resumable; `--dry-run` shows the plan, `--force` re-runs a cell) |
 | `ablation_status.py` | Regenerates `outputs/ablation/STATUS.md` from the result CSVs |
 | `summarize_ablation.py` | Aggregates seeds and applies the licence/ONNX/latency decision rule |
 | `measure_latency.py` | Cost axis for every backbone on one instrument (torch + ONNX Runtime) |

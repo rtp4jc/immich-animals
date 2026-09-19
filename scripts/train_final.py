@@ -28,7 +28,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from animal_id.benchmark.metrics import evaluate_embedding_model
+from animal_id.benchmark.metrics import evaluate_embedding_model, retrieval_metrics
 from animal_id.common.constants import DATA_DIR, ONNX_EMBEDDING_PATH
 from animal_id.common.datasets import IdentityDataset
 from animal_id.common.logging_config import setup_logging
@@ -146,22 +146,6 @@ def build_combined_json(out_path: Path) -> Path:
         merged += json.loads((DATA_DIR / name).read_text())
     out_path.write_text(json.dumps(merged))
     return out_path
-
-
-def retrieval_metrics(embeddings, labels, k_values=(1, 5)):
-    """Leave-one-out cosine retrieval, matching run_ablation.py exactly."""
-    similarities = embeddings @ embeddings.T
-    np.fill_diagonal(similarities, -np.inf)
-    ranked = labels[np.argsort(-similarities, axis=1)]
-    matches = ranked == labels[:, None]
-    matches = matches[matches.any(axis=1)]
-    if matches.shape[0] == 0:
-        return 0.0, {k: 0.0 for k in k_values}
-    rank = matches.argmax(axis=1) + 1
-    return (
-        float(np.mean(1.0 / rank)),
-        {k: float(np.mean(matches[:, :k].any(axis=1))) for k in k_values},
-    )
 
 
 def loader_for(json_path, img_size, batch_size, is_training, generator=None):
@@ -313,7 +297,7 @@ def main():
             labels.extend(batch_labels.numpy())
     embeddings = np.vstack(embeddings)
     labels = np.array(labels)
-    mrr, topk = retrieval_metrics(embeddings, labels)
+    mrr, topk, _ = retrieval_metrics(embeddings, labels)
     best_eps, eps_sweep = tune_eps(embeddings, labels)
 
     onnx_path.parent.mkdir(parents=True, exist_ok=True)
