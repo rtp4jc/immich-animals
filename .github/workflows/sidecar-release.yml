@@ -95,10 +95,12 @@ jobs:
           build-args: MODEL_TAG=${{ steps.meta.outputs.tag }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
+      # Artifact paths cannot contain a colon, so store the bare digest.
       - name: Save digest
         run: |
           mkdir -p /tmp/digests
-          touch "/tmp/digests/${{ steps.push.outputs.digest }}"
+          digest="${{ steps.push.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
       - uses: actions/upload-artifact@v4
         with:
           name: digest-${{ steps.meta.outputs.arch }}
@@ -127,5 +129,5 @@ jobs:
           docker buildx imagetools create \
             -t "${{ env.IMAGE }}:${version}" \
             -t "${{ env.IMAGE }}:latest" \
-            $(printf "${{ env.IMAGE }}@sha256:%s " $(ls /tmp/digests | sed 's/^sha256://'))
+            $(printf "${{ env.IMAGE }}@sha256:%s " $(ls /tmp/digests))
           docker buildx imagetools inspect "${{ env.IMAGE }}:${version}"
