@@ -32,6 +32,18 @@ RESULTS_CSV = OUTPUT_DIR / "results.csv"
 LOG_TAIL_BYTES = 400_000
 HEALTH_LINES = 12
 
+# The cells this sweep owes. Ceiling rows recorded earlier are NOT part of it,
+# so completion is counted, never judged.
+STAGE_B_CELLS = [
+    ("resnet50", 42),
+    ("resnet50", 1),
+    ("resnet50", 2),
+    ("convnext_tiny", 42),
+    ("convnext_tiny", 1),
+    ("convnext_tiny", 2),
+    ("megadescriptor_t_224", 42),
+]
+
 
 def _tail_text(path: Path, num_bytes: int) -> str:
     if not path.exists():
@@ -80,6 +92,40 @@ def queue_state() -> list[str]:
     return lines
 
 
+def stage_b_progress() -> list[str]:
+    """Tick off the expected cells; FINISHED is a count, not an impression."""
+    done = {}
+    if RESULTS_CSV.exists():
+        with open(RESULTS_CSV, newline="") as f:
+            for row in csv.DictReader(f):
+                if row.get("mode") != "finetune":
+                    continue
+                try:
+                    key = (row["backbone"], int(row["seed"]))
+                except (KeyError, ValueError):
+                    continue
+                done[key] = row
+
+    lines, complete = [], 0
+    for backbone, seed in STAGE_B_CELLS:
+        row = done.get((backbone, seed))
+        if row is None:
+            lines.append(f"- [ ] {backbone} seed {seed}")
+        elif (row.get("status") or "ok") == "failed":
+            lines.append(f"- [x] {backbone} seed {seed} — **FAILED**")
+            complete += 1
+        else:
+            lines.append(
+                f"- [x] {backbone} seed {seed} — MRR {row.get('mrr')} "
+                f"top1 {row.get('top1')}"
+            )
+            complete += 1
+    header = f"**{complete}/{len(STAGE_B_CELLS)} cells recorded**"
+    if complete == len(STAGE_B_CELLS):
+        header += " — Stage B COMPLETE"
+    return [header, ""] + lines
+
+
 def _table(path: Path, columns: list[str], where=None) -> list[str]:
     if not path.exists():
         return ["_(none yet)_"]
@@ -121,6 +167,10 @@ def build() -> str:
         "## Queue",
         "",
         *queue_state(),
+        "",
+        "## Stage B — progress",
+        "",
+        *stage_b_progress(),
         "",
         "## Stage B — decision (fine-tuned, the numbers that ship)",
         "",
