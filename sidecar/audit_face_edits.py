@@ -1,6 +1,6 @@
-"""Report the face edits that re-running Face Detection would discard.
+"""Report the face edits that Face Detection → Reset would discard.
 
-Run it before pointing Immich at the sidecar, and again before turning it off.
+Refresh keeps all of it; this is the cost of the Reset button.
 
 Usage: python3 audit_face_edits.py [--container immich_postgres] [--sql]
 """
@@ -114,7 +114,7 @@ def report(c: dict[str, int | None]) -> None:
         print(f"No face edits found. Nothing to lose.\n\n{UNCOUNTED}\n")
         return
 
-    print("Lost when you re-run Face Detection")
+    print("Lost if you Reset Face Detection")
     for label, n, note in lost:
         print(f"  {n:>6}  {label}{f'  ({note})' if note and n else ''}")
     print("\nKept")
