@@ -1,0 +1,43 @@
+immich-animals
+Copyright (C) 2026 Ryan Peterson
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License version 3, as published by
+the Free Software Foundation. See LICENSE for the full text.
+
+The AGPL applies because the detector is fine-tuned from Ultralytics YOLO11,
+which is AGPL-3.0. If you run a modified version of this software as a network
+service, section 13 requires you to offer its source to that service's users.
+
+
+Third-party components
+----------------------
+
+Ultralytics YOLO11 (AGPL-3.0) — https://github.com/ultralytics/ultralytics
+    `models/onnx/detector.onnx` is fine-tuned from `yolo11n.pt`.
+
+ConvNeXt (MIT) — https://github.com/facebookresearch/ConvNeXt
+timm (Apache-2.0) — https://github.com/huggingface/pytorch-image-models
+    `models/onnx/embedding.onnx` is fine-tuned from the timm weight tag
+    `convnext_tiny.fb_in22k_ft_in1k` (ConvNeXt **V1**). ConvNeXt-V2's ImageNet
+    weights are CC-BY-NC-4.0 and are deliberately not used.
+
+ONNX Runtime (MIT), OpenCV (Apache-2.0), FastAPI (MIT), Uvicorn (BSD-3-Clause),
+httpx (BSD-3-Clause), orjson (Apache-2.0 / MIT), NumPy (BSD-3-Clause).
+
+
+Training data
+-------------
+
+DogFaceNet — https://github.com/GuillaumeMougeot/DogFaceNet
+    Identity embedding. The code is MIT; the images are described only as
+    retrieved from the web, with no stated image licence.
+
+Stanford Dogs — http://vision.stanford.edu/aditya86/ImageNetDogs/
+    Detection. Derived from ImageNet, whose terms permit non-commercial
+    research and educational use only.
+
+Because of the training data terms above, the models are offered for
+non-commercial research and personal use. This is a narrower grant than the
+AGPL gives the code, and it is why this project is not offered for commercial
+use.
