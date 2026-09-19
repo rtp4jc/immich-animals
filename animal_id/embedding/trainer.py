@@ -13,6 +13,7 @@ import torch.optim as optim
 from tqdm import tqdm
 
 from animal_id.benchmark.metrics import evaluate_embedding_model
+from animal_id.embedding.config import HEAD_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +26,11 @@ class EmbeddingTrainer:
         self.device = device
         self.run_dir = Path(run_dir)
 
-        # Label smoothing helps prevent overfitting on specific identities
-        self.criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+        # Read it off the head so a configured value cannot silently do nothing.
+        smoothing = getattr(getattr(model, "head", None), "label_smoothing", None)
+        if not isinstance(smoothing, (int, float)):
+            smoothing = HEAD_CONFIG.label_smoothing
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=float(smoothing))
 
         # Global best model tracking
         # We track mAP (Mean Average Precision) because this is an Open-Set problem.

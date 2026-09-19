@@ -86,9 +86,20 @@ class ONNXKeypoint(_ONNXModel, KeypointModel):
 
 
 class ONNXEmbedding(_ONNXModel, EmbeddingModel):
-    """ONNX embedding model wrapper."""
+    """ONNX embedding model wrapper.
+
+    Unlike the YOLO stages, the embedder is trained on ImageNet-normalized
+    input (``IdentityDataset``), so serving it raw [0, 1] is a train/serve skew
+    that costs real accuracy without any error.
+    """
 
     interpolation = cv2.INTER_AREA
+    mean = np.array([0.485, 0.456, 0.406], np.float32).reshape(3, 1, 1)
+    std = np.array([0.229, 0.224, 0.225], np.float32).reshape(3, 1, 1)
+
+    def _preprocess(self, image: np.ndarray) -> tuple[np.ndarray, tuple[int, int]]:
+        batch, source_shape = super()._preprocess(image)
+        return (batch - self.mean) / self.std, source_shape
 
     def predict(self, image: np.ndarray) -> np.ndarray:
         """Generate embedding for image."""
