@@ -3,8 +3,8 @@
 _Run 2026-09-18. Companion to [plan.md](plan.md). Live numbers are in
 `outputs/ablation/STATUS.md` (gitignored); this file records the conclusions._
 
-> **Status: Stage B in flight.** Q3 and the final Q1/Q2/Q4 numbers are marked
-> PENDING below and get filled in when the sweep completes.
+> **Status: Stage B complete (3 seeds), Stage C in flight.** Q1 and Q3 are
+> answered below; Q4 fills in when the head A/B finishes.
 
 ## Headline
 
@@ -31,13 +31,23 @@ pinned, because the license rides on the tag and not on the architecture.
 
 ## Q1 — Baseline gap: how much does a modern backbone beat ResNet50?
 
-**PENDING** final seeds. Stage A linear probe put ConvNeXt-V1-Tiny at .961 MRR
-vs ResNet50's .875 (+8.5pp). Early Stage B cells are consistent with a
-mid-single-digit to ~7pp fine-tuned gap; error bars pending.
+**Answered. +7.3pp MRR, +9.8pp Top-1, on 3 seeds each.**
 
-Worth noting for method: ResNet50's fine-tuned MRR (.896) is only +2.1pp over
-its linear probe (.875), i.e. the frozen-trunk ranking predicted the fine-tuned
-one. That is the assumption Stage A's design rests on, and it held.
+| backbone | MRR (3 seeds) | Top-1 | licence |
+|---|---|---|---|
+| convnext_tiny | **0.966 ± 0.001** | 0.951 | Apache-2.0 |
+| resnet50 (baseline) | 0.893 ± 0.004 | 0.853 | Apache-2.0 |
+
+The seed spread is tiny — σ = 0.001 and 0.004 — so the gap is roughly 15x the
+combined noise. This is a real effect, not a lucky seed, and it is the one
+number the whole ablation existed to produce.
+
+Two method notes. First, the linear probe predicted the fine-tuned ranking
+correctly (probe: .961 vs .875; fine-tuned: .966 vs .893), which is the
+assumption Stage A's design rests on — it held. Second, ResNet50 early-stopped
+on all three seeds (best at epoch 20/30/31 of 45) while ConvNeXt used the full
+budget and was still nudging upward at +0.0003 mAP/10 epochs. That asymmetry is
+evidence the baseline has saturated on this data and the replacement has not.
 
 ## Q2 — Best shippable (Apache) backbone
 
@@ -68,16 +78,27 @@ cannot decide for you.
 
 ## Q3 — Ceiling gap vs encumbered backbones
 
-**PENDING** (MegaDescriptor-T fine-tune is the last queued cell). At linear
-probe, MegaDescriptor-T scored .848 — *below* the ImageNet ResNet50 baseline.
+**Answered, and the ceiling is below the floor.** Fine-tuned on 1 seed,
+MegaDescriptor-T scores **0.883 MRR** — under the ImageNet ResNet50 baseline
+(0.893) and 8.3pp under the shippable Apache winner (0.966).
 
-Per decision **D1**, the animal-pretrained tier did not win Stage A, so
-**MiewID and DINOv3 stay deferred** and their bespoke loaders were never built.
-That decision is now settled by data rather than by guess.
+| tier | backbone | MRR | licence |
+|---|---|---|---|
+| shippable | convnext_tiny | **0.966** | Apache-2.0 |
+| reference | convnextv2_tiny | 0.960 | CC-BY-NC |
+| baseline | resnet50 | 0.893 | Apache-2.0 |
+| animal-pretrained | megadescriptor_t_224 | 0.883 | CC-BY-NC |
 
-This also reproduces PetFace rather than the wildlife-benchmark literature: the
-cited 20–70pp animal-pretraining wins did not transfer to ~7 images/identity
-open-set dog faces.
+So there is **no ceiling to chase**: per decision **D1**, MiewID and DINOv3 stay
+deferred and their bespoke loaders were never built. That decision is now
+settled by measurement at fine-tune, not merely at linear probe.
+
+Note also that the best *permissive* backbone beats the best *encumbered* one
+(0.966 vs 0.960). The licence constraint cost nothing here — it gained.
+
+This reproduces PetFace rather than the wildlife-benchmark literature: the cited
+20-70pp animal-pretraining wins did not transfer to ~7 images/identity open-set
+dog faces. A reported delta is a measurement on someone else's distribution.
 
 ## Q4 — Head effect (ArcFace vs Sub-center)
 
