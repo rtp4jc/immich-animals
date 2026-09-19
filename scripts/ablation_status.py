@@ -74,9 +74,15 @@ def queue_state() -> list[str]:
     workers = [line for line in running.splitlines() if "/.venv/bin/python" in line]
 
     text = _tail_text(QUEUE_LOG, LOG_TAIL_BYTES)
-    cells = re.findall(r"=== \[(\d+)/(\d+)\] Ablation: (.{0,140}?) ===", text)
-    epochs = re.findall(r"Epoch (\d+)/(\d+): ([^\n]{0,110})", text)
-    phases = re.findall(r"=== (Phase \d[^=]{0,40}|Linear probe[^=]{0,40}) ===", text)
+    cell_marker = re.compile(r"=== \[(\d+)/(\d+)\] Ablation: (.{0,140}?) ===")
+    cells = cell_marker.findall(text)
+    # Scope phase/epoch to the CURRENT cell: the tail spans several cells, and
+    # reading a finished cell's last epoch looks like the running one going
+    # backwards.
+    last = list(cell_marker.finditer(text))
+    current = text[last[-1].end() :] if last else text
+    epochs = re.findall(r"Epoch (\d+)/(\d+): ([^\n]{0,110})", current)
+    phases = re.findall(r"=== (Phase \d[^=]{0,40}|Linear probe[^=]{0,40}) ===", current)
 
     lines = []
     if workers:
