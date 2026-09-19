@@ -14,7 +14,48 @@ both with a single `Max Distance`, and our 512-d embedding geometry is not
 ArcFace's — a threshold tuned for dogs will over- or under-merge people. Both
 modes ship so that is measurable rather than guessed.
 
-## 2. Min Detection Score — needs the better validation set
+## 2. Min Detection Score — RESOLVED: 0.3, now measured properly
+
+Settled on the held-out set (1524 identity photos of 121 individual dogs, 450
+dog-free negatives; `scripts/fetch_validation_set.py`, scored by
+`scripts/evaluate_sidecar.py`). Share of photos with at least one detection:
+
+| minScore | Commons (955) | MPDD (569) | negatives (450) |
+| --- | --- | --- | --- |
+| 0.10 | 0.823 | 0.993 | 0.160 |
+| 0.20 | 0.823 | 0.993 | 0.160 |
+| **0.30** | **0.802** | **0.991** | **0.136** |
+| 0.50 | 0.704 | 0.974 | 0.073 |
+| 0.70 | 0.498 | 0.921 | 0.038 |
+
+0.1 and 0.2 are identical — no detection scores land in that band. 0.3 costs two
+points of recall over 0.2 and cuts false positives 15%. 0.5 buys six more points
+of FP reduction for ten points of recall. Immich's 0.7 default halves recall.
+Recall at 0.3 is understated: ~10% of the Commons denominator contains no dog at
+all (category noise) and another ~13% has a dog only a few pixels tall.
+
+False positives at 0.3 are almost entirely near-neighbour quadrupeds:
+
+| subject | rate |
+| --- | --- |
+| Canidae (wolf/fox/jackal/dingo) | 28/70 = 0.400 |
+| rabbits | 3/10 = 0.300 |
+| goats | 5/20 = 0.250 |
+| sheep, deer | 3/20 = 0.150 |
+| cats | 18/125 = 0.144 |
+| cattle | 1/30 = 0.033 |
+| horses, boar, **people**, landscapes, buildings | **0.000** |
+
+Zero on 60 people photos, 35 landscapes, 35 horses, 10 buildings. Eyeballing the
+crops, the canid "false positives" are wolves and dingoes — a dog detector
+firing on *Canis lupus* is arguably correct. So the junk-person risk in a real
+library reduces to: roughly one in seven cat photos.
+
+Keeping the sidecar honouring Immich's `minScore` rather than overriding it: the
+knob belongs where a user expects it, and 0.3 is a settings change, not a code
+change.
+
+## 2b. Superseded: the earlier 31-photo numbers
 
 Immich's default `0.7` is tuned for human faces: on the throwaway set it found
 20 faces in 18 of 31 photos, versus 28 in 25 at `0.3`. `0.3` is what the README
@@ -43,23 +84,31 @@ photos through the sidecar's own crop geometry, same-identity cosine similarity
 averages **0.54**, not the ~0.9 that split implies. A `maxDistance` of 0.30 only
 links pairs above 0.70 similarity, which most true pairs miss.
 
-Swept on those 27 photos (5 identities, `min_samples=2`):
+Swept on the held-out Commons set (766 crops, 61 individual dogs,
+`min_samples=3`) — this supersedes an earlier 27-photo sweep that suggested
+v-measure was flat across the range. It is not:
 
-| maxDistance | clusters | unassigned | homogeneity | completeness | v-measure |
-| --- | --- | --- | --- | --- | --- |
-| 0.25 | 4 | 41% | 0.688 | 0.688 | 0.688 |
-| 0.30 | 5 | 33% | 0.732 | 0.658 | 0.693 |
-| 0.35 | 4 | 22% | 0.665 | 0.715 | 0.689 |
-| 0.40 | 5 | 7% | 0.707 | 0.669 | 0.687 |
-| 0.45 | 4 | 0% | 0.605 | 0.716 | 0.656 |
+| maxDistance | clusters | homogeneity | completeness | v-measure | purity | unassigned |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0.25 | 45 | 0.476 | 0.770 | 0.589 | **0.936** | 53% |
+| **0.30** | 48 | 0.572 | 0.788 | 0.663 | **0.904** | **41%** |
+| 0.35 | 48 | 0.669 | 0.826 | 0.739 | 0.817 | 26% |
+| 0.40 | 37 | 0.702 | 0.878 | **0.781** | 0.748 | 19% |
+| 0.45 | 21 | 0.537 | 0.888 | 0.669 | 0.422 | 13% |
 
-V-measure is flat from 0.25 to 0.45 — the threshold barely changes cluster
-*quality*, it changes how much is left unassigned. At 0.30 a third of detections
-cluster with nothing, and with `minFaces=1` each becomes its own person. That is
-the manual merging being signed up for: in the live run it produced 12 people
-from 28 faces of 5 dogs.
+V-measure peaks at **0.40**; purity falls monotonically as the threshold opens
+up. The `eps=0.35` shipped in `embedding.json` — swept on the DogFaceNet
+training split — lands in a sensible zone on held-out internet photos too, which
+is a better generalisation result than expected.
 
-Re-sweep on the real validation set before treating any of this as settled.
+`0.30` is the chosen setting because purity `0.904` is the property that matters
+when the recovery path is asymmetric. The price is that **41% of detections
+cluster with nothing** and, at `minFaces=1`, each becomes its own person. That is
+the manual merging being signed up for.
+
+MPDD peaks earlier (v-measure 0.787 at 0.30, collapsing to purity 0.37 by 0.40)
+because its images are tight Market-1501-style crops, not snapshots — weight the
+Commons column when tuning, since that is what Immich actually sends.
 
 ## 3b. Crop geometry — tested, left alone
 

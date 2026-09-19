@@ -58,16 +58,27 @@ uv run --project sidecar python sidecar/smoke_test.py path/to/dog.jpg \
   --url http://localhost:3003
 ```
 
-For threshold tuning use `scripts/fetch_validation_set.py` and
-`scripts/evaluate_sidecar.py`, which sweep Min Detection Score against detection
-recall and the false-positive rate on dog-free photos.
+For threshold tuning, `scripts/fetch_validation_set.py` builds a held-out set
+(121 individual dogs, 1524 photos, plus 450 dog-free negatives) and
+`scripts/evaluate_sidecar.py` sweeps both settings against it:
+
+```bash
+uv run python scripts/fetch_validation_set.py
+uv run python scripts/evaluate_sidecar.py --url http://localhost:3003
+```
 
 ## Verified
 
-Against a stock Immich **v3.2.2** stack with 31 Wikimedia dog photos: 12 people
-clustered, correct bounding-box thumbnails, CLIP smart search and OCR still
-served through the proxy. Dropping Min Detection Score from 0.7 to 0.3 took
-detections from 20 faces across 18 photos to 28 across 25.
+Against a stock Immich **v3.2.2** stack: people clustered from dog photos,
+thumbnails cropped from our bounding boxes, CLIP smart search and OCR still
+served through the proxy, in both `KEEP_HUMAN_FACES` modes.
+
+On the held-out validation set, at Min Detection Score `0.3`: **80%** of
+in-the-wild dog photos get a detection, against a **0%** false-positive rate on
+people, landscapes, horses and buildings. What it does fire on is near-neighbour
+quadrupeds — 40% of wolf/dingo/jackal photos and 14% of cat photos — so the junk
+person risk in a real library is roughly one cat photo in seven. Immich's 0.7
+default halves recall.
 
 ## Notes
 
