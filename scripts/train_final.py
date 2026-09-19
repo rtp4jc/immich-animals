@@ -192,6 +192,11 @@ def main():
         help="Fold the val identities into training (fixed epochs, final checkpoint).",
     )
     parser.add_argument("--epochs", type=int, default=None)
+    parser.add_argument(
+        "--checkpoint",
+        default=None,
+        help="Export an existing best_model.pt instead of training a new one.",
+    )
     parser.add_argument("--output", default=None, help="ONNX destination.")
     args = parser.parse_args()
 
@@ -207,16 +212,23 @@ def main():
     run_dir = PROJECT_ROOT / "runs" / f"{timestamp}_{backbone.value}_final"
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    if args.include_val:
+    if args.include_val and not args.checkpoint:
         train_json = build_combined_json(run_dir / "identity_trainval.json")
         trained_on = "train+val"
     else:
         train_json = DATA_DIR / "identity_train.json"
         trained_on = "train"
 
-    train_dataset, train_loader = loader_for(
-        train_json, img_size, batch_size, True, generator
-    )
+    if args.checkpoint:
+        # Only the head size is needed; no training pass will run.
+        train_dataset = IdentityDataset(
+            json_path=train_json, img_size=img_size, is_training=False
+        )
+        train_loader = None
+    else:
+        train_dataset, train_loader = loader_for(
+            train_json, img_size, batch_size, True, generator
+        )
     # Monitoring only when val is folded in — it is no longer held out.
     _, val_loader = loader_for(
         DATA_DIR / "identity_val.json", img_size, batch_size, False
@@ -238,29 +250,38 @@ def main():
         head_type=head,
     ).to(device)
 
-    trainer = EmbeddingTrainer(
-        model=model,
-        train_loader=train_loader,
-        val_loader=val_loader,
-        device=device,
-        run_dir=run_dir,
-    )
     warmup = args.epochs or TRAINING_CONFIG.warmup_epochs
     full = args.epochs or TRAINING_CONFIG.full_train_epochs
-    best_path = trainer.train(
-        warmup_epochs=warmup,
-        full_epochs=full,
-        head_lr=TRAINING_CONFIG.head_lr,
-        backbone_lr=TRAINING_CONFIG.backbone_lr,
-        full_lr=TRAINING_CONFIG.full_train_lr,
-        # Selecting on val would be selecting on training data once it is folded in.
-        patience=NO_EARLY_STOP
-        if args.include_val
-        else TRAINING_CONFIG.early_stopping_patience,
-        linear_probe=False,
-    )
+    best_path = None
 
-    if args.include_val:
+    if args.checkpoint:
+        model.load_state_dict(torch.load(args.checkpoint, map_location=device))
+        warmup = full = 0
+        print(f"Loaded {args.checkpoint} - exporting without training")
+    else:
+        trainer = EmbeddingTrainer(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            device=device,
+            run_dir=run_dir,
+        )
+        best_path = trainer.train(
+            warmup_epochs=warmup,
+            full_epochs=full,
+            head_lr=TRAINING_CONFIG.head_lr,
+            backbone_lr=TRAINING_CONFIG.backbone_lr,
+            full_lr=TRAINING_CONFIG.full_train_lr,
+            # Selecting on val would be selecting on training data once it is folded in.
+            patience=NO_EARLY_STOP
+            if args.include_val
+            else TRAINING_CONFIG.early_stopping_patience,
+            linear_probe=False,
+        )
+
+    if args.checkpoint:
+        pass  # already loaded above
+    elif args.include_val:
         # Our own checkpoint dict carries a numpy scalar, which the 2.6+
         # weights_only default refuses.
         state = torch.load(
