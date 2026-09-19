@@ -1,30 +1,27 @@
 # animal-ml sidecar
 
 Adds your dogs to Immich's **People** tab. Immich already detects human faces and
-groups them into people; this runs alongside it and does the same for individual
-dogs — not "there is a dog here", but "this is the same dog as in those other 40
-photos".
+groups them into people and this adds an additional dog detector on top of the
+existing models. Human face detection and recognition should work the same as
+before.
 
-Dogs appear as people, mixed in with the humans. There is no separate Animals
-section: Immich has one pipeline for this, so we use it.
+Dogs appear as people, mixed in with the humans. There is no separate animals
+section.
 
-Human faces keep working. Nothing in Immich is modified or replaced — this is a
-small service beside it that answers the same question Immich already asks.
+> **First beta, and it focused on dogs.** Cats and other animals are not supported
+> yet. A cat will occasionally be detected, but that is not the goal of this
+> release or a focus in this round of model training.
 
-> **First beta, and it is about dogs.** Cats and other animals are not supported
-> yet. A cat will occasionally be detected as a person; that is a false positive,
-> not partial cat support.
-
-> **Read this before pointing it at your main library.** Turning it on re-runs
-> face detection, which **discards the face work you have already done**: names,
-> merges, splits and hidden faces are all reset, for people as well as dogs.
+> **Read this before pointing it at your main library.** Turning it on requires
+> re-running face detection, which **discards the face work you have already done**:
+> names, merges, splits and hidden faces are all reset, for people as well as dogs.
 > Turning it back off means another re-run and another reset. If you have spent
-> time naming people, use a test instance or a library you do not mind rebuilding.
+> time naming people, use a test instance or a library you do not mind re-editing.
 
 ## What you need
 
 - Immich running under `docker compose` (v3.0 or newer)
-- About 1 GB of disk and a few minutes of CPU per thousand photos
+- About 1 GB of disk space
 
 ## 1. Add the service
 
@@ -51,12 +48,11 @@ docker compose up -d animal-ml
 
 That is the only setting to change. Leave **Min Detection Score** and **Max
 Distance** where they are: they are tuned for human faces and still apply to
-them. Dogs need different values, so the sidecar uses its own threshold and maps
-its numbers onto yours rather than asking you to retune.
+them. Dogs need different values, so the sidecar uses its own thresholds.
 
 ## 3. Find the dogs
 
-**Administration → Jobs → Face Detection → All**, then when it finishes,
+**Administration → Job Queues → Face Detection → All**, then when it finishes,
 **Facial Recognition → All**. Expect roughly ten photos a second; the People tab
 fills in as it goes.
 
@@ -68,16 +64,15 @@ Name a dog the way you would name a person, and search finds them by name.
 ## What works, what does not
 
 Dogs you photograph a lot cluster well. In testing, a dog with 673 photos put
-491 of them in one person; a dog with 11 photos scattered across five.
+491 of them in one person; a dog with 11 photos scattered across five "people".
 
 - **Dogs with plenty of photos** get one large cluster plus a few strays to merge
 - **Dogs with under ~15 photos** may not group at all
 - **Similar-looking dogs** get mixed together — two black curly-coated dogs are
   genuinely hard
-- **Cats** are detected as people about one photo in seven. Landscapes,
-  buildings and photos of people are not.
+- **Cats** are detected as people about one photo in seven.
 
-Merging two people in Immich is easy and splitting one is not, so the defaults
+Merging two people in Immich is easy, but splitting one is not, so the defaults
 lean towards leaving you a few extra clusters rather than wrongly combining two
 dogs.
 
@@ -88,6 +83,8 @@ re-run Face Detection. Dog people remain listed until you delete them, and — a
 above — this second re-run resets face names and merges again.
 
 ## Settings
+
+TODO: settings where? This section doesn't say where you can configure these
 
 | Variable | Default | What it does |
 | --- | --- | --- |
@@ -132,17 +129,13 @@ immich-server ──▶ animal-ml ──facial-recognition──▶ our ONNX mod
                       └──────everything else──────▶ immich-machine-learning
 ```
 
-Forwarding is not optional: Immich's `urls` list is failover, not routing, so
-whichever server answers has to answer every task.
-
-It is its own uv project, separate from the training project at the repo root,
-so the image installs `fastapi`/`onnxruntime`/`opencv` and has no path to torch.
+It is its own uv project, separate from the training project at the repo root
+to keep the dependencies lighter than the training project.
 
 ## Build
 
 Models are not in git. The default build downloads them from the release named
-by `MODEL_TAG` and checks them against `SHA256SUMS`, so a truncated or tampered
-download fails the build instead of shipping quietly. Needs BuildKit.
+by `MODEL_TAG` and checks them against `SHA256SUMS`.
 
 ```bash
 # from the repo root
@@ -193,13 +186,3 @@ both are tuned for people. Rather than make users retune them:
   0.707 on tightly-cropped dataset images. Human embeddings are never touched, so
   disabling the sidecar leaves them valid.
 
-## Measured
-
-Against a stock Immich **v3.2.2** stack, and on the held-out validation set at
-`DOG_MIN_SCORE=0.3`:
-
-- **80%** of in-the-wild dog photos produce a detection; **0%** false positives
-  on people, landscapes, horses and buildings; 14% on cats, 40% on wild canids
-- 1943 photos → 1508 faces → 530 people, v-measure 0.869
-- CLIP search and OCR keep working through the proxy in both `KEEP_HUMAN_FACES`
-  modes
