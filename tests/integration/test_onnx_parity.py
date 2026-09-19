@@ -1,5 +1,6 @@
 import numpy as np
 import onnxruntime as ort
+import pytest
 import torch
 
 from animal_id.embedding.backbones import BackboneType
@@ -11,11 +12,22 @@ EMBEDDING_DIM = TRAINING_CONFIG.embedding_dim
 IMG_SIZE = DATA_CONFIG.img_size
 
 
-def test_onnx_embedding_parity(tmp_path):
+# The deploy candidates, plus a cheap one. MegaDescriptor is excluded: its
+# timm hf-hub loader hits the network even with pretrained=False.
+@pytest.mark.parametrize(
+    "backbone",
+    [
+        BackboneType.MOBILENET_V3_SMALL,
+        BackboneType.RESNET50,
+        BackboneType.CONVNEXT_TINY,
+    ],
+)
+def test_onnx_embedding_parity(tmp_path, backbone):
+    """The Immich contract: 512-d, L2-normalized, and identical under ORT."""
     torch.manual_seed(42)
 
     model = AnimalEmbeddingModel(
-        backbone_type=BackboneType.MOBILENET_V3_SMALL,
+        backbone_type=backbone,
         num_classes=None,  # inference mode — no ArcFace head
         embedding_dim=EMBEDDING_DIM,
         pretrained=False,
