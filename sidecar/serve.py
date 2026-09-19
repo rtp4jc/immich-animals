@@ -1,13 +1,15 @@
-"""Serve Immich's machine-learning HTTP contract with our dog models.
+"""Answer Immich's machine-learning HTTP contract with dog models.
 
-Immich asks for human faces and gets dogs. Every other task (CLIP, OCR) is
-forwarded verbatim to the stock immich-machine-learning container, because
-Immich's `urls` list is failover, not routing: whichever server answers has to
+Immich has one face-detection pipeline, so dogs ride along in it: we answer the
+facial-recognition task with dogs and forward it upstream for people as well.
+Every other task (CLIP, OCR) is passed through untouched, because Immich's
+`urls` list is failover rather than routing — whichever server answers has to
 answer everything.
 
-KEEP_HUMAN_FACES (on by default) returns upstream's human faces alongside the
-dogs, and rescales our embeddings so Immich's human-tuned Max Distance also
-works for dogs. Set it false to serve dogs only, and set Max Distance yourself.
+Immich's own Min Detection Score and Max Distance stay at whatever the user has
+them set to. Dogs want different values, so the sidecar applies its own
+threshold and maps its embeddings onto Immich's, rather than asking the user to
+retune settings that are already right for people.
 """
 
 import hashlib
@@ -15,6 +17,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import NamedTuple
 
 import cv2
 import httpx
@@ -26,6 +29,8 @@ from fastapi.responses import ORJSONResponse, PlainTextResponse, Response
 
 TASK = "facial-recognition"
 BBOX_PAD = 0.1  # matches AnimalPipeline's crop, which the embedder was tuned on
+# Immich's smaller face models; its picker doubles as ours.
+SMALL_FACE_MODELS = {"buffalo_s", "buffalo_m"}
 
 MODEL_DIR = Path(os.environ.get("MODEL_DIR", "models/onnx"))
 UPSTREAM_URL = os.environ.get("UPSTREAM_ML_URL", "").rstrip("/")
@@ -34,13 +39,14 @@ KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
     "true",
     "yes",
 }
-# Our embeddings cluster best at DOG_MAX_DISTANCE, Immich's humans at its own
-# default. One setting cannot serve both, so we move ours onto theirs.
+# Immich's default suits people; dogs need roughly 0.3 or half of them are lost.
+DOG_MIN_SCORE = float(os.environ.get("DOG_MIN_SCORE", "0.3"))
+# Where our embeddings cluster best, and the Max Distance Immich is set to.
 DOG_MAX_DISTANCE = float(os.environ.get("DOG_MAX_DISTANCE", "0.35"))
 IMMICH_MAX_DISTANCE = float(os.environ.get("IMMICH_MAX_DISTANCE", "0.5"))
 
 
-def _load(name: str) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
+def _session(name: str) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
     session = ort.InferenceSession(
         str(MODEL_DIR / name), providers=["CPUExecutionProvider"]
     )
@@ -48,14 +54,43 @@ def _load(name: str) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
     return session, spec.name, tuple(spec.shape[2:])
 
 
-detector, _det_input, _det_size = _load("detector.onnx")
-embedder, _emb_input, _emb_size = _load("embedding.onnx")
+def _channel_constant(values: list[float]) -> np.ndarray:
+    return np.array(values, dtype=np.float32).reshape(3, 1, 1)
 
-# The embedder expects ImageNet normalisation; skipping it costs accuracy
-# silently, so read it from the sidecar JSON the exporter writes.
-_prep = json.loads((MODEL_DIR / "embedding.json").read_text())["preprocessing"]
-_MEAN = np.array(_prep["mean"], dtype=np.float32).reshape(3, 1, 1)
-_STD = np.array(_prep["std"], dtype=np.float32).reshape(3, 1, 1)
+
+class _Embedder(NamedTuple):
+    session: ort.InferenceSession
+    input_name: str
+    size: tuple[int, int]
+    mean: np.ndarray
+    std: np.ndarray
+
+
+def _load_embedder(stem: str) -> _Embedder:
+    """Load an embedder plus the preprocessing its exporter recorded.
+
+    ImageNet normalisation is not baked into the graph and skipping it costs
+    accuracy silently, so it is read rather than assumed.
+    """
+    session, input_name, size = _session(f"{stem}.onnx")
+    prep = json.loads((MODEL_DIR / f"{stem}.json").read_text())["preprocessing"]
+    return _Embedder(
+        session,
+        input_name,
+        size,
+        _channel_constant(prep["mean"]),
+        _channel_constant(prep["std"]),
+    )
+
+
+detector, _det_input, _det_size = _session("detector.onnx")
+_large = _load_embedder("embedding")
+_small = _load_embedder("embedding_resnet50")
+
+
+def _embedder_for(face_model: str) -> _Embedder:
+    """Follow Immich's face-model choice: smaller model, faster embedder."""
+    return _small if face_model in SMALL_FACE_MODELS else _large
 
 
 def _blob(image: np.ndarray, size: tuple[int, int], interpolation: int) -> np.ndarray:
@@ -63,8 +98,8 @@ def _blob(image: np.ndarray, size: tuple[int, int], interpolation: int) -> np.nd
     return np.transpose(resized.astype(np.float32) / 255.0, (2, 0, 1))[None]
 
 
-def _detect(rgb: np.ndarray, min_score: float) -> list[tuple[float, list[int]]]:
-    """Detections above min_score, as (score, bbox) in source-image pixels."""
+def _detect(rgb: np.ndarray) -> list[tuple[float, list[int]]]:
+    """Detections above DOG_MIN_SCORE, as (score, bbox) in source pixels."""
     height, width = rgb.shape[:2]
     scale_x, scale_y = width / _det_size[1], height / _det_size[0]
     raw = detector.run(None, {_det_input: _blob(rgb, _det_size, cv2.INTER_LINEAR)})
@@ -79,7 +114,7 @@ def _detect(rgb: np.ndarray, min_score: float) -> list[tuple[float, list[int]]]:
             ],
         )
         for x1, y1, x2, y2, score, _ in raw[0][0]
-        if score >= min_score
+        if score >= DOG_MIN_SCORE
     ]
 
 
@@ -87,7 +122,7 @@ def _detect(rgb: np.ndarray, min_score: float) -> list[tuple[float, list[int]]]:
 # affinely: d' = (1 - a) + a*d, since random high-dimensional vectors are nearly
 # orthogonal. Solving d' = IMMICH_MAX_DISTANCE at d = DOG_MAX_DISTANCE gives a.
 _SHIFT = (1 - IMMICH_MAX_DISTANCE) / (1 - DOG_MAX_DISTANCE)
-_RESCALE = KEEP_HUMAN_FACES and 0 < _SHIFT < 1
+_RESCALE = 0 < _SHIFT < 1
 
 
 def _unit(vector: np.ndarray) -> np.ndarray:
@@ -103,9 +138,10 @@ def _rescale(vector: np.ndarray) -> np.ndarray:
     return _unit(mixed).astype(np.float32)
 
 
-def _embed(crop: np.ndarray) -> np.ndarray:
-    blob = (_blob(crop, _emb_size, cv2.INTER_AREA) - _MEAN) / _STD
-    vector = embedder.run(None, {_emb_input: blob})[0][0]
+def _embed(crop: np.ndarray, embedder: _Embedder) -> np.ndarray:
+    blob = _blob(crop, embedder.size, cv2.INTER_AREA)
+    blob = (blob - embedder.mean) / embedder.std
+    vector = embedder.session.run(None, {embedder.input_name: blob})[0][0]
     return _rescale(vector) if _RESCALE else vector
 
 
@@ -122,9 +158,9 @@ def _pad(bbox: list[int], width: int, height: int) -> tuple[int, int, int, int]:
 
 app = FastAPI()
 logging.getLogger("uvicorn.error").info(
-    "animal-ml: humans=%s rescale=%s (Max Distance %.2f behaves as %.2f) upstream=%s",
+    "animal-ml: people=%s, dog min score %.2f, Max Distance %.2f acts as %.2f, upstream=%s",
     KEEP_HUMAN_FACES,
-    _RESCALE,
+    DOG_MIN_SCORE,
     IMMICH_MAX_DISTANCE,
     DOG_MAX_DISTANCE if _RESCALE else IMMICH_MAX_DISTANCE,
     UPSTREAM_URL or "unset",
@@ -150,7 +186,7 @@ async def predict(request: Request) -> Response:
             media_type=upstream.headers.get("content-type"),
         )
 
-    min_score = entries[TASK]["detection"]["options"]["minScore"]
+    embedder = _embedder_for(entries[TASK].get("recognition", {}).get("modelName", ""))
     buffer = np.frombuffer(await form["image"].read(), np.uint8)
     decoded = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
     if decoded is None:
@@ -159,7 +195,7 @@ async def predict(request: Request) -> Response:
     height, width = rgb.shape[:2]
 
     faces = []
-    for score, bbox in _detect(rgb, min_score):
+    for score, bbox in _detect(rgb):
         x1, y1, x2, y2 = _pad(bbox, width, height)
         crop = rgb[y1:y2, x1:x2]
         if crop.size == 0:
@@ -169,7 +205,7 @@ async def predict(request: Request) -> Response:
                 "boundingBox": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
                 # Immich expects the vector as a JSON string, not an array.
                 "embedding": orjson.dumps(
-                    _embed(crop), option=orjson.OPT_SERIALIZE_NUMPY
+                    _embed(crop, embedder), option=orjson.OPT_SERIALIZE_NUMPY
                 ).decode(),
                 "score": score,
             }

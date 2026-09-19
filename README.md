@@ -2,6 +2,12 @@
 
 Detects and identifies individual animals in photos, mirroring Immich's people pipeline (detect → crop → embed → cluster → user confirms). Initial focus is dogs.
 
+## Just want it working in Immich?
+
+**[sidecar/](sidecar/)** adds your dogs to Immich's People tab. One container,
+one setting, no fork of Immich. Start there — the rest of this README is about
+training the models.
+
 ## Architecture
 
 `AnimalPipeline` in `animal_id/pipeline/animal_pipeline.py` runs three ONNX models:

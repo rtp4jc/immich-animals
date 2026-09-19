@@ -51,7 +51,7 @@ jobs:
         run: |
           gh release download "${{ steps.meta.outputs.tag }}" \
             --repo "${{ github.repository }}" \
-            --pattern 'detector.onnx' --pattern 'embedding.onnx' --pattern 'embedding.json' \
+            --pattern '*.onnx' --pattern 'embedding*.json' \
             --dir /tmp/models
           cd /tmp/models && sha256sum -c "$GITHUB_WORKSPACE/sidecar/SHA256SUMS"
 

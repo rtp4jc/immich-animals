@@ -8,12 +8,10 @@ services:
     environment:
       # Everything that isn't facial-recognition is forwarded here.
       UPSTREAM_ML_URL: http://immich-machine-learning:3003
-      # Keep finding human faces too, and rescale our embeddings so one
-      # Max Distance suits both. Set false to serve dogs only, in which case
-      # set Max Distance to DOG_MAX_DISTANCE yourself.
-      KEEP_HUMAN_FACES: "true"
-      # Where our embeddings actually cluster best, and the Max Distance in
-      # your Immich settings. Only change the second if you changed the first.
-      DOG_MAX_DISTANCE: "0.35"
-      IMMICH_MAX_DISTANCE: "0.5"
+      # Defaults below; uncomment only to change them. Immich's own
+      # Min Detection Score and Max Distance stay as they are.
+      # KEEP_HUMAN_FACES: "true"
+      # DOG_MIN_SCORE: "0.3"
+      # DOG_MAX_DISTANCE: "0.35"
+      # IMMICH_MAX_DISTANCE: "0.5"
     restart: always
