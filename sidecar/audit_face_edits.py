@@ -9,22 +9,10 @@ import argparse
 import subprocess
 import sys
 
-# Immich prunes the *_audit tables after 31 days (sync.service.js MAX_DAYS), so
-# merges older than that leave no trace at all.
-AUDIT_DAYS = 31
-
-# A job run rewrites a large share of the library in one minute; a person edits a
-# handful. 1% separates the two on every library we have measured.
-#
-# Edits made before the last mass face deletion are already gone, so `cutoff`
-# finds that job run and the estimates below only count what came after it.
+# Every count here is a column, never an inference. Merges and reassignments are
+# left out because Immich stores no evidence of them: a merge deletes the losing
+# person and a reassignment only moves a face to another group.
 QUERY = """
-with cutoff as (
-  select coalesce(max(m), '-infinity'::timestamptz) c
-    from (select date_trunc('minute', "deletedAt") m, count(*) n
-            from asset_face_audit group by 1) s,
-         (select greatest(count(*), 1) * 0.01 t from asset_face) k
-   where n >= t)
 select
   (select count(*) from person where name <> ''),
   (select count(*) from asset_face af
@@ -38,26 +26,20 @@ select
   (select count(*) from person where "isHidden"),
   (select count(*) from person where "isFavorite"),
   (select count(*) from person where "birthDate" is not null),
-  (select count(*) from asset_face where "sourceType" <> 'machine-learning'),
   (select count(*) from asset_face where not "isVisible"),
   (select count(*) from asset_face where "deletedAt" is not null),
-  (select coalesce(sum(n) filter (where n < t), 0)
-     from (select date_trunc('minute', "updatedAt") m, count(*) n
-             from asset_face where "updatedAt" > cutoff.c group by 1) s,
-          (select greatest(count(*), 1) * 0.01 t from asset_face) k),
-  (select coalesce(sum(n) filter (where n < t), 0)
-     from (select date_trunc('minute', "deletedAt") m, count(*) n
-             from person_audit where "deletedAt" > cutoff.c group by 1) s,
-          (select greatest(count(*), 1) * 0.01 t from person) k),
+  (select count(*) from asset_face where "sourceType" <> 'machine-learning'),
   (select count(*) from person),
   (select count(*) from asset_face where "deletedAt" is null)
-from cutoff
 """
 
 FIELDS = (
-    "named named_faces named_surviving hidden favorite birthdate manual_faces "
-    "hidden_faces deleted_faces hand_faces merges people faces"
+    "named named_faces named_surviving hidden favorite birthdate "
+    "hidden_faces deleted_faces manual_faces people faces"
 ).split()
+
+UNCOUNTED = """Merges and faces moved between people are missing from this list:
+Immich records neither, so no tool can count them. They go the same way."""
 
 
 def run(container: str, user: str, database: str) -> dict[str, int]:
@@ -84,7 +66,7 @@ def run(container: str, user: str, database: str) -> dict[str, int]:
     if result.returncode != 0:
         sys.exit(result.stderr.strip() or f"could not query {container}")
     return {
-        k: int(float(v))
+        k: int(v)
         for k, v in zip(FIELDS, result.stdout.strip().split("\t"), strict=True)
     }
 
@@ -100,8 +82,7 @@ def report(c: dict[str, int]) -> None:
         ("favourited people", c["favorite"], ""),
         ("birth dates", c["birthdate"], ""),
         ("hidden faces", c["hidden_faces"], ""),
-        ("merges", c["merges"], f"estimated, last {AUDIT_DAYS} days"),
-        ("hand edits to faces", c["hand_faces"], "estimated: moved, hidden or deleted"),
+        ("deleted faces", c["deleted_faces"], "these come back"),
     ]
     kept = [
         ("manually added faces", c["manual_faces"], ""),
@@ -114,18 +95,16 @@ def report(c: dict[str, int]) -> None:
 
     print(f"\n{c['people']} people, {c['faces']} faces.\n")
     if not any(n for _, n, _ in lost + kept):
-        print("No manual face edits found. Nothing to lose.\n")
+        print(f"No face edits found. Nothing to lose.\n\n{UNCOUNTED}\n")
         return
 
     print("Lost when you re-run Face Detection")
     for label, n, note in lost:
         print(f"  {n:>6}  {label}{f'  ({note})' if note and n else ''}")
-    if c["deleted_faces"]:
-        print(f"  {c['deleted_faces']:>6}  deleted faces  (these come back)")
     print("\nKept")
     for label, n, note in kept:
         print(f"  {n:>6}  {label}{f'  ({note})' if note and n else ''}")
-    print()
+    print(f"\n{UNCOUNTED}\n")
 
 
 def main() -> None:

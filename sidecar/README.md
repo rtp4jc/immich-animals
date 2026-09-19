@@ -38,23 +38,20 @@ Lost when you re-run Face Detection
        0  favourited people
        0  birth dates
        2  hidden faces
-       3  merges  (estimated, last 31 days)
-      27  hand edits to faces  (estimated: moved, hidden or deleted)
+       3  deleted faces  (these come back)
 
 Kept
        4  manually added faces
        2  named people holding one  (they keep the name, but lose every detected face)
+
+Merges and faces moved between people are missing from this list:
+Immich records neither, so no tool can count them. They go the same way.
 ```
 
 Everything under **Lost** goes when you re-run Face Detection, whether you are
 turning the sidecar on or off. Read the top line as the real cost: those people
-go back to being unnamed clusters, and you name them again by hand.
-
-The two estimated lines are counted by looking for minutes where only a handful
-of rows changed, since Immich does not record who changed what. Job runs rewrite
-thousands of rows a minute and are excluded, and so is anything from before your
-last full Face Detection, because that already discarded it. Merges older than
-31 days cannot be counted at all — Immich has deleted the evidence by then.
+go back to being unnamed clusters, and you name them again by hand. Every number
+is a column read straight out of the database, not an estimate.
 
 **Kept** is the exception worth knowing. A face you added by hand is not machine
 learning output, so a re-run leaves it alone. A person whose only face is a
