@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+httpx
+numpy
+onnxruntime
+opencv-python-headless
+orjson
+python-multipart

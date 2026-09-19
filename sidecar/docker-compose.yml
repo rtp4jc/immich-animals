@@ -1,0 +1,13 @@
+# Build the image from this repo's root:
+#   docker build -f sidecar/Dockerfile -t animal-ml .
+# then copy this file next to Immich's docker-compose.yml as
+# docker-compose.override.yml and point Administration -> Settings ->
+# Machine Learning -> URL at http://animal-ml:3003.
+services:
+  animal-ml:
+    container_name: animal_ml
+    image: animal-ml
+    environment:
+      # Everything that isn't facial-recognition is forwarded here.
+      UPSTREAM_ML_URL: http://immich-machine-learning:3003
+    restart: always

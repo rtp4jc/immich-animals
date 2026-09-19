@@ -43,6 +43,11 @@ dev = [
     "jupyter>=1.0.0",
     "ruff>=0.1.0",
     "pre-commit>=3.5.0",
+    "fastapi>=0.141.1",
+    "uvicorn>=0.53.0",
+    "httpx>=0.28.1",
+    "orjson>=3.12.0",
+    "python-multipart>=0.0.32",
 ]
 
 [tool.setuptools.packages.find]

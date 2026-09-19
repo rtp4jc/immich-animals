@@ -1,3 +1,4 @@
+import json
 from unittest.mock import MagicMock, patch
 
 import cv2
@@ -5,7 +6,13 @@ import numpy as np
 import pytest
 
 from animal_id.pipeline.models import AnimalClass
-from animal_id.pipeline.onnx_models import ONNXDetector, ONNXEmbedding, ONNXKeypoint
+from animal_id.pipeline.onnx_models import (
+    IMAGENET_MEAN,
+    IMAGENET_STD,
+    ONNXDetector,
+    ONNXEmbedding,
+    ONNXKeypoint,
+)
 
 
 @pytest.fixture
@@ -150,3 +157,53 @@ class TestONNXEmbedding:
 
         assert isinstance(result, np.ndarray)
         assert result.shape == (512,)
+
+    def test_preprocess_applies_imagenet_normalisation(
+        self, mock_session_class, sample_image
+    ):
+        """Without a sidecar the embedder falls back to ImageNet constants."""
+        mock_input = MagicMock()
+        mock_input.shape = [1, 3, 224, 224]
+        mock_session_class.return_value.get_inputs.return_value = [mock_input]
+
+        embedder = ONNXEmbedding("dummy_path.onnx")
+        processed_image, _ = embedder._preprocess(sample_image)
+
+        scaled = processed_image * np.array(IMAGENET_STD, dtype=np.float32).reshape(
+            3, 1, 1
+        ) + np.array(IMAGENET_MEAN, dtype=np.float32).reshape(3, 1, 1)
+        assert processed_image.shape == (1, 3, 224, 224)
+        assert processed_image.dtype == np.float32
+        assert np.min(processed_image) < 0.0  # Raw [0, 1] would never go negative.
+        assert scaled.min() >= -1e-5
+        assert scaled.max() <= 1.0 + 1e-5
+
+    def test_preprocess_reads_sidecar_mean_std(
+        self, mock_session_class, sample_image, tmp_path
+    ):
+        """Preprocessing constants come from the exported model's sidecar JSON."""
+        mock_input = MagicMock()
+        mock_input.shape = [1, 3, 224, 224]
+        mock_session_class.return_value.get_inputs.return_value = [mock_input]
+
+        model_path = tmp_path / "embedding.onnx"
+        (tmp_path / "embedding.json").write_text(
+            json.dumps(
+                {"preprocessing": {"mean": [0.5, 0.5, 0.5], "std": [0.5, 1.0, 2.0]}}
+            )
+        )
+
+        embedder = ONNXEmbedding(str(model_path))
+        processed_image, _ = embedder._preprocess(sample_image)
+
+        raw = np.transpose(
+            cv2.resize(sample_image, (224, 224), interpolation=cv2.INTER_AREA).astype(
+                np.float32
+            )
+            / 255.0,
+            (2, 0, 1),
+        )
+        expected = (raw - 0.5) / np.array([0.5, 1.0, 2.0], dtype=np.float32).reshape(
+            3, 1, 1
+        )
+        assert processed_image[0] == pytest.approx(expected)
