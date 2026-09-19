@@ -8,13 +8,47 @@ Detects and identifies individual animals in photos, mirroring Immich's people p
 one setting, no fork of Immich. Start there — the rest of this README is about
 training the models.
 
+## Model card
+
+Every ablation run is in [`embedding_benchmarks.csv`](embedding_benchmarks.csv)
+(a checked-in copy of `run_ablation.py`'s `outputs/ablation/results.csv`); this
+is the digest of what actually ships.
+
+**Identity retrieval** — DogFaceNet held-out split, 1078 queries over 149
+identities. Tight, mostly frontal face crops.
+
+| Embedder | Top-1 | Top-5 | MRR | mAP | TAR@FAR=1% | Params | CPU |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| ConvNeXt-Tiny (default) | 0.953 | 0.983 | 0.967 | 0.624 | 0.826 | 28.7 M | 29 ms |
+| ResNet50 (`buffalo_m` and below) | 0.857 | 0.945 | 0.896 | 0.494 | 0.621 | 25.1 M | 23 ms |
+
+Across three seeds top-1 moves 0.3pp (ConvNeXt) and 1.3pp (ResNet50). A
+sub-center ArcFace head averaged 0.2pp better — inside that noise, so the plain
+ArcFace runs are what shipped.
+
+**Detection** — YOLO11n, held out on 1524 photos of 121 individual dogs plus 450
+dog-free photos, at the sidecar's `DOG_MIN_SCORE=0.3`. 80% of in-the-wild dog
+photos get a detection (99% on tight crops). False positives are near-neighbour
+quadrupeds: 40% of wolves and dingoes, 14% of cats, and **zero** across 60
+photos of people, 35 horses, 35 landscapes and 10 buildings.
+
+**Clustering** — 766 in-the-wild crops of 61 dogs, cosine DBSCAN at the shipped
+`eps=0.35`: purity 0.82, v-measure 0.74, 26% of crops unassigned.
+
+The two numbers that predict how this feels in a real library are **detection
+recall** and **cluster purity**. Top-1 on DogFaceNet is measured on crops far
+cleaner than anything Immich sends and overstates identification in the wild;
+same-identity cosine similarity is ~0.54 on real photos, not the ~0.9 that split
+implies. Full sweeps and the trade-offs behind each threshold are in
+[.planning/9-18-2026-immich-sidecar/decisions.md](.planning/9-18-2026-immich-sidecar/decisions.md).
+
 ## Architecture
 
 `AnimalPipeline` in `animal_id/pipeline/animal_pipeline.py` runs three ONNX models:
 
 1. **Detector** (`ONNXDetector`): YOLO11n, outputs animal bounding boxes.
 2. **Keypoint estimator** (`ONNXKeypoint`): YOLO11n-pose, finds 4 facial landmarks (eyes, nose, throat) to refine the crop. **Off by default**: benchmarks are better without it.
-3. **Embedder** (`ONNXEmbedding`): ResNet50 + ArcFace, 512-dim L2-normalised vectors compared by cosine similarity, matching Immich's face-embedding contract.
+3. **Embedder** (`ONNXEmbedding`): ConvNeXt-Tiny + ArcFace (a ResNet50 variant also ships), 512-dim L2-normalised vectors compared by cosine similarity, matching Immich's face-embedding contract.
 
 `pipeline/onnx_models.py` wraps the three models and `pipeline/models.py` defines the `DetectionModel`, `KeypointModel`, and `EmbeddingModel` Protocols they satisfy.
 
