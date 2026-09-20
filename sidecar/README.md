@@ -8,6 +8,8 @@ before.
 Dogs appear as people, mixed in with the humans. There is no separate animals
 section.
 
+![Immich's People page: a grid of circular face thumbnails, the first five named dogs — Rex, Shadow, Sofi, Baron, Gunny — followed by rows of unnamed dog and human faces.](../docs/images/people-page.webp)
+
 **Testing in beta with a focus on dogs.** Cats and other animals are not supported
 yet. A cat will occasionally be detected, but that is not the goal of this
 release or a focus in this round of model training.
@@ -57,6 +59,8 @@ The full face detection queue must empty before face recognition starts so
 you will not see partial results until the detection queue is empty.
 
 When completed, name and modify a dog the way you would a person!
+
+![An Immich person page titled Rex, 521 assets, showing a grid of photographs of a Cavalier King Charles Spaniel.](../docs/images/person-page.webp)
 
 ## What works, what does not
 
