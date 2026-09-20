@@ -82,27 +82,32 @@ you to add names again.
 
 ## Settings
 
-These are the sidecar's own settings, not Immich's. Add them under
-`environment:` in the `docker-compose.override.yml` from step 1, then
-`docker compose up -d animal-ml` to apply. Changing anything but
-`UPSTREAM_ML_URL` means re-running Facial Recognition, and changing
-`DOG_MIN_SCORE` means **Face Detection → Refresh** as well.
-
-Facial Recognition has no Refresh: its **Reset** re-clusters everything and drops
-names, so set `DOG_MAX_DISTANCE` before you start naming.
+### In the docker container definition
+These are the sidecar's settings, not in Immich. 
+Add them under `environment:` in the `docker-compose.override.yml` from step 1, then
+`docker compose up -d animal-ml` to apply and do **Face Detection → Refresh**.
 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `UPSTREAM_ML_URL` | — | Your existing Immich ML container. Required: search and OCR are forwarded to it. |
 | `KEEP_HUMAN_FACES` | `true` | `false` serves dogs only and stops detecting human faces. |
 | `DOG_MIN_SCORE` | `0.3` | How confident the detector must be. Lower finds more dogs and more cats. |
-| `DOG_MAX_DISTANCE` | `0.35` | How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
+| `DOG_MAX_DISTANCE` | `0.35` | **SEE NOTE BELOW** How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
 | `IMMICH_MAX_DISTANCE` | `0.5` | The Max Distance in your Immich settings. Change only if you changed that. |
 
-Immich's face-model setting picks the embedder too: `buffalo_l` and anything
-larger or unrecognised uses the more accurate ConvNeXt model, `buffalo_m` and
-`buffalo_s` use a faster ResNet50. Changing it means **Face Detection → Reset**,
-since embeddings from the two are not comparable.
+**NOTE**: `DOG_MAX_DISTANCE` is tricky to change. You can't just do a refresh after changing 
+it because previously detected faces do not get a new embedding on refresh. If you need to change it, I would suggest 
+disabling the sidecar temporarily, refreshing the face detection again (**Face Detection → Refresh**),
+then adding the sidecard again with the new configuration and refreshing. This will result in 
+only the named dogs being lost and the human faces remaining unchanged.
+
+### From Immich UI
+Immich's face-model setting picks the embedder: `buffalo_l` and anything
+larger uses the more accurate ConvNeXt model, `buffalo_m` and `buffalo_s` use a faster 
+ResNet50. Changing it requires a **Face Detection → Reset** run (not just Refresh),
+since embeddings from the two are not compatible. You could hypothetically follow the same procedure
+as changing the `DOG_MAX_DISTANCE` above, but human face embeddings technically need to be 
+reset too when you change this setting so I wouldn't.
 
 ## Trouble
 
