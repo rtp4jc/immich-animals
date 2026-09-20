@@ -52,10 +52,11 @@ them. Dogs need different values, so the sidecar uses its own thresholds.
 
 **Administration → Job Queues → Face Detection → Refresh**.
 
-Seeing only a handful of people afterwards is Immich hiding anyone with fewer
-than three photos — **Account Settings → Features → People** lowers that.
+Expect this to take up to several hours depending on the size of your library. 
+The full face detection queue must empty before face recognition starts so 
+you will not see partial results until the detection queue is empty.
 
-Name a dog the way you would name a person, and search finds them by name.
+When completed, name and modify a dog the way you would a person!
 
 ## What works, what does not
 
@@ -77,7 +78,7 @@ dogs.
 Point the Machine Learning URL back at `http://immich-machine-learning:3003` and
 run **Face Detection → Refresh**. The dog faces will be removed, but
 human faces will be untouched. Dog names are not kept, so turning it on again requires
-you to apply names again.
+you to add names again.
 
 ## Settings
 
