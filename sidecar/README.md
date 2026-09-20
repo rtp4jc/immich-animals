@@ -8,13 +8,13 @@ before.
 Dogs appear as people, mixed in with the humans. There is no separate animals
 section.
 
-> **First beta, and it focused on dogs.** Cats and other animals are not supported
-> yet. A cat will occasionally be detected, but that is not the goal of this
-> release or a focus in this round of model training.
+**Testing in beta with a focus on dogs.** Cats and other animals are not supported
+yet. A cat will occasionally be detected, but that is not the goal of this
+release or a focus in this round of model training.
 
-> **Use Refresh, not Reset** on the Face Detection queue. Refresh keeps every
-> face already in your library, so names, merges and hidden people survive both
-> adding the sidecar and removing it. Reset deletes every detected face first.
+**Use Refresh, not Reset** on the Face Detection queue. Refresh keeps every
+face already in your library, so names, merges and hidden people survive both
+adding the sidecar and removing it. Reset deletes every detected face first.
 
 ## What you need
 
