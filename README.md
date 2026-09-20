@@ -164,3 +164,36 @@ Download and extract under `data/` (gitignored). Scripts guide preparation after
 | [Stanford Dogs](http://vision.stanford.edu/aditya86/ImageNetDogs/) | `data/stanford_dogs/images/`, `data/stanford_dogs/annotation/` | Detection, keypoints |
 | [StanfordExtra](https://www.kaggle.com/datasets/ollieboyne/stanfordextra-dogs-dataset) | `data/stanford_dogs/stanford_extra_keypoints.json` | Keypoint labels |
 | [Oxford Pets](https://www.robots.ox.ac.uk/~vgg/data/pets/) | `data/oxford_pets/images/`, `data/oxford_pets/annotations/` | Additional detection data |
+
+## Notice of AI usage
+
+This project does rely heavily on AI code generation capabilities. I'm somewhat
+hesitant to admit that because I'm not just vibe coding this project and turning
+my brain off. I do care about the quality of this code and consistently work
+to ensure maintain a high quality bar on all produced code via tests, manual
+validation, and actual manual reviews of the code. That being said, I have not
+read every line of code in this code base and, right now, I don't have time to.
+This is currently in a prototyping/beta stage and I indend to do full due
+diligence when/if this gets merged into Immich. To make this easier on myself,
+I'm consistently having AI sweep for redundant code, bugs, and improper
+organization to keep it DRY and minimal.
+
+### How I'm combatting AI slop
+
+In addition to the audits and processes listed above, I'm combatting AI slop
+by making each step in the process as small as possible and human verifiable.
+
+For example, in dataset preparation there are several datasets we are pulling
+from. If bounding boxes are parsed incorrectly, you'll be training the model
+to find random parts of the background, not the animal. Before just telling
+an LLM to add this new dataset to the training mix and vibing it out on the
+pytorch metrics, I have it parse the results, and visualize several examples.
+I go through each to ensure the bounding box, label, and identity looks
+correct. You can see how I've done that in
+[scripts/02_inspect_detection_datasets.py](scripts/02_inspect_detection_datasets.py)
+and
+[scripts/04_prepare_keypoint_data.py](scripts/04_prepare_keypoint_data.py).
+
+This is one example, but I'm continually looking for ways to make sure I 1)
+understand this code and technology deeply and 2) trust it enough to share
+with friends and family.
