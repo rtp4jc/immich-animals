@@ -93,7 +93,7 @@ Add them under `environment:` in the `docker-compose.override.yml` from step 1, 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `UPSTREAM_ML_URL` | — | Your existing Immich ML container. Required: search and OCR are forwarded to it. |
-| `KEEP_HUMAN_FACES`* | `true` | `false` serves dogs only and stops detecting human faces. A refresh will delete all human face edits you have made |
+| `KEEP_HUMAN_FACES` | `true` | `false` serves dogs only and stops detecting human faces. A refresh will delete all human face edits you have made |
 | `DOG_MIN_SCORE` | `0.3` | How confident the detector must be. Lower finds more dogs and more cats. Just requires a refresh. |
 | `DOG_MAX_DISTANCE` | `0.35` | **SEE NOTE BELOW** How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
 | `IMMICH_MAX_DISTANCE` | `0.5` | The Max Distance in your Immich settings. Change only if you changed that. |
