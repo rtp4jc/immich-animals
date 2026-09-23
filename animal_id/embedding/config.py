@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from animal_id.data.sample import Source
+
 from .backbones import BackboneType
 from .losses import HeadType
 
@@ -61,7 +63,7 @@ class DataConfig:
     train_json_path: str = "data/identity_train.json"
     val_json_path: str = "data/identity_val.json"
     test_json_path: str = "data/identity_test.json"
-    dogfacenet_path: str = "data/dogfacenet/DogFaceNet_224resized/after_4_bis"
+    sources: tuple[Source, ...] = (Source.DOGFACENET,)
     img_size: int = 224
     batch_size: int = 32
 

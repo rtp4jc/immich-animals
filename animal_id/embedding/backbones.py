@@ -12,18 +12,7 @@ from enum import Enum
 
 import torch.nn as nn
 
-
-class LicenseTier(Enum):
-    """Whether a backbone's *weights* can ship in Immich.
-
-    timm reports the weight license per tag (``timm.get_pretrained_cfg(tag).license``);
-    these mirror it. The architecture being Apache says nothing about the weights —
-    every ConvNeXt-V2 tag is CC-BY-NC even though timm itself is Apache.
-    """
-
-    PERMISSIVE = "permissive"  # Apache-2.0 / BSD — shippable.
-    NONCOMMERCIAL = "noncommercial"  # CC-BY-NC — reference ceiling only.
-    ENCUMBERED = "encumbered"  # Bespoke terms (DINOv3), needs a license decision.
+from animal_id.common.license import LicenseTier
 
 
 class BackboneType(Enum):

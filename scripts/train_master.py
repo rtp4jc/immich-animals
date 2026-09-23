@@ -40,6 +40,8 @@ from animal_id.common.identity_loader import IdentityLoader
 from animal_id.common.logging_config import setup_logging
 from animal_id.common.seed import set_seed, worker_init_fn
 from animal_id.common.utils import find_latest_run, find_latest_timestamped_run
+from animal_id.data import sources
+from animal_id.data.export import identity_splits
 from animal_id.detection.dataset_converter import (
     CocoDetectorDatasetConverter,
     create_default_config,
@@ -55,7 +57,6 @@ from animal_id.embedding.config import (
     HEAD_CONFIG,
     TRAINING_CONFIG,
 )
-from animal_id.embedding.dataset_converter import EmbeddingDatasetConverter
 from animal_id.embedding.export import export_embedding_onnx
 from animal_id.embedding.losses import HeadType
 from animal_id.embedding.models import AnimalEmbeddingModel
@@ -287,13 +288,15 @@ def run_embedding_data_prep():
     """Runs the data preparation step for the embedding model."""
     logger.info("STARTING EMBEDDING DATA PREPARATION")
 
-    dataset_converter = EmbeddingDatasetConverter(
-        source_path=DATA_CONFIG.dogfacenet_path,
-        output_train_json=DATA_CONFIG.train_json_path,
-        output_val_json=DATA_CONFIG.val_json_path,
-        output_test_json=DATA_CONFIG.test_json_path,
-    )
-    dataset_converter.convert()
+    samples = [s for name in DATA_CONFIG.sources for s in sources.load(name)]
+    splits = identity_splits(samples)
+    for split, path in (
+        ("train", DATA_CONFIG.train_json_path),
+        ("val", DATA_CONFIG.val_json_path),
+        ("test", DATA_CONFIG.test_json_path),
+    ):
+        (PROJECT_ROOT / path).write_text(json.dumps(splits[split], indent=2))
+        logger.info(f"Wrote {len(splits[split])} {split} samples to {path}")
 
 
 def save_run_config(run_dir, backbone, head, seed, training_config):
