@@ -13,7 +13,10 @@ from pathlib import Path
 class Source(StrEnum):
     """Every dataset with an adapter or a written manifest; the value names its manifest."""
 
+    COCO = "coco"
     DOGFACENET = "dogfacenet"
+    OXFORD_PETS = "oxford_pets"
+    STANFORD_DOGS = "stanford_dogs"
 
 
 @dataclass(frozen=True)
@@ -21,7 +24,7 @@ class Box:
     """One animal. If identity is None, the box has no ID. If xyxy is None,
     there may be and identity, but no bounding box."""
 
-    label: str
+    label: str  # Lowercase COCO-style class name: "dog", "cat".
     xyxy: tuple[float, float, float, float] | None = None
     identity: str | None = None
 
@@ -72,3 +75,12 @@ def read_manifest(path: Path) -> list[Sample]:
             )
             samples.append(Sample(**row, boxes=boxes))
     return samples
+
+
+def normalised_xyxy(
+    x1: float, y1: float, x2: float, y2: float, width: int, height: int
+) -> tuple[float, float, float, float] | None:
+    """Pixel corners clamped into the image and scaled to [0, 1]; None if nothing is left."""
+    x1, x2 = max(0, x1) / width, min(width, x2) / width
+    y1, y2 = max(0, y1) / height, min(height, y2) / height
+    return (x1, y1, x2, y2) if x1 < x2 and y1 < y2 else None

@@ -59,11 +59,10 @@ tests/               # unit/ and integration/
 
 Every dataset is parsed by an adapter in `animal_id/data/sources/` into `Sample`s
 (image path, source, licence, and boxes carrying a class and optional identity),
-cached as `data/manifests/<source>.jsonl`. Exports in `animal_id/data/export.py`
-turn them into what each trainer reads; the embedder trains on
-`DataConfig.sources`. Detection still uses `detection/dataset_converter.py`
-(raw data → COCO) and `yolo_converter.py` (COCO → YOLO) until it moves onto
-the same contract.
+cached as `data/manifests/<source>.jsonl`. Exports in `animal_id/data/exports/`
+write them in each trainer's format: `torch_identity.py` for the embedder
+(`DataConfig.sources`) and `yolo.py` for the detector (`DETECTION_*` in
+`train_master.py`, which picks the sources, classes and negative caps).
 
 ## Setup
 
@@ -130,7 +129,7 @@ Benchmarks log to Weights & Biases by default; pass `--no-wandb` to disable. In 
 
 | Script | Purpose |
 |---|---|
-| 02 | Inspect detection datasets |
+| 02 | Inspect COCO- and YOLO-format exports (keypoint and detection) |
 | 04, 05, 12 | Keypoint data prep, training, ONNX export |
 | `data.py` | `parse` sources into manifests; `inspect` prints a per-source summary and writes a contact sheet to `outputs/data_inspect/` |
 | 09 | Validate embeddings |
@@ -173,7 +172,7 @@ After adding a source, check it parsed correctly with
 | [DogFaceNet](https://github.com/GuillaumeMougeot/DogFaceNet#dataset) | `data/dogfacenet/DogFaceNet_224resized/`, `data/dogfacenet/DogFaceNet_alignment/` | Identity embedding |
 | [Stanford Dogs](http://vision.stanford.edu/aditya86/ImageNetDogs/) | `data/stanford_dogs/images/`, `data/stanford_dogs/annotation/` | Detection, keypoints |
 | [StanfordExtra](https://www.kaggle.com/datasets/ollieboyne/stanfordextra-dogs-dataset) | `data/stanford_dogs/stanford_extra_keypoints.json` | Keypoint labels |
-| [Oxford Pets](https://www.robots.ox.ac.uk/~vgg/data/pets/) | `data/oxford_pets/images/`, `data/oxford_pets/annotations/` | Additional detection data |
+| [Oxford Pets](https://www.robots.ox.ac.uk/~vgg/data/pets/) | `data/oxford_pets/images/`, `data/oxford_pets/annotations/` | Detection negatives (cats) |
 
 ## Notice of AI usage
 

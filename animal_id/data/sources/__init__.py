@@ -4,11 +4,16 @@ import logging
 
 from animal_id.common.constants import DATA_DIR, MANIFEST_DIR
 from animal_id.data.sample import Sample, Source, read_manifest, write_manifest
-from animal_id.data.sources import dogfacenet
+from animal_id.data.sources import coco, dogfacenet, oxford_pets, stanford_dogs
 
 logger = logging.getLogger(__name__)
 
-SOURCES = {Source.DOGFACENET: dogfacenet.load}
+SOURCES = {
+    Source.COCO: coco.load,
+    Source.DOGFACENET: dogfacenet.load,
+    Source.OXFORD_PETS: oxford_pets.load,
+    Source.STANFORD_DOGS: stanford_dogs.load,
+}
 
 
 def parse(name: Source) -> None:
