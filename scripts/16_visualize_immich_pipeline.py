@@ -5,6 +5,7 @@ Benchmark animal identification pipeline using the Immich API as a black box.
 
 import argparse
 import json
+import logging
 from pathlib import Path
 
 import numpy as np
@@ -16,7 +17,7 @@ from animal_id.benchmark.visualizer import BenchmarkVisualizer
 from animal_id.common.identity_loader import IdentityLoader
 from animal_id.common.logging_config import setup_logging
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 # Define project root
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

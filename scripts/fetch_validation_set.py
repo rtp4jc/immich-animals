@@ -36,8 +36,7 @@ import requests
 from animal_id.common.constants import DATA_DIR
 from animal_id.common.logging_config import setup_logging
 
-setup_logging()
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__, logging.INFO)
 
 OUT_DIR = DATA_DIR / "sidecar-validation"
 API = "https://commons.wikimedia.org/w/api.php"

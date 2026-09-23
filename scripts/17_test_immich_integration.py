@@ -5,6 +5,7 @@ Tests the custom dog identification pipeline running in the Immich ML container.
 
 import argparse
 import json
+import logging
 import sys
 from pathlib import Path
 
@@ -12,7 +13,7 @@ import requests
 
 from animal_id.common.logging_config import setup_logging
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 
 def main(args):

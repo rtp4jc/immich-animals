@@ -8,6 +8,7 @@ Provides dataset statistics and sample visualizations.
 
 import argparse
 import json
+import logging
 from collections import Counter
 from pathlib import Path
 
@@ -20,7 +21,7 @@ from animal_id.common.visualization import (
     visualize_yolo_annotations,
 )
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 # Add project root to Python path
 

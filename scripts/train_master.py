@@ -71,8 +71,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SEED = 42
 
 
-setup_logging()
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__, logging.INFO)
 
 
 def run_full_pipeline_benchmark(

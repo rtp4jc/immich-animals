@@ -35,8 +35,7 @@ from animal_id.identification import cluster, cluster_quality, embed_gallery
 from animal_id.pipeline.animal_pipeline import AnimalPipeline
 from animal_id.pipeline.onnx_models import ONNXDetector, ONNXEmbedding
 
-setup_logging()
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__, logging.INFO)
 
 _SPLIT_TO_JSON = {
     "val": "identity_val.json",
