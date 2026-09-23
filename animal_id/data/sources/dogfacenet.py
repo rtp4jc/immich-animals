@@ -6,8 +6,8 @@ from pathlib import Path
 from animal_id.data.sample import Box, Sample, Source
 
 ROOT = "dogfacenet/DogFaceNet_224resized/after_4_bis"
-# The images were scraped from the web and the dataset states no licence.
-LICENSE = "unknown"
+# As declared on the dataset's Zenodo record (12578449); the repo's MIT covers code.
+LICENSE = "CC BY 4.0"
 
 
 def load(data_dir: Path) -> Iterator[Sample]:

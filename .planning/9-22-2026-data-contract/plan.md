@@ -61,7 +61,7 @@ DogFaceNet alone).
 
 | Source | Stated licence | Tier |
 | --- | --- | --- |
-| DogFaceNet | none (images scraped from the web) | not permissive |
+| DogFaceNet | CC BY 4.0 (Zenodo record; images originally from the web) | permissive |
 | Stanford Dogs | ImageNet terms, non-commercial | not permissive |
 | COCO 2017 | per image: Flickr CC variants incl. NC; annotations CC BY 4.0 | filter per image |
 | Oxford-IIIT Pets | CC BY-SA 4.0 | policy decision |
