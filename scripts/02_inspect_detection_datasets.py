@@ -61,35 +61,6 @@ def analyze_data_distributions():
                 percentage = (count / total) * 100
                 print(f"  {source}: {count} ({percentage:.1f}%)")
 
-    # Analyze COCO detection datasets
-    coco_dir = DATA_DIR / "detector" / "coco"
-    if coco_dir.exists():
-        print("\nDETECTION DATASETS:")
-        for json_file in coco_dir.glob("annotations_*.json"):
-            split_name = json_file.stem.replace("annotations_", "")
-            with open(json_file) as f:
-                coco_data = json.load(f)
-
-            # Count images by source (extract from file path)
-            source_counts = Counter()
-            for img in coco_data["images"]:
-                path = img["file_name"]
-                if "coco" in path:
-                    source_counts["COCO"] += 1
-                elif "stanford_dogs" in path:
-                    source_counts["Stanford Dogs"] += 1
-                elif "oxford_pets" in path:
-                    source_counts["Oxford Pets"] += 1
-                else:
-                    source_counts["Other"] += 1
-
-            total = len(coco_data["images"])
-            print(f"\n  {split_name.upper()} SET:")
-            print(f"    Total images: {total}")
-            for source, count in source_counts.most_common():
-                percentage = (count / total) * 100
-                print(f"    {source}: {count} ({percentage:.1f}%)")
-
 
 def list_available_dataset_paths():
     """Find YOLO yaml configs and COCO annotation files under DATA_DIR."""

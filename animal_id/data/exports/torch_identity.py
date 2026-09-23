@@ -1,11 +1,13 @@
-"""Turns Samples into what each trainer reads.
+"""Identity splits as JSON rows for the PyTorch ``IdentityDataset`` (embedding training).
 
-splits = identity_splits(sources.load(Source.DOGFACENET))
+torch_identity.write(sources.load(Source.DOGFACENET), {"train": ..., "val": ..., "test": ...})
 """
 
+import json
 import logging
 import random
 from collections import defaultdict
+from pathlib import Path
 
 from animal_id.common.constants import DATA_DIR, PROJECT_ROOT
 from animal_id.data.sample import Sample
@@ -13,7 +15,7 @@ from animal_id.data.sample import Sample
 logger = logging.getLogger(__name__)
 
 
-def identity_splits(
+def splits(
     samples: list[Sample],
     min_images: int = 5,
     val_ratio: float = 0.15,
@@ -65,3 +67,10 @@ def identity_splits(
         else:
             splits["train"].extend(rows_by_label[label])
     return splits
+
+
+def write(samples: list[Sample], paths: dict[str, Path]) -> None:
+    """Writes each split's rows to ``paths[split]``."""
+    for split, rows in splits(samples).items():
+        paths[split].write_text(json.dumps(rows, indent=2))
+        logger.info(f"Wrote {len(rows)} {split} rows to {paths[split]}")

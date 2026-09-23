@@ -41,15 +41,9 @@ from animal_id.common.logging_config import setup_logging
 from animal_id.common.seed import set_seed, worker_init_fn
 from animal_id.common.utils import find_latest_run, find_latest_timestamped_run
 from animal_id.data import sources
-from animal_id.data.export import identity_splits
-from animal_id.detection.dataset_converter import (
-    CocoDetectorDatasetConverter,
-    create_default_config,
-)
+from animal_id.data.exports import torch_identity, yolo
+from animal_id.data.sample import Source
 from animal_id.detection.trainer import DetectionTrainer
-from animal_id.detection.yolo_converter import (
-    CocoToYoloDetectionConverter,
-)
 from animal_id.embedding.backbones import BackboneType
 from animal_id.embedding.config import (
     DATA_CONFIG,
@@ -216,37 +210,29 @@ def run_full_pipeline_benchmark(
     return True
 
 
-def run_detection_data_prep(
-    output_dir="data/detector/coco", yaml_path="data/detector/dogs_detection.yaml"
-):
+DETECTION_YAML = "data/detector/dogs_detection.yaml"
+DETECTION_SOURCES = (Source.COCO, Source.STANFORD_DOGS, Source.OXFORD_PETS)
+DETECTION_CLASSES = ("dog",)
+# Uncapped, COCO's ~119K dog-free images would outnumber the ~25K dog images 5:1.
+DETECTION_MAX_NEGATIVES = {Source.COCO: 17000}
+
+
+def run_detection_data_prep(yaml_path=DETECTION_YAML):
     """Runs the data preparation and conversion for the detection model."""
     logger.info("STARTING DETECTION DATA PREPARATION")
-
-    # Create COCO dataset
-    config = create_default_config()
-    config["output_dir"] = output_dir
-    converter = CocoDetectorDatasetConverter(config)
-    converter.convert()
-
-    # Convert to YOLO format
-    yolo_converter = CocoToYoloDetectionConverter(
-        coco_annotations_dir=output_dir,
-        labels_output_dir="data",
-        data_root="data",
-        yaml_output_path=yaml_path,
+    samples = [s for name in DETECTION_SOURCES for s in sources.load(name)]
+    yolo.write(
+        samples, DETECTION_CLASSES, DETECTION_MAX_NEGATIVES, PROJECT_ROOT / yaml_path
     )
-    yolo_converter.convert()
 
 
-def run_detection_pipeline(
-    output_dir="data/detector/coco", yaml_path="data/detector/dogs_detection.yaml"
-):
+def run_detection_pipeline(yaml_path=DETECTION_YAML):
     """Runs the full detection pipeline."""
     logger.info("STARTING DETECTION PIPELINE")
 
     # 1. Prepare Data
-    logger.info("Step 1: Preparing Detection Dataset (COCO -> YOLO)")
-    run_detection_data_prep(output_dir, yaml_path)
+    logger.info("Step 1: Preparing Detection Dataset")
+    run_detection_data_prep(yaml_path)
 
     # 2. Train Model
     logger.info("\nStep 2: Training YOLOv11 Detector")
@@ -289,14 +275,14 @@ def run_embedding_data_prep():
     logger.info("STARTING EMBEDDING DATA PREPARATION")
 
     samples = [s for name in DATA_CONFIG.sources for s in sources.load(name)]
-    splits = identity_splits(samples)
-    for split, path in (
-        ("train", DATA_CONFIG.train_json_path),
-        ("val", DATA_CONFIG.val_json_path),
-        ("test", DATA_CONFIG.test_json_path),
-    ):
-        (PROJECT_ROOT / path).write_text(json.dumps(splits[split], indent=2))
-        logger.info(f"Wrote {len(splits[split])} {split} samples to {path}")
+    torch_identity.write(
+        samples,
+        {
+            "train": PROJECT_ROOT / DATA_CONFIG.train_json_path,
+            "val": PROJECT_ROOT / DATA_CONFIG.val_json_path,
+            "test": PROJECT_ROOT / DATA_CONFIG.test_json_path,
+        },
+    )
 
 
 def save_run_config(run_dir, backbone, head, seed, training_config):
@@ -574,9 +560,7 @@ def build_parser():
     )
     sub = parser.add_subparsers(dest="command")
 
-    sub.add_parser(
-        "detection-data", help="Prepare the detection dataset (COCO -> YOLO)"
-    )
+    sub.add_parser("detection-data", help="Prepare the detection dataset (YOLO labels)")
     sub.add_parser("detection", help="Prepare, train and export the detector")
     sub.add_parser("embedding-data", help="Prepare the embedding dataset")
     embedding = sub.add_parser(

@@ -47,6 +47,10 @@ onto `fo.Sample` if we want the App later.
    Stanford Dogs, Oxford Pets; boxes for every animal class, with the class list
    chosen at export. YOLO export straight from normalised boxes; delete
    `CocoDetectorDatasetConverter` and the COCO→YOLO detection converter.
+   Follow-ups, each landed with a retrain and `evaluate_sidecar.py` numbers:
+   Oxford body boxes from the trimaps (bbox of pet + boundary pixels; its XML
+   boxes are heads) would add 4,978 dog positives and locate 2,371 cats; and
+   keeping every COCO image with a non-dog animal as a hard negative.
 3. **First permissive sources.** Open Images V7 (detection, multi-class),
    Commons identity categories and MPDD (identity, whole-body). Needs crop
    support in `IdentityDataset` matching the sidecar's 10% padding.

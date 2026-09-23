@@ -3,7 +3,6 @@ import json
 import pytest
 import yaml
 
-from animal_id.detection.yolo_converter import CocoToYoloDetectionConverter
 from animal_id.keypoint.yolo_converter import CocoToYoloKeypointConverter
 
 IMG_W, IMG_H = 640, 480
@@ -19,57 +18,6 @@ def _write_coco(ann_dir, file_names, annotations):
         (ann_dir / f"annotations_{split}.json").write_text(
             json.dumps({"images": images, "annotations": annotations})
         )
-
-
-@pytest.fixture
-def detection_converter(tmp_path):
-    ann_dir = tmp_path / "coco"
-    _write_coco(
-        ann_dir,
-        ["images/sub/a.jpg", "images/sub/b.jpg", "images/sub/c.jpg"],
-        [
-            {"id": 1, "image_id": 0, "bbox": [100, 100, 50, 60]},
-            # Overflows the image on every side; must be clamped to it.
-            {"id": 2, "image_id": 1, "bbox": [-20, -10, 700, 600]},
-        ],
-    )
-    (tmp_path / "detector").mkdir()
-    return CocoToYoloDetectionConverter(
-        coco_annotations_dir=str(ann_dir),
-        labels_output_dir=str(tmp_path),
-        data_root=str(tmp_path),
-        yaml_output_path=str(tmp_path / "detector" / "d.yaml"),
-    )
-
-
-def test_detection_normalizes_to_centre_format(detection_converter, tmp_path):
-    detection_converter.convert()
-    label = (tmp_path / "labels" / "sub" / "a.txt").read_text()
-    # centre x/y and w/h, normalized against 640x480
-    assert label == "0 0.195312 0.270833 0.078125 0.125000\n"
-
-
-def test_detection_clamps_bbox_to_image(detection_converter, tmp_path):
-    detection_converter.convert()
-    # The clamped box covers the whole image: centre (0.5, 0.5), full width/height.
-    assert (
-        tmp_path / "labels" / "sub" / "b.txt"
-    ).read_text() == "0 0.500000 0.500000 1.000000 1.000000\n"
-
-
-def test_detection_writes_empty_label_for_negatives(detection_converter, tmp_path):
-    """An image with no annotations still needs a label file: that is how YOLO
-    marks a negative sample."""
-    detection_converter.convert()
-    label = tmp_path / "labels" / "sub" / "c.txt"
-    assert label.exists() and label.read_text() == ""
-
-
-def test_detection_yaml_has_no_pose_keys(detection_converter, tmp_path):
-    detection_converter.convert()
-    config = yaml.safe_load((tmp_path / "detector" / "d.yaml").read_text())
-    assert config["nc"] == 1 and config["names"] == ["dog"]
-    assert "kpt_shape" not in config
 
 
 @pytest.fixture
