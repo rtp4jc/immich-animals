@@ -30,7 +30,7 @@ def splits(
                 continue
             if box.xyxy is not None:
                 raise ValueError(f"IdentityDataset cannot crop boxes yet: {sample}")
-            paths_by_identity[f"{sample.source}/{box.identity}"].append(sample.path)
+            paths_by_identity[(sample.source, box.identity)].append(sample.path)
 
     # Labels are assigned before the split, over every identity, so a label is
     # stable for a given input regardless of which split it lands in.
@@ -53,19 +53,25 @@ def splits(
         for label, identity in enumerate(kept)
     ]
 
-    total = sum(len(rows) for rows in rows_by_label)
-    order = list(range(len(rows_by_label)))
-    random.Random(seed).shuffle(order)
-
-    # Whole identities fill test, then val, then train (open-set protocol).
+    # Each source is split on its own, so adding a source never moves another
+    # source's identities between splits (and never changes its test set).
     splits = {"train": [], "val": [], "test": []}
-    for label in order:
-        if len(splits["test"]) < int(total * test_ratio):
-            splits["test"].extend(rows_by_label[label])
-        elif len(splits["val"]) < int(total * val_ratio):
-            splits["val"].extend(rows_by_label[label])
-        else:
-            splits["train"].extend(rows_by_label[label])
+    for source in sorted({source for source, _ in kept}):
+        order = [label for label, (s, _) in enumerate(kept) if s == source]
+        total = sum(len(rows_by_label[label]) for label in order)
+        random.Random(seed).shuffle(order)
+
+        # Whole identities fill test, then val, then train (open-set protocol).
+        part = {"train": [], "val": [], "test": []}
+        for label in order:
+            if len(part["test"]) < int(total * test_ratio):
+                part["test"].extend(rows_by_label[label])
+            elif len(part["val"]) < int(total * val_ratio):
+                part["val"].extend(rows_by_label[label])
+            else:
+                part["train"].extend(rows_by_label[label])
+        for split, rows in part.items():
+            splits[split].extend(rows)
     return splits
 
 

@@ -51,9 +51,15 @@ onto `fo.Sample` if we want the App later.
    Oxford body boxes from the trimaps (bbox of pet + boundary pixels; its XML
    boxes are heads) would add 4,978 dog positives and locate 2,371 cats; and
    keeping every COCO image with a non-dog animal as a hard negative.
-3. **First permissive sources.** Open Images V7 (detection, multi-class),
-   Commons identity categories and MPDD (identity, whole-body). Needs crop
-   support in `IdentityDataset` matching the sidecar's 10% padding.
+3. **First permissive sources.** MPDD (identity, whole-body) landed first.
+   Each source's identities are split on their own so adding a source never
+   moves another's, and `sidecar-validation` takes MPDD's test identities.
+   Detector crops for unlocated identity boxes are deferred to the first source
+   of uncropped photos: on both current identity sources the detector finds
+   exactly one dog in >= 98% of images and boxes nearly the whole frame (median
+   99% of MPDD's area, 91% of DogFaceNet's), so cropping would change nothing.
+   Next: Open Images V7 (detection, multi-class), Commons identity categories
+   (needs that crop step, matching the sidecar's 10% padding).
 4. **Harvested identity data.** YFCC100M CC-BY by owner + pet-name tag;
    dedupe (perceptual hash) across sources before any split.
 

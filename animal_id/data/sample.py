@@ -15,6 +15,7 @@ class Source(StrEnum):
 
     COCO = "coco"
     DOGFACENET = "dogfacenet"
+    MPDD = "mpdd"
     OXFORD_PETS = "oxford_pets"
     STANFORD_DOGS = "stanford_dogs"
 

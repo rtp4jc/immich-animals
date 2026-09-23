@@ -8,7 +8,7 @@ from animal_id.common.license import LicenseTier, license_tier
 from animal_id.data import sources, visualize
 from animal_id.data.exports import torch_identity, yolo
 from animal_id.data.sample import Box, Sample, read_manifest, write_manifest
-from animal_id.data.sources import coco, dogfacenet, oxford_pets, stanford_dogs
+from animal_id.data.sources import coco, dogfacenet, mpdd, oxford_pets, stanford_dogs
 
 
 def _identity_samples(source, num_identities=20, per_identity=6):
@@ -49,6 +49,15 @@ def test_dogfacenet_identity_is_the_folder(tmp_path):
     assert samples[0].boxes[0].xyxy is None
 
 
+def test_mpdd_identity_is_the_filename_prefix(tmp_path):
+    for split, name in (("train", "12_c1s1_0.jpg"), ("gallery", "3_c2s4_1.jpg")):
+        (tmp_path / mpdd.ROOT / split).mkdir(parents=True)
+        (tmp_path / mpdd.ROOT / split / name).touch()
+    samples = list(mpdd.load(tmp_path))
+    assert sorted(s.boxes[0].identity for s in samples) == ["12", "3"]
+    assert all(s.boxes[0].xyxy is None for s in samples)
+
+
 def test_identity_splits_are_disjoint_and_complete():
     splits = torch_identity.splits(_identity_samples("a"))
     ids = {k: {r["identity_label"] for r in rows} for k, rows in splits.items()}
@@ -67,6 +76,16 @@ def test_same_identity_name_in_two_sources_stays_distinct():
     splits = torch_identity.splits(_identity_samples("a") + _identity_samples("b"))
     labels = {r["identity_label"] for rows in splits.values() for r in rows}
     assert len(labels) == 40
+
+
+def test_adding_a_source_leaves_each_sources_split_unchanged():
+    by_source = {"a": _identity_samples("a"), "b": _identity_samples("b", 30)}
+    both = torch_identity.splits(by_source["a"] + by_source["b"])
+    for source, samples in by_source.items():
+        for split, rows in torch_identity.splits(samples).items():
+            assert {r["file_path"] for r in rows} == {
+                r["file_path"] for r in both[split] if f"/{source}/" in r["file_path"]
+            }
 
 
 def test_identity_splits_drop_identities_below_min_images():

@@ -12,9 +12,9 @@ photos with no dog (every false positive becomes a junk "person" in Immich).
 
 Sources: hand-picked Wikimedia Commons categories for named individual dogs
 (free licences, but noisy — see NON_PHOTO), Commons "Quality images" categories
-for negatives, and the Multi-pose Dog Dataset (CC BY 4.0, 30 MB) for a second
-opinion on identity. MPDD images are reID-style crops, not snapshots, so the
-manifest tags every file with its source and the evaluator scores them apart.
+for negatives, and the embedder's MPDD test identities (``data/mpdd``) for a
+second opinion on identity. MPDD images are reID-style crops, not snapshots, so
+the manifest tags every file with its source and the evaluator scores them apart.
 
     uv run python scripts/fetch_validation_set.py
     uv run python scripts/fetch_validation_set.py --limit 3   # smoke run
@@ -22,19 +22,22 @@ manifest tags every file with its source and the evaluator scores them apart.
 
 import argparse
 import hashlib
-import io
 import json
 import logging
 import re
+import shutil
 import time
-import zipfile
 from collections import defaultdict
 from pathlib import Path
 
 import requests
 
-from animal_id.common.constants import DATA_DIR
+from animal_id.common.constants import DATA_DIR, PROJECT_ROOT
 from animal_id.common.logging_config import setup_logging
+from animal_id.data import sources
+from animal_id.data.exports import torch_identity
+from animal_id.data.sample import Source
+from animal_id.data.sources import mpdd
 
 logger = setup_logging(__name__, logging.INFO)
 
@@ -133,11 +136,6 @@ NEGATIVE_CATEGORIES = [
     ("Category:Quality images of automobiles", 20, 0),
     ("Category:Quality images of food", 10, 0),
 ]
-
-MPDD_URL = "https://data.mendeley.com/public-files/datasets/v5j6m8dzhv/files/05d1d583-faf6-410d-89a5-a6b1134b6e5e/file_downloaded"
-MPDD_SHA256 = "6c800c1b4aa67629544dec7444dee85bc57781abde1ae1d077ea9ef1804284cd"
-MPDD_LICENCE = "CC BY 4.0"
-MPDD_CREDIT = "Multi-pose Dog Dataset, doi:10.17632/v5j6m8dzhv.1"
 
 # Commons categories are full of things that are not photographs of the dog:
 # statues, graves, stamps, paintings, merchandise, and — for the historic
@@ -354,46 +352,31 @@ def fetch_negatives(limit: int) -> list[dict]:
     return records
 
 
-def fetch_mpdd(cache: Path, limit: int | None) -> list[dict]:
-    """Extract the Multi-pose Dog Dataset, grouped by its identity prefix."""
-    archive = cache / "MPDD.zip"
-    if not archive.exists():
-        logger.info("Downloading MPDD (30 MB)...")
-        archive.parent.mkdir(parents=True, exist_ok=True)
-        r = requests.get(MPDD_URL, headers={"User-Agent": UA}, timeout=600)
-        r.raise_for_status()
-        archive.write_bytes(r.content)
-    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-    if digest != MPDD_SHA256:
-        logger.error(f"MPDD checksum mismatch ({digest}), skipping")
-        return []
-
-    with zipfile.ZipFile(io.BytesIO(archive.read_bytes())) as zf:
-        by_identity = defaultdict(list)
-        for name in zf.namelist():
-            if name.lower().endswith(".jpg"):
-                by_identity[Path(name).name.split("_")[0]].append(name)
-        usable = {k: v for k, v in sorted(by_identity.items()) if len(v) >= MIN_PHOTOS}
-        records = []
-        for identity, names in list(usable.items())[:limit]:
-            slug = f"mpdd-{int(identity):04d}"
-            for name in names:
-                dest = OUT_DIR / "identities" / slug / Path(name).name
-                if not dest.exists():
-                    dest.parent.mkdir(parents=True, exist_ok=True)
-                    dest.write_bytes(zf.read(name))
-                records.append(
-                    {
-                        "path": str(dest.relative_to(OUT_DIR)),
-                        "label": slug,
-                        "source": "mpdd",
-                        "source_url": "https://doi.org/10.17632/v5j6m8dzhv.1",
-                        "licence": MPDD_LICENCE,
-                        "credit": MPDD_CREDIT,
-                        "category": "MPDD",
-                    }
-                )
-    logger.info(f"mpdd: {len(usable)} identities, {len(records)} photos")
+def fetch_mpdd(limit: int | None) -> list[dict]:
+    """MPDD's embedder test identities, so the sidecar is scored on dogs it never trained on."""
+    by_identity = defaultdict(list)
+    for row in torch_identity.splits(sources.load(Source.MPDD))["test"]:
+        by_identity[row["identity_label"]].append(PROJECT_ROOT / row["file_path"])
+    records = []
+    for paths in list(by_identity.values())[:limit]:
+        slug = f"mpdd-{int(paths[0].name.split('_')[0]):04d}"
+        for path in paths:
+            dest = OUT_DIR / "identities" / slug / path.name
+            if not dest.exists():
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(path, dest)
+            records.append(
+                {
+                    "path": str(dest.relative_to(OUT_DIR)),
+                    "label": slug,
+                    "source": "mpdd",
+                    "source_url": "https://doi.org/10.17632/v5j6m8dzhv.1",
+                    "licence": mpdd.LICENSE,
+                    "credit": "Multi-pose Dog Dataset, doi:10.17632/v5j6m8dzhv.1",
+                    "category": "MPDD",
+                }
+            )
+    logger.info(f"mpdd: {len(by_identity)} test identities, {len(records)} photos")
     return records
 
 
@@ -423,7 +406,7 @@ def main(args: argparse.Namespace) -> None:
     OUT_DIR = Path(args.out)
     records = fetch_identities(args.limit, args.per_identity)
     if not args.no_mpdd:
-        records += fetch_mpdd(OUT_DIR / ".cache", args.limit or args.mpdd_identities)
+        records += fetch_mpdd(args.limit)
     records += fetch_negatives(args.limit or args.negatives)
 
     # Drop entries whose file vanished, so the manifest always matches disk.
@@ -444,6 +427,5 @@ if __name__ == "__main__":
     parser.add_argument("--out", default=str(OUT_DIR))
     parser.add_argument("--per-identity", type=int, default=30)
     parser.add_argument("--negatives", type=int, default=450)
-    parser.add_argument("--mpdd-identities", type=int, default=60)
     parser.add_argument("--no-mpdd", action="store_true")
     main(parser.parse_args())
