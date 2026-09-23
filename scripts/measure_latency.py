@@ -17,6 +17,7 @@ Writes ``outputs/ablation/latency.csv`` (one row per backbone), which
 import argparse
 import copy
 import csv
+import logging
 import time
 from pathlib import Path
 
@@ -33,7 +34,7 @@ from animal_id.embedding.config import TRAINING_CONFIG
 from animal_id.embedding.export import export_embedding_onnx
 from animal_id.embedding.models import AnimalEmbeddingModel
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "ablation"

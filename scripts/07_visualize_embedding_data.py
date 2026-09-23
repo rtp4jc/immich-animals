@@ -6,6 +6,7 @@ label integrity.
 """
 
 import json
+import logging
 import os
 from collections import Counter, defaultdict
 
@@ -15,7 +16,7 @@ from animal_id.common.logging_config import setup_logging
 from animal_id.common.visualization import visualize_identity_dataset
 from animal_id.embedding.config import DATA_CONFIG
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 # --- Configuration ---
 NUM_IDENTITIES_TO_SHOW = 4

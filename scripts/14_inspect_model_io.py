@@ -8,13 +8,14 @@ on correct information, not assumptions.
 """
 
 import argparse
+import logging
 from pathlib import Path
 
 import onnxruntime as ort
 
 from animal_id.common.logging_config import setup_logging
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 # Add project root to Python path
 

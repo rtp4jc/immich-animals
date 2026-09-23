@@ -6,6 +6,7 @@ This script loads the best-performing keypoint model from the Phase 1 training
 and exports it to the ONNX format for use in the inference pipeline.
 """
 
+import logging
 import os
 import sys
 from pathlib import Path
@@ -21,7 +22,7 @@ from animal_id.common.constants import (
 from animal_id.common.logging_config import setup_logging
 from animal_id.common.utils import find_latest_run
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 # Add project root to Python path
 

@@ -29,8 +29,7 @@ from animal_id.common.constants import DATA_DIR
 from animal_id.common.logging_config import setup_logging
 from animal_id.identification import cluster, cluster_quality
 
-setup_logging()
-logger = logging.getLogger(__name__)
+logger = setup_logging(__name__, logging.INFO)
 
 TASK = "facial-recognition"
 DEFAULT_DIR = DATA_DIR / "sidecar-validation"

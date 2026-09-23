@@ -6,6 +6,7 @@ python scripts/09_validate_embeddings.py                     # both
 """
 
 import argparse
+import logging
 import os
 
 import matplotlib.pyplot as plt
@@ -24,7 +25,7 @@ from animal_id.embedding.backbones import BackboneType
 from animal_id.embedding.config import DATA_CONFIG, DEFAULT_BACKBONE, TRAINING_CONFIG
 from animal_id.embedding.models import AnimalEmbeddingModel
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 # --- Configuration ---
 FAR_TARGETS = [1e-1, 1e-2, 1e-3, 1e-4]

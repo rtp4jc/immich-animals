@@ -13,6 +13,7 @@ Runs the full two-stage pipeline for dog detection and keypoint estimation.
 
 import argparse
 import glob
+import logging
 import os
 from pathlib import Path
 
@@ -22,7 +23,7 @@ from ultralytics import YOLO
 from animal_id.common.logging_config import setup_logging
 from animal_id.common.visualization import setup_output_dir
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 # Add project root to Python path
 

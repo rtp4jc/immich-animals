@@ -41,6 +41,7 @@ recorded — without training anything.
 import argparse
 import copy
 import datetime
+import logging
 import time
 import traceback
 from pathlib import Path
@@ -63,7 +64,7 @@ from animal_id.embedding.losses import HeadType
 from animal_id.embedding.models import AnimalEmbeddingModel
 from animal_id.embedding.trainer import EmbeddingTrainer
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "ablation"

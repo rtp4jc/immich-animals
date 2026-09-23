@@ -7,11 +7,12 @@ Uses extracted animal_id.keypoint.trainer module.
 """
 
 import argparse
+import logging
 
 from animal_id.common.logging_config import setup_logging
 from animal_id.keypoint.trainer import KeypointTrainer
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 # Add project root to Python path
 

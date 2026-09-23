@@ -21,6 +21,7 @@ import argparse
 import csv
 import datetime
 import json
+import logging
 import re
 from pathlib import Path
 
@@ -42,7 +43,7 @@ from animal_id.embedding.trainer import EmbeddingTrainer
 from animal_id.identification.clusterer import cluster
 from animal_id.identification.metrics import cluster_quality
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "ablation"

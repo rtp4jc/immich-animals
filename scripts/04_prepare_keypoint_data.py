@@ -8,6 +8,7 @@ Use script 02 to inspect the created datasets.
 """
 
 import argparse
+import logging
 
 from animal_id.common.logging_config import setup_logging
 from animal_id.keypoint.dataset_converter import (
@@ -18,7 +19,7 @@ from animal_id.keypoint.yolo_converter import (
     CocoToYoloKeypointConverter,
 )
 
-setup_logging()
+setup_logging(__name__, logging.INFO)
 
 # Add project root to Python path
 
