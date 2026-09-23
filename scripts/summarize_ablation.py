@@ -19,11 +19,8 @@ from pathlib import Path
 
 from ablation_results import load_rows
 
-from animal_id.embedding.backbones import (
-    BackboneType,
-    LicenseTier,
-    get_backbone_license,
-)
+from animal_id.common.license import LicenseTier
+from animal_id.embedding.backbones import BackboneType, get_backbone_license
 from animal_id.embedding.losses import HeadType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]

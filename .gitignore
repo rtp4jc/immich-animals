@@ -3,7 +3,7 @@ __pycache__
 .ruff_cache/
 .venv/
 venv/
-data
+/data
 models
 outputs
 runs

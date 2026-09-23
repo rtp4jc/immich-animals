@@ -44,6 +44,7 @@ dog-free photos with a min detection score of 30%.
 ```
 animal_id/
 ├── pipeline/        # AnimalPipeline orchestrator + ONNX wrappers
+├── data/            # Sample contract, source adapters, exports, contact sheets
 ├── detection/       # YOLO detector training (Ultralytics)
 ├── keypoint/        # YOLO-pose training on Stanford Dogs keypoints
 ├── embedding/       # PyTorch embedding model: backbones.py, models.py (ArcFace head), losses.py, trainer.py
@@ -56,7 +57,13 @@ tests/               # unit/ and integration/
 .planning/           # Dated design docs: production audit (2026-04) and backbone ablation plan (2026-06)
 ```
 
-Each training subpackage follows the same pattern: `dataset_converter.py` (raw data → COCO), `yolo_converter.py` (COCO → YOLO) where relevant, and `trainer.py`.
+Every dataset is parsed by an adapter in `animal_id/data/sources/` into `Sample`s
+(image path, source, licence, and boxes carrying a class and optional identity),
+cached as `data/manifests/<source>.jsonl`. Exports in `animal_id/data/export.py`
+turn them into what each trainer reads; the embedder trains on
+`DataConfig.sources`. Detection still uses `detection/dataset_converter.py`
+(raw data → COCO) and `yolo_converter.py` (COCO → YOLO) until it moves onto
+the same contract.
 
 ## Setup
 
@@ -125,7 +132,8 @@ Benchmarks log to Weights & Biases by default; pass `--no-wandb` to disable. In 
 |---|---|
 | 02 | Inspect detection datasets |
 | 04, 05, 12 | Keypoint data prep, training, ONNX export |
-| 07, 09 | Visualise and validate embeddings |
+| `data.py` | `parse` sources into manifests; `inspect` prints a per-source summary and writes a contact sheet to `outputs/data_inspect/` |
+| 09 | Validate embeddings |
 | 14, 15 | Model I/O inspection, two-stage inference |
 | 16, 17 | Immich container integration (needs a local Immich fork at `immich-clone/`, not included) |
 | 18, 19 | Identification clustering and FiftyOne explorer |
@@ -156,6 +164,8 @@ Unit tests cover data loading, models, and converters. Integration tests run sho
 ## Data
 
 Download and extract under `data/` (gitignored). Scripts guide preparation after download.
+After adding a source, check it parsed correctly with
+`uv run python scripts/data.py inspect <source>`.
 
 | Dataset | Location | Used for |
 |---|---|---|

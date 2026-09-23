@@ -29,3 +29,6 @@ ONNX_DIR = MODELS_DIR / "onnx"
 ONNX_DETECTOR_PATH = ONNX_DIR / "detector.onnx"
 ONNX_KEYPOINT_PATH = ONNX_DIR / "keypoint.onnx"
 ONNX_EMBEDDING_PATH = ONNX_DIR / "embedding.onnx"
+
+# --- Data ---
+MANIFEST_DIR = DATA_DIR / "manifests"

@@ -15,7 +15,7 @@ from summarize_ablation import (  # noqa: E402
     select_winner,
 )
 
-from animal_id.embedding.backbones import LicenseTier  # noqa: E402
+from animal_id.common.license import LicenseTier  # noqa: E402
 
 
 def make(backbone, mrr, latency, tier=LicenseTier.PERMISSIVE, onnx=True, std=0.0):
