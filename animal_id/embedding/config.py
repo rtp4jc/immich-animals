@@ -63,7 +63,7 @@ class DataConfig:
     train_json_path: str = "data/identity_train.json"
     val_json_path: str = "data/identity_val.json"
     test_json_path: str = "data/identity_test.json"
-    sources: tuple[Source, ...] = (Source.DOGFACENET,)
+    sources: tuple[Source, ...] = (Source.DOGFACENET, Source.MPDD)
     img_size: int = 224
     batch_size: int = 32
 
