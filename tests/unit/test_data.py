@@ -8,7 +8,14 @@ from animal_id.common.license import LicenseTier, license_tier
 from animal_id.data import sources, visualize
 from animal_id.data.exports import torch_identity, yolo
 from animal_id.data.sample import Box, Sample, read_manifest, write_manifest
-from animal_id.data.sources import coco, dogfacenet, mpdd, oxford_pets, stanford_dogs
+from animal_id.data.sources import (
+    coco,
+    dogfacenet,
+    dogreid,
+    mpdd,
+    oxford_pets,
+    stanford_dogs,
+)
 
 
 def _identity_samples(source, num_identities=20, per_identity=6):
@@ -56,6 +63,42 @@ def test_mpdd_identity_is_the_filename_prefix(tmp_path):
     samples = list(mpdd.load(tmp_path))
     assert sorted(s.boxes[0].identity for s in samples) == ["12", "3"]
     assert all(s.boxes[0].xyxy is None for s in samples)
+
+
+def test_dogreid_loads_only_open_set_train_frames(tmp_path):
+    root = tmp_path / dogreid.ROOT
+    (root / "images/rex").mkdir(parents=True)
+    (root / "splits.tab").write_text(
+        "DOG_ID,VIDEO_ID,GROUP,SPLIT_CLOSED_SET,SPLIT_OPEN_SET\n"
+        "rex,v1,0,train,train\nrex,v2,0,gallery,query\nfido,v3,1,query,gallery\n"
+    )
+    (root / "bounding_boxes.tab").write_text(
+        "DOG_ID,VIDEO_ID,x_top_left,y_top_left,width,height\n"
+        "rex,v1,50,20,100,60\nrex,v2,0,0,10,10\nfido,v3,0,0,10,10\n"
+    )
+    Image.new("RGB", (200, 100)).save(root / "images/rex/rex-v1.jpg")
+    (sample,) = dogreid.load(tmp_path)
+    assert sample.path == "dogreid/images/rex/rex-v1.jpg"
+    assert sample.boxes == (Box("dog", (0.25, 0.2, 0.75, 0.8), "rex"),)
+
+
+def test_boxed_identities_are_exported_as_padded_crops(tmp_path, monkeypatch):
+    monkeypatch.setattr(torch_identity, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(torch_identity, "DATA_DIR", tmp_path / "data")
+    (tmp_path / "data/src").mkdir(parents=True)
+    samples = []
+    for i in range(20):
+        Image.new("RGB", (200, 100)).save(tmp_path / f"data/src/{i}.jpg")
+        box = Box("dog", (0.25, 0.2, 0.75, 0.8), identity=str(i // 5))
+        samples.append(Sample(f"src/{i}.jpg", "src", "CC0", (box,)))
+    paths = {s: tmp_path / f"{s}.json" for s in ("train", "val", "test")}
+    torch_identity.write(samples, paths)
+    rows = [r for p in paths.values() for r in json.loads(p.read_text())]
+    assert len(rows) == 20
+    for row in rows:
+        assert row["file_path"].startswith(f"data/{torch_identity.CROP_DIR}/")
+        # 100px-wide box padded by 10% of its width on every side.
+        assert Image.open(tmp_path / row["file_path"]).size == (120, 80)
 
 
 def test_identity_splits_are_disjoint_and_complete():

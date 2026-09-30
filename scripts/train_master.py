@@ -211,7 +211,12 @@ def run_full_pipeline_benchmark(
 
 
 DETECTION_YAML = "data/detector/dogs_detection.yaml"
-DETECTION_SOURCES = (Source.COCO, Source.STANFORD_DOGS, Source.OXFORD_PETS)
+DETECTION_SOURCES = (
+    Source.COCO,
+    Source.DOGREID,
+    Source.STANFORD_DOGS,
+    Source.OXFORD_PETS,
+)
 DETECTION_CLASSES = ("dog",)
 # Uncapped, COCO's ~119K dog-free images would outnumber the ~25K dog images 5:1.
 DETECTION_MAX_NEGATIVES = {Source.COCO: 17000}

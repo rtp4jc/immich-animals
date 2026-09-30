@@ -58,8 +58,12 @@ onto `fo.Sample` if we want the App later.
    of uncropped photos: on both current identity sources the detector finds
    exactly one dog in >= 98% of images and boxes nearly the whole frame (median
    99% of MPDD's area, 91% of DogFaceNet's), so cropping would change nothing.
-   Next: Open Images V7 (detection, multi-class), Commons identity categories
-   (needs that crop step, matching the sidecar's 10% padding).
+   DogReID-1553 (CC0, owner phone videos, one boxed dog per frame) landed
+   second and brought that crop step: boxed identities are cropped to files at
+   export with the sidecar's 10% padding, so every row stays one animal's
+   image. Only its open-set train frames are loaded; the query/gallery split
+   is the held-out benchmark. Next: Open Images V7 (detection, multi-class),
+   Commons identity categories.
 4. **Harvested identity data.** YFCC100M CC-BY by owner + pet-name tag;
    dedupe (perceptual hash) across sources before any split.
 
@@ -76,3 +80,4 @@ DogFaceNet alone).
 | COCO 2017 | per image: Flickr CC variants incl. NC; annotations CC BY 4.0 | filter per image |
 | Oxford-IIIT Pets | CC BY-SA 4.0 | policy decision |
 | MPDD | CC BY 4.0 | permissive |
+| DogReID-1553 | CC0 1.0 (Harvard Dataverse) | permissive |
