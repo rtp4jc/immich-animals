@@ -259,6 +259,7 @@ def _yolo_labels(tmp_path, samples, **kwargs):
         samples,
         ("dog", "cat"),
         kwargs.pop("max_negatives", {}),
+        kwargs.pop("repeats", {}),
         tmp_path / "det/d.yaml",
         **kwargs,
     )
@@ -308,3 +309,20 @@ def test_yolo_caps_negatives_per_source(tmp_path, monkeypatch):
     labels = _yolo_labels(tmp_path, samples, max_negatives={"a": 2})
     assert sum(p.startswith("a/") for p in labels) == 2
     assert sum(p.startswith("b/") for p in labels) == 5
+
+
+def test_yolo_repeats_a_source_in_train_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(yolo, "DATA_DIR", tmp_path)
+    box = (Box("dog", (0.1, 0.1, 0.9, 0.9)),)
+    samples = [
+        Sample(f"{src}/images/{i}.jpg", src, "CC0", box)
+        for src in ("a", "b")
+        for i in range(40)
+    ]
+    _yolo_labels(tmp_path, samples, repeats={"a": 3})
+    train = (tmp_path / "det/train.txt").read_text().split()
+    val = (tmp_path / "det/val.txt").read_text().split()
+    in_train = {s: {p for p in train if f"/{s}/" in p} for s in ("a", "b")}
+    assert sum("/a/" in p for p in train) == 3 * len(in_train["a"])
+    assert sum("/b/" in p for p in train) == len(in_train["b"])
+    assert len(val) == len(set(val))

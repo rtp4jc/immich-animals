@@ -220,6 +220,19 @@ DETECTION_SOURCES = (
 DETECTION_CLASSES = ("dog",)
 # Uncapped, COCO's ~119K dog-free images would outnumber the ~25K dog images 5:1.
 DETECTION_MAX_NEGATIVES = {Source.COCO: 17000}
+# DogReID's ~3.3K owner photos are the target domain but <8% of the mix; 3x
+# measured 0.940 owner-photo recall where the base mix had 0.826.
+DETECTION_REPEATS = {Source.DOGREID: 3}
+# Fine-tuning a trained detector: "auto" would replace lr0 with its own schedule.
+DETECTION_FINETUNE = {
+    "epochs": 30,
+    "optimizer": "SGD",
+    "lr0": 0.002,
+    "lrf": 0.1,
+    "warmup_epochs": 1,
+    "close_mosaic": 5,
+    "patience": 30,
+}
 
 
 def run_detection_data_prep(yaml_path=DETECTION_YAML):
@@ -227,12 +240,16 @@ def run_detection_data_prep(yaml_path=DETECTION_YAML):
     logger.info("STARTING DETECTION DATA PREPARATION")
     samples = [s for name in DETECTION_SOURCES for s in sources.load(name)]
     yolo.write(
-        samples, DETECTION_CLASSES, DETECTION_MAX_NEGATIVES, PROJECT_ROOT / yaml_path
+        samples,
+        DETECTION_CLASSES,
+        DETECTION_MAX_NEGATIVES,
+        DETECTION_REPEATS,
+        PROJECT_ROOT / yaml_path,
     )
 
 
-def run_detection_pipeline(yaml_path=DETECTION_YAML):
-    """Runs the full detection pipeline."""
+def run_detection_pipeline(yaml_path=DETECTION_YAML, finetune: Path | None = None):
+    """Runs the full detection pipeline, from COCO weights or fine-tuning ``finetune``."""
     logger.info("STARTING DETECTION PIPELINE")
 
     # 1. Prepare Data
@@ -241,13 +258,10 @@ def run_detection_pipeline(yaml_path=DETECTION_YAML):
 
     # 2. Train Model
     logger.info("\nStep 2: Training YOLOv11 Detector")
-    model_name = "yolo11n.pt"
-    epochs = 100
-    batch_size = 16
-    imgsz = 640
-
-    trainer = DetectionTrainer(model_name)
-    trainer.update_config(data=yaml_path, epochs=epochs, batch=batch_size, imgsz=imgsz)
+    trainer = DetectionTrainer(str(finetune) if finetune else "yolo11n.pt")
+    trainer.update_config(data=yaml_path, epochs=100, batch=16, imgsz=640)
+    if finetune:
+        trainer.update_config(**DETECTION_FINETUNE)
     results = trainer.train()
     logger.info(f"Detection training complete. Results saved to: {results.save_dir}")
 
@@ -566,7 +580,14 @@ def build_parser():
     sub = parser.add_subparsers(dest="command")
 
     sub.add_parser("detection-data", help="Prepare the detection dataset (YOLO labels)")
-    sub.add_parser("detection", help="Prepare, train and export the detector")
+    detection = sub.add_parser(
+        "detection", help="Prepare, train and export the detector"
+    )
+    detection.add_argument(
+        "--finetune",
+        type=Path,
+        help="Fine-tune these detector weights instead of training from COCO.",
+    )
     sub.add_parser("embedding-data", help="Prepare the embedding dataset")
     embedding = sub.add_parser(
         "embedding", help="Prepare, train and export the embedding model"
@@ -654,7 +675,7 @@ def embedding_overrides(args):
 
 COMMANDS = {
     "detection-data": lambda args: run_detection_data_prep(),
-    "detection": lambda args: run_detection_pipeline(),
+    "detection": lambda args: run_detection_pipeline(finetune=args.finetune),
     "embedding-data": lambda args: run_embedding_data_prep(),
     "embedding": lambda args: run_embedding_pipeline(**embedding_overrides(args)),
     "export-detector": lambda args: run_detector_export_latest(),
