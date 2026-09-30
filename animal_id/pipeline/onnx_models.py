@@ -35,23 +35,42 @@ class _ONNXModel:
 class ONNXDetector(_ONNXModel, DetectionModel):
     """ONNX detection model wrapper."""
 
+    def _preprocess(
+        self, image: np.ndarray
+    ) -> tuple[np.ndarray, tuple[float, int, int]]:
+        """Letterbox, returning the scale and left/top padding that map boxes back.
+
+        YOLO trains on aspect-preserved images padded to square; stretched phone
+        photos cost the detector ~7pp recall on owner photos.
+        """
+        height, width = image.shape[:2]
+        scale = min(self.input_size[0] / height, self.input_size[1] / width)
+        h, w = round(height * scale), round(width * scale)
+        top, left = (self.input_size[0] - h) // 2, (self.input_size[1] - w) // 2
+        canvas = np.full((*self.input_size, 3), 114, np.uint8)  # Ultralytics' pad
+        canvas[top : top + h, left : left + w] = cv2.resize(
+            image, (w, h), interpolation=self.interpolation
+        )
+        chw = np.transpose(canvas.astype(np.float32) / 255.0, (2, 0, 1))
+        return chw[None], (scale, left, top)
+
     def predict(self, image: np.ndarray) -> list[dict[str, Any]]:
         """Detect animals in image."""
-        detector_input, (h, w) = self._preprocess(image)
+        h, w = image.shape[:2]
+        detector_input, (scale, left, top) = self._preprocess(image)
 
         results = []
         for x1, y1, x2, y2, conf, _ in self._run(detector_input):
             if conf < DETECTION_CONF_THRESHOLD:
                 continue
 
-            # Scale to original image size.
             results.append(
                 {
                     "bbox": [
-                        int(x1 * w / self.input_size[1]),
-                        int(y1 * h / self.input_size[0]),
-                        int(x2 * w / self.input_size[1]),
-                        int(y2 * h / self.input_size[0]),
+                        int(np.clip((x1 - left) / scale, 0, w)),
+                        int(np.clip((y1 - top) / scale, 0, h)),
+                        int(np.clip((x2 - left) / scale, 0, w)),
+                        int(np.clip((y2 - top) / scale, 0, h)),
                     ],
                     "confidence": float(conf),
                     "class": AnimalClass.DOG,

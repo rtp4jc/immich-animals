@@ -16,59 +16,56 @@ def sample_image():
 
 @patch("animal_id.pipeline.onnx_models.ort.InferenceSession")
 class TestONNXDetector:
-    def test_preprocess(self, mock_session_class, sample_image):
-        """Test that preprocessing resizes, normalizes, and transposes the image correctly."""
+    def test_preprocess_letterboxes_without_stretching(
+        self, mock_session_class, sample_image
+    ):
+        """A 1200x800 photo fills the width and is padded top and bottom, not squashed."""
         mock_input = MagicMock()
         mock_input.shape = [1, 3, 640, 640]
         mock_session_class.return_value.get_inputs.return_value = [mock_input]
 
         detector = ONNXDetector("dummy_path.onnx")
-        processed_image, original_shape = detector._preprocess(sample_image)
+        processed_image, (scale, left, top) = detector._preprocess(sample_image)
 
-        assert original_shape == (800, 1200)
-        assert processed_image.shape == (1, 3, 640, 640)  # Batch, C, H, W
+        assert processed_image.shape == (1, 3, 640, 640)
         assert processed_image.dtype == np.float32
-        assert np.max(processed_image) <= 1.0
-        assert np.min(processed_image) >= 0.0
+        assert 0.0 <= processed_image.min() and processed_image.max() <= 1.0
+        assert scale == pytest.approx(640 / 1200)
+        assert (left, top) == (0, (640 - 427) // 2)
+        assert np.allclose(processed_image[0, :, :top], 114 / 255)
+        assert np.allclose(processed_image[0, :, top + 427 :], 114 / 255)
 
-    def test_predict_parsing(self, mock_session_class, sample_image):
-        """Test that the raw ONNX output is parsed and scaled correctly."""
+    def test_predict_maps_boxes_back_to_source_pixels(
+        self, mock_session_class, sample_image
+    ):
         mock_input = MagicMock()
         mock_input.shape = [1, 3, 640, 640]
         mock_session = mock_session_class.return_value
         mock_session.get_inputs.return_value = [mock_input]
-
-        # Mock the ONNX session to return a predefined detection
-        # The real output is a list containing the tensor.
-        # The tensor shape is (num_detections, 6) where 6 = x1, y1, x2, y2, conf, class_id
-        mock_output = np.array(
+        # Rows are x1, y1, x2, y2, conf, class_id in letterboxed input pixels.
+        mock_session.run.return_value = [
             [
-                [100, 150, 200, 250, 0.9, 0],
-                [300, 350, 400, 450, 0.05, 0],  # Should be filtered out
+                np.array(
+                    [
+                        [100, 200, 200, 300, 0.9, 0],
+                        [300, 350, 400, 450, 0.05, 0],  # below the floor
+                    ]
+                )
             ]
-        )
-        # The source code uses result[0][0], so we nest the array
-        mock_session.run.return_value = [[mock_output]]
+        ]
 
-        detector = ONNXDetector("dummy_path.onnx")
-        results = detector.predict(sample_image)
+        results = ONNXDetector("dummy_path.onnx").predict(sample_image)
 
-        # Original image is 800 (H) x 1200 (W)
-        # Input size is 640 (H) x 640 (W)
-        # Scale W: 1200 / 640 = 1.875
-        # Scale H: 800 / 640 = 1.25
-
-        assert len(results) == 1  # Low confidence detection filtered out
-        det = results[0]
-
-        expected_x1 = int(100 * 1200 / 640)  # 187
-        expected_y1 = int(150 * 800 / 640)  # 187
-        expected_x2 = int(200 * 1200 / 640)  # 375
-        expected_y2 = int(250 * 800 / 640)  # 312
-
-        assert det["class"] == AnimalClass.DOG
-        assert det["confidence"] == pytest.approx(0.9)
-        assert det["bbox"] == [expected_x1, expected_y1, expected_x2, expected_y2]
+        scale, top = 640 / 1200, (640 - 427) // 2
+        assert len(results) == 1
+        assert results[0]["class"] == AnimalClass.DOG
+        assert results[0]["confidence"] == pytest.approx(0.9)
+        assert results[0]["bbox"] == [
+            int(100 / scale),
+            int((200 - top) / scale),
+            int(200 / scale),
+            int((300 - top) / scale),
+        ]
 
 
 @patch("animal_id.pipeline.onnx_models.ort.InferenceSession")

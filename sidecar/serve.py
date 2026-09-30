@@ -98,19 +98,43 @@ def _blob(image: np.ndarray, size: tuple[int, int], interpolation: int) -> np.nd
     return np.transpose(resized.astype(np.float32) / 255.0, (2, 0, 1))[None]
 
 
+def _letterbox(
+    image: np.ndarray, size: tuple[int, int]
+) -> tuple[np.ndarray, float, int, int]:
+    """The blob plus the scale and left/top padding that map boxes back to source pixels.
+
+    YOLO trains on aspect-preserved images padded to square; stretched phone
+    photos cost the detector ~7pp recall on owner photos.
+    """
+    height, width = image.shape[:2]
+    scale = min(size[0] / height, size[1] / width)
+    h, w = round(height * scale), round(width * scale)
+    top, left = (size[0] - h) // 2, (size[1] - w) // 2
+    canvas = np.full((*size, 3), 114, np.uint8)  # Ultralytics' pad colour
+    canvas[top : top + h, left : left + w] = cv2.resize(
+        image, (w, h), interpolation=cv2.INTER_LINEAR
+    )
+    return (
+        np.transpose(canvas.astype(np.float32) / 255.0, (2, 0, 1))[None],
+        scale,
+        left,
+        top,
+    )
+
+
 def _detect(rgb: np.ndarray) -> list[tuple[float, list[int]]]:
     """Detections above DOG_MIN_SCORE, as (score, bbox) in source pixels."""
     height, width = rgb.shape[:2]
-    scale_x, scale_y = width / _det_size[1], height / _det_size[0]
-    raw = detector.run(None, {_det_input: _blob(rgb, _det_size, cv2.INTER_LINEAR)})
+    blob, scale, left, top = _letterbox(rgb, _det_size)
+    raw = detector.run(None, {_det_input: blob})
     return [
         (
             float(score),
             [
-                int(x1 * scale_x),
-                int(y1 * scale_y),
-                int(x2 * scale_x),
-                int(y2 * scale_y),
+                int(np.clip((x1 - left) / scale, 0, width)),
+                int(np.clip((y1 - top) / scale, 0, height)),
+                int(np.clip((x2 - left) / scale, 0, width)),
+                int(np.clip((y2 - top) / scale, 0, height)),
             ],
         )
         for x1, y1, x2, y2, score, _ in raw[0][0]

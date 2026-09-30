@@ -6,7 +6,6 @@ from PIL import Image
 from torchvision import transforms
 
 from animal_id.pipeline.onnx_models import (
-    ONNXDetector,
     ONNXEmbedding,
     ONNXKeypoint,
     _ONNXModel,
@@ -62,7 +61,6 @@ def test_serving_preprocessing_matches_training(tmp_path):
 
 
 def test_yolo_stages_stay_unnormalised():
-    """Detector and keypoint are YOLO: they expect [0, 1], not ImageNet stats."""
-    assert ONNXDetector._preprocess is _ONNXModel._preprocess
+    """Keypoint is YOLO: it expects [0, 1], not ImageNet stats."""
     assert ONNXKeypoint._preprocess is _ONNXModel._preprocess
     assert ONNXEmbedding._preprocess is not _ONNXModel._preprocess

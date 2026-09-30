@@ -11,7 +11,7 @@
 ARG MODEL_SOURCE=remote
 
 FROM alpine:3.21 AS models-remote
-ARG MODEL_TAG=sidecar-v0.1.0
+ARG MODEL_TAG=sidecar-v0.1.1
 ARG MODEL_URL=https://github.com/rtp4jc/immich-animals/releases/download
 WORKDIR /models
 COPY sidecar/SHA256SUMS .
