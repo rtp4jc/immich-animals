@@ -255,14 +255,7 @@ def test_oxford_pets_labels_species_without_location(tmp_path):
 def _yolo_labels(tmp_path, samples, **kwargs):
     for s in samples:
         (tmp_path / s.path).parent.mkdir(parents=True, exist_ok=True)
-    yolo.write(
-        samples,
-        ("dog", "cat"),
-        kwargs.pop("max_negatives", {}),
-        kwargs.pop("repeats", {}),
-        tmp_path / "det/d.yaml",
-        **kwargs,
-    )
+    yolo.write(samples, ("dog", "cat"), tmp_path / "det/d.yaml", **kwargs)
     listed = (tmp_path / "det/train.txt").read_text().split() + (
         tmp_path / "det/val.txt"
     ).read_text().split()

@@ -242,9 +242,9 @@ def run_detection_data_prep(yaml_path=DETECTION_YAML):
     yolo.write(
         samples,
         DETECTION_CLASSES,
-        DETECTION_MAX_NEGATIVES,
-        DETECTION_REPEATS,
         PROJECT_ROOT / yaml_path,
+        max_negatives=DETECTION_MAX_NEGATIVES,
+        repeats=DETECTION_REPEATS,
     )
 
 
