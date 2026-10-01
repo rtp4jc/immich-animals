@@ -20,9 +20,7 @@ Release 0.2.0. The better value in each row is bold.
 
 **Test set**: [DogReID-1553](https://doi.org/10.7910/DVN/LVTRLG) open-set test,
 777 dogs filmed by their owners on phones. Each query is matched against a
-gallery from a different scene, cropped to the ground-truth box plus 10%. The
-earlier DogFaceNet-based backbone ablation is in
-[`embedding_benchmarks.csv`](embedding_benchmarks.csv).
+gallery from a different scene, cropped to the ground-truth box plus 10%.
 
 ### Detection
 | Detector (conf >= 0.3) | DogReID recall | Commons + MPDD recall | Dog-free photos with a detection |
