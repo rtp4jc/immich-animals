@@ -64,11 +64,12 @@ When completed, name and modify a dog the way you would a person!
 
 ## What works, what does not
 
-Dogs you photograph a lot cluster well. In testing, a dog with 673 photos put
-491 of them in one person; a dog with 11 photos scattered across five "people".
+Dogs you photograph a lot cluster well. In a simulation of 300 households on
+dogs the models never saw, 47 of every 100 dogs ended up as one correct person,
+27 were never grouped, and 10 were merged with another dog from the same home.
 
 - **Dogs with plenty of photos** get one large cluster plus a few strays to merge
-- **Dogs with under ~15 photos** may not group at all
+- **Dogs with only a handful of photos** may not group at all
 - **Similar-looking dogs** get mixed together — two black curly-coated dogs are
   genuinely hard
 - **Cats** are detected as people about one photo in nine, and wolves and foxes
@@ -106,7 +107,7 @@ Add them under `environment:` in the `docker-compose.override.yml` from step 1, 
 **NOTE**: `DOG_MAX_DISTANCE` is tricky to change. You can't just do a refresh after changing 
 it because previously detected faces do not get a new embedding on refresh. If you need to change it, I would suggest 
 disabling the sidecar temporarily, refreshing the face detection again (**Face Detection → Refresh**),
-then adding the sidecard again with the new configuration and refreshing. This will result in 
+then adding the sidecar again with the new configuration and refreshing. This will result in 
 only the named dogs being lost and the human faces remaining unchanged.
 
 ### From Immich UI
@@ -125,8 +126,7 @@ forwarded to Immich's own ML container.
 looks at photos that have never been scanned. Run it as **Refresh**.
 
 **Too many near-duplicate people** — merge them, or raise `DOG_MAX_DISTANCE` to
-`0.45` and run Facial Recognition → Reset, which re-clusters everything and drops
-names.
+`0.45` following the note under [Settings](#settings).
 
 ---
 
@@ -173,8 +173,8 @@ including that `embedding` is a JSON *string* — Immich casts it to a pgvector.
 uv run --project sidecar python sidecar/smoke_test.py dog.jpg --url http://localhost:3003
 ```
 
-For tuning, `scripts/fetch_validation_set.py` builds a held-out set (121
-individual dogs, 1524 photos, 450 dog-free negatives) and
+For tuning, `scripts/fetch_validation_set.py` builds a held-out set (88
+individual dogs, 1,196 photos, 450 dog-free negatives) and
 `scripts/evaluate_sidecar.py` sweeps detection recall against the false-positive
 rate and clusters the embeddings the way Immich does.
 

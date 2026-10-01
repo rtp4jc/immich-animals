@@ -10,7 +10,7 @@ training the models.
 
 ## Model card
 
-Release 0.2.0. The better value in each row is bold.
+Release 0.2.0. The better value in each column is bold.
 
 ### Embedding
 | Embedder | DogReID top-1 | Top-5 | MRR | TAR@FAR=1% | Params | CPU, 4 threads |
@@ -58,7 +58,7 @@ animal_id/
 └── common/          # constants.py (single source of truth for paths), datasets, seeding, shared YOLO converter
 scripts/             # train_master.py, run_ablation.py, and numbered helper scripts (see below)
 tests/               # unit/ and integration/
-.planning/           # Dated design docs: production audit (2026-04) and backbone ablation plan (2026-06)
+.planning/           # Dated design docs (audit, backbone ablation, sidecar, data contract)
 ```
 
 Every dataset is parsed by an adapter in `animal_id/data/sources/` into `Sample`s

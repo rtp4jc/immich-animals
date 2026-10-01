@@ -12,6 +12,6 @@ services:
       # Min Detection Score and Max Distance stay as they are.
       # KEEP_HUMAN_FACES: "true"
       # DOG_MIN_SCORE: "0.3"
-      # DOG_MAX_DISTANCE: "0.35"
+      # DOG_MAX_DISTANCE: "0.4"
       # IMMICH_MAX_DISTANCE: "0.5"
     restart: always
