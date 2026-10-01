@@ -110,7 +110,7 @@ uv run python scripts/run_ablation.py --backbone convnext_tiny --mode probe
 uv run python scripts/summarize_ablation.py --mode finetune   # apply the decision rule
 
 # Train and export the production model (folds val in; writes models/onnx/embedding.onnx)
-uv run python scripts/train_final.py --backbone convnext_tiny --include-val
+uv run python scripts/train_final.py --backbone dinov2_b --include-val
 ```
 
 Backbone weights carry their own licence, which gates deployment separately from

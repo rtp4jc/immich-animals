@@ -13,7 +13,7 @@ import torch.optim as optim
 from tqdm import tqdm
 
 from animal_id.benchmark.metrics import evaluate_embedding_model
-from animal_id.embedding.config import HEAD_CONFIG
+from animal_id.embedding.config import HEAD_CONFIG, TRAINING_CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,13 @@ class EmbeddingTrainer:
         # Metrics tracking
         self.epoch_metrics = []
 
-    def train_epoch(self, optimizer):
+    def _autocast(self):
+        # bf16 halves ViT-B's step time; the margin head stays fp32 (below).
+        return torch.autocast(
+            self.device.type, dtype=torch.bfloat16, enabled=self.device.type == "cuda"
+        )
+
+    def train_epoch(self, optimizer, scheduler=None):
         """Train for one epoch using ArcFace loss."""
         self.model.train()
         total_loss = 0.0
@@ -56,8 +62,9 @@ class EmbeddingTrainer:
             images, labels = images.to(self.device), labels.to(self.device)
 
             optimizer.zero_grad()
-            # Forward pass through backbone AND ArcFace head
-            logits = self.model(images, labels)
+            with self._autocast():
+                embeddings = self.model.get_embeddings(images)
+            logits = self.model.head(embeddings.float(), labels)
             loss = self.criterion(logits, labels)
             loss.backward()
 
@@ -65,6 +72,8 @@ class EmbeddingTrainer:
             torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
 
             optimizer.step()
+            if scheduler is not None:
+                scheduler.step()
 
             total_loss += loss.item()
             num_batches += 1
@@ -85,8 +94,8 @@ class EmbeddingTrainer:
         Instead, we generate embeddings for all validation images and measure how well
         they cluster by identity using cosine similarity.
         """
-        metrics = evaluate_embedding_model(self.model, self.val_loader, self.device)
-        return metrics
+        with self._autocast():
+            return evaluate_embedding_model(self.model, self.val_loader, self.device)
 
     def save_checkpoint(self, epoch, val_metric, is_best=False):
         """Save model checkpoint."""
@@ -109,12 +118,12 @@ class EmbeddingTrainer:
         return None
 
     def _train_and_validate_epoch(
-        self, optimizer, epoch, total_epochs, phase, patience
+        self, optimizer, epoch, total_epochs, phase, patience, scheduler=None
     ):
         """Helper method to train and validate one epoch with timing and logging."""
         epoch_start = time.time()
 
-        train_loss = self.train_epoch(optimizer)
+        train_loss = self.train_epoch(optimizer, scheduler)
 
         # Validation Step
         val_metrics = self.validate()
@@ -183,115 +192,103 @@ class EmbeddingTrainer:
             }
         return value
 
+    def _head_params(self):
+        return list(self.model.backbone.projection_head.parameters()) + list(
+            self.model.head.parameters()
+        )
+
+    def _trunk_groups(self, lr):
+        """Trunk param groups; a ViT's blocks decay by ``layer_decay`` from the top down."""
+        trunk = self.model.backbone.feature_extractor
+        blocks = getattr(trunk, "blocks", None)
+        if blocks is None:
+            return [{"params": trunk.parameters(), "lr": lr}]
+        decay, n = TRAINING_CONFIG.layer_decay, len(blocks)
+        groups = [
+            {"params": block.parameters(), "lr": lr * decay ** (n - 1 - i)}
+            for i, block in enumerate(blocks)
+        ]
+        rest = [
+            (name, p)
+            for name, p in trunk.named_parameters()
+            if not name.startswith("blocks.")
+        ]
+        # Final norm sits above the blocks; patch/position embeddings below them.
+        groups.append(
+            {"params": [p for name, p in rest if name.startswith("norm")], "lr": lr}
+        )
+        groups.append(
+            {
+                "params": [p for name, p in rest if not name.startswith("norm")],
+                "lr": lr * decay**n,
+            }
+        )
+        return groups
+
     def train(
         self,
         warmup_epochs,
         full_epochs,
         head_lr,
         backbone_lr,
-        full_lr,
         patience,
         linear_probe=False,
     ):
-        """Full training loop with warmup and fine-tuning phases.
+        """Head warmup on a frozen trunk, then the whole model under one-cycle AdamW.
 
         When ``linear_probe`` is True, the trunk stays frozen and only the
         projection + margin head train (``warmup_epochs`` epochs, no fine-tune
         phase) — a per-backbone-LR-free feature-quality probe.
         """
         logger.info(f"Starting training in run directory: {self.run_dir}")
+        weight_decay = TRAINING_CONFIG.weight_decay
 
-        if linear_probe:
-            logger.info(
-                f"\n=== Linear probe ({warmup_epochs} epochs, frozen trunk) ==="
+        phase = "linear_probe" if linear_probe else "warmup"
+        logger.info(f"\n=== {phase} ({warmup_epochs} epochs, frozen trunk) ===")
+        self.model.freeze_feature_extractor()
+        optimizer = optim.AdamW(
+            self._head_params(), lr=head_lr, weight_decay=weight_decay
+        )
+        for epoch in range(warmup_epochs):
+            if self._train_and_validate_epoch(
+                optimizer, epoch, warmup_epochs, phase, patience
+            ):
+                break
+
+        if not linear_probe and full_epochs:
+            logger.info(f"\n=== Full training ({full_epochs} epochs) ===")
+            self.model.load_state_dict(
+                torch.load(self.run_dir / "best_model.pt", map_location=self.device)
             )
-            self.model.freeze_feature_extractor()
-            optimizer = optim.Adam(
-                filter(lambda p: p.requires_grad, self.model.parameters()),
-                lr=head_lr,
+            self.model.unfreeze_feature_extractor()
+            self.phase_best_val_metric = -1.0
+            self.patience_counter = 0
+
+            groups = [{"params": self._head_params(), "lr": head_lr}]
+            groups += self._trunk_groups(backbone_lr)
+            optimizer = optim.AdamW(groups, weight_decay=weight_decay)
+            # Per-step warmup (10%) then cosine decay, each group to its own peak.
+            scheduler = optim.lr_scheduler.OneCycleLR(
+                optimizer,
+                max_lr=[g["lr"] for g in groups],
+                total_steps=full_epochs * len(self.train_loader),
+                pct_start=0.1,
             )
-            for epoch in range(warmup_epochs):
-                should_stop = self._train_and_validate_epoch(
-                    optimizer, epoch, warmup_epochs, "linear_probe", patience
-                )
-                if should_stop:
+            for epoch in range(full_epochs):
+                if self._train_and_validate_epoch(
+                    optimizer,
+                    warmup_epochs + epoch,
+                    full_epochs,
+                    "full_training",
+                    patience,
+                    scheduler,
+                ):
                     break
 
-            with open(self.run_dir / "training_metrics.json", "w") as f:
-                json.dump(
-                    [self._convert_metric(m) for m in self.epoch_metrics], f, indent=2
-                )
-            logger.info(
-                f"Linear probe complete. Best validation mAP: {self.best_val_metric:.4f}"
-            )
-            return self.run_dir / "best_model.pt"
-
-        # Phase 1: Warmup (freeze trunk, train projection + margin head)
-        logger.info(f"\n=== Phase 1: Warmup ({warmup_epochs} epochs) ===")
-        self.model.freeze_feature_extractor()
-        optimizer = optim.Adam(self.model.parameters(), lr=head_lr)
-
-        for epoch in range(warmup_epochs):
-            should_stop = self._train_and_validate_epoch(
-                optimizer, epoch, warmup_epochs, "warmup", patience
-            )
-            if should_stop:
-                break
-
-        # Phase 2: Full training (unfreeze backbone)
-        logger.info(f"\n=== Phase 2: Full Training ({full_epochs} epochs) ===")
-
-        # Load the best model from Phase 1 before starting Phase 2
-        best_phase1_path = self.run_dir / "best_model.pt"
-        if best_phase1_path.exists():
-            logger.info(f"Loading best Phase 1 model: {best_phase1_path}")
-            self.model.load_state_dict(
-                torch.load(best_phase1_path, map_location=self.device)
-            )
-
-        self.model.unfreeze_feature_extractor()
-
-        # Reset phase tracking for new phase
-        self.phase_best_val_metric = -1.0
-        self.patience_counter = 0
-
-        # Different learning rates for backbone and head
-        optimizer = optim.Adam(
-            [
-                {"params": self.model.backbone.parameters(), "lr": backbone_lr},
-                {"params": self.model.head.parameters(), "lr": full_lr},
-            ]
-        )
-
-        # Linear warmup → cosine; ramp < patience so base LR is reached before
-        # early stopping can fire.
-        warmup_epochs_phase2 = 5
-        linear_scheduler = optim.lr_scheduler.LinearLR(
-            optimizer, start_factor=0.01, total_iters=warmup_epochs_phase2
-        )
-        cosine_scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=full_epochs - warmup_epochs_phase2
-        )
-        scheduler = optim.lr_scheduler.SequentialLR(
-            optimizer,
-            schedulers=[linear_scheduler, cosine_scheduler],
-            milestones=[warmup_epochs_phase2],
-        )
-
-        for epoch in range(full_epochs):
-            should_stop = self._train_and_validate_epoch(
-                optimizer, warmup_epochs + epoch, full_epochs, "full_training", patience
-            )
-            scheduler.step()
-            if should_stop:
-                break
-
-        # Save training metrics
         with open(self.run_dir / "training_metrics.json", "w") as f:
             json.dump(
                 [self._convert_metric(m) for m in self.epoch_metrics], f, indent=2
             )
-
         logger.info(
             f"Training completed. Best validation mAP: {self.best_val_metric:.4f}"
         )

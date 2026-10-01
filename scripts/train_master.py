@@ -287,6 +287,7 @@ def run_embedding_data_prep():
             "val": PROJECT_ROOT / DATA_CONFIG.val_json_path,
             "test": PROJECT_ROOT / DATA_CONFIG.test_json_path,
         },
+        DATA_CONFIG.min_images,
     )
 
 
@@ -366,6 +367,7 @@ def run_embedding_pipeline(
         json_path=PROJECT_ROOT / DATA_CONFIG.val_json_path,
         img_size=DATA_CONFIG.img_size,
         is_training=False,
+        source=DATA_CONFIG.select_on,
     )
 
     train_loader = DataLoader(
@@ -406,7 +408,6 @@ def run_embedding_pipeline(
         full_epochs=training_config.full_train_epochs,
         head_lr=training_config.head_lr,
         backbone_lr=training_config.backbone_lr,
-        full_lr=training_config.full_train_lr,
         patience=training_config.early_stopping_patience,
     )
     logger.info(f"Embedding training complete. Best model: {best_model_path}")

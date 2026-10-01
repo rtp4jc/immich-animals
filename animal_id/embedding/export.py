@@ -7,13 +7,7 @@ import torch.nn as nn
 def export_embedding_onnx(
     model: nn.Module, output_path: str | Path, img_size: int = 224
 ) -> None:
-    """Export an embedding model to ONNX using the legacy TorchScript exporter.
-
-    Args:
-        model: Embedding model in eval mode on the target device.
-        output_path: Destination .onnx file path.
-        img_size: Spatial size of the square input (default 224).
-    """
+    """Export an eval-mode embedding model to ONNX with the TorchScript exporter."""
     dummy = torch.zeros(
         1, 3, img_size, img_size, device=next(model.parameters()).device
     )
@@ -25,7 +19,8 @@ def export_embedding_onnx(
         str(output_path),
         dynamo=False,
         export_params=True,
-        opset_version=12,
+        # ViT attention lowers to scaled_dot_product_attention, which needs >= 14.
+        opset_version=17,
         do_constant_folding=True,
         input_names=["input"],
         output_names=["output"],

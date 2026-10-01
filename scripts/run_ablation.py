@@ -115,11 +115,14 @@ def check_onnx_export(model, img_size):
             tmp_path.unlink()
 
 
-def build_loader(json_name, img_size, batch_size, is_training, generator=None):
+def build_loader(
+    json_name, img_size, batch_size, is_training, generator=None, source=None
+):
     dataset = IdentityDataset(
         json_path=DATA_DIR / json_name,
         img_size=img_size,
         is_training=is_training,
+        source=source,
     )
     loader = DataLoader(
         dataset,
@@ -150,6 +153,7 @@ def run_cell(cell, backbone, head, args, epochs, device):
         img_size,
         batch_size,
         is_training=False,
+        source=DATA_CONFIG.select_on,
     )
     _, test_loader = build_loader(
         "identity_test.json", img_size, batch_size, is_training=False
@@ -183,7 +187,6 @@ def run_cell(cell, backbone, head, args, epochs, device):
             full_epochs=0,
             head_lr=TRAINING_CONFIG.head_lr,
             backbone_lr=TRAINING_CONFIG.backbone_lr,
-            full_lr=TRAINING_CONFIG.full_train_lr,
             patience=TRAINING_CONFIG.early_stopping_patience,
             linear_probe=True,
         )
@@ -193,7 +196,6 @@ def run_cell(cell, backbone, head, args, epochs, device):
             full_epochs=epochs or TRAINING_CONFIG.full_train_epochs,
             head_lr=TRAINING_CONFIG.head_lr,
             backbone_lr=TRAINING_CONFIG.backbone_lr,
-            full_lr=TRAINING_CONFIG.full_train_lr,
             patience=TRAINING_CONFIG.early_stopping_patience,
             linear_probe=False,
         )

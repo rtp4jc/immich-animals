@@ -10,9 +10,12 @@ from animal_id.embedding.trainer import EmbeddingTrainer
 def mock_trainer_with_empty_val_loader(tmp_path):
     """Fixture for an EmbeddingTrainer with an empty validation dataloader."""
     mock_model = MagicMock()
-    # Fix: Configure the mock model to return a valid logit tensor that requires gradients
-    mock_model.return_value = torch.rand(2, 1001, requires_grad=True)
-    mock_model.parameters.return_value = [torch.nn.Parameter(torch.rand(1))]
+    # The margin head returns logits that require gradients.
+    mock_model.head.return_value = torch.rand(2, 1001, requires_grad=True)
+    params = [torch.nn.Parameter(torch.rand(1))]
+    mock_model.parameters.return_value = params
+    mock_model.backbone.projection_head.parameters.return_value = params
+    mock_model.head.parameters.return_value = []
     mock_model.state_dict.return_value = {}  # Needed for save_checkpoint
 
     # Mock the train_loader to yield one batch so the training loop runs
@@ -63,7 +66,6 @@ def test_train_loop_handles_empty_val_metrics(mock_trainer_with_empty_val_loader
             full_epochs=0,  # No full training needed for this test
             head_lr=1e-3,
             backbone_lr=1e-4,
-            full_lr=1e-5,
             patience=3,
         )
     except KeyError as e:

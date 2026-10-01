@@ -15,9 +15,12 @@ class IdentityDataset(Dataset):
     Enhanced dataset with built-in data augmentations for animal identity training.
     """
 
-    def __init__(self, json_path, img_size=224, is_training=True):
+    def __init__(self, json_path, img_size=224, is_training=True, source=None):
+        """``source`` keeps only that source's rows (e.g. to select checkpoints on it)."""
         with open(json_path) as f:
-            self.annotations = json.load(f)
+            self.annotations = [
+                row for row in json.load(f) if source is None or row["source"] == source
+            ]
 
         # Get max label value for ArcFace (not just unique count)
         all_labels = [item["identity_label"] for item in self.annotations]

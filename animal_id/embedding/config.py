@@ -8,7 +8,7 @@ from .backbones import BackboneType
 from .losses import HeadType
 
 # Default backbone for training and inference.
-DEFAULT_BACKBONE = BackboneType.RESNET50
+DEFAULT_BACKBONE = BackboneType.DINOV2_B
 
 
 @dataclass(frozen=True)
@@ -45,15 +45,17 @@ class TrainingConfig:
     model_output_path: str = "models/dog_embedding_best.pt"
     embedding_dim: int = 512
     hardware_workers: int = 8
-    warmup_epochs: int = 25
-    full_train_epochs: int = 45
+    # Phase 1 trains the projection + margin head on a frozen trunk.
+    warmup_epochs: int = 5
+    full_train_epochs: int = 30
     early_stopping_patience: int = 10
-    # ArcFace head warmup; standard Adam range for a metric-learning head.
-    head_lr: float = 1e-4
-    # Fine-tune the pretrained trunk; 100x smaller than the head.
-    backbone_lr: float = 1e-6
-    # Head in phase 2; differential LR above the backbone.
-    full_train_lr: float = 1e-5
+    # Projection + margin head, both phases.
+    head_lr: float = 1e-3
+    # Peak trunk LR in phase 2; ViT blocks below the top decay by layer_decay each,
+    # so the self-supervised early layers barely move.
+    backbone_lr: float = 1e-5
+    layer_decay: float = 0.8
+    weight_decay: float = 0.05
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,10 @@ class DataConfig:
     val_json_path: str = "data/identity_val.json"
     test_json_path: str = "data/identity_test.json"
     sources: tuple[Source, ...] = (Source.DOGFACENET, Source.DOGREID, Source.MPDD)
+    # Checkpoints are chosen on this source's val identities: owner phone photos,
+    # where selecting on DogFaceNet's aligned faces picked the wrong models.
+    select_on: Source = Source.DOGREID
+    min_images: int = 2
     img_size: int = 224
     batch_size: int = 32
 

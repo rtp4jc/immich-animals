@@ -11,7 +11,7 @@ Two differences from an ablation cell:
   is exported rather than the best-on-val one.
 - It writes ``models/onnx/embedding.onnx``, the path the pipeline loads.
 
-    uv run python scripts/train_final.py --backbone convnext_tiny --include-val
+    uv run python scripts/train_final.py --backbone dinov2_b --include-val
 
 Appends its test metrics to ``outputs/ablation/final.csv`` so the production
 model can be compared against the ablation cells it came from.
@@ -149,9 +149,11 @@ def build_combined_json(out_path: Path) -> Path:
     return out_path
 
 
-def loader_for(json_path, img_size, batch_size, is_training, generator=None):
+def loader_for(
+    json_path, img_size, batch_size, is_training, generator=None, source=None
+):
     dataset = IdentityDataset(
-        json_path=json_path, img_size=img_size, is_training=is_training
+        json_path=json_path, img_size=img_size, is_training=is_training, source=source
     )
     return dataset, DataLoader(
         dataset,
@@ -229,7 +231,11 @@ def main():
         )
     # Monitoring only when val is folded in — it is no longer held out.
     _, val_loader = loader_for(
-        DATA_DIR / "identity_val.json", img_size, batch_size, False
+        DATA_DIR / "identity_val.json",
+        img_size,
+        batch_size,
+        False,
+        source=DATA_CONFIG.select_on,
     )
     _, test_loader = loader_for(
         DATA_DIR / "identity_test.json", img_size, batch_size, False
@@ -269,7 +275,6 @@ def main():
             full_epochs=full,
             head_lr=TRAINING_CONFIG.head_lr,
             backbone_lr=TRAINING_CONFIG.backbone_lr,
-            full_lr=TRAINING_CONFIG.full_train_lr,
             # Selecting on val would be selecting on training data once it is folded in.
             patience=NO_EARLY_STOP
             if args.include_val

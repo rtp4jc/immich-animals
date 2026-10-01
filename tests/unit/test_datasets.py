@@ -1,3 +1,5 @@
+import json
+
 import torch
 
 from animal_id.common.datasets import IdentityDataset
@@ -63,3 +65,15 @@ def test_dataset_transforms_validation(mock_image_dataset):
     # Validation transform (Resize + Normalize) should be deterministic
     assert torch.allclose(img1, img2)
     assert img1.shape == (3, 224, 224)
+
+
+def test_dataset_keeps_only_the_requested_source(tmp_path):
+    rows = [
+        {"file_path": f"{s}.jpg", "identity_label": i, "source": s}
+        for i, s in enumerate(("dogreid", "dogfacenet", "dogreid"))
+    ]
+    (tmp_path / "val.json").write_text(json.dumps(rows))
+    dataset = IdentityDataset(
+        tmp_path / "val.json", is_training=False, source="dogreid"
+    )
+    assert [r["identity_label"] for r in dataset.annotations] == [0, 2]

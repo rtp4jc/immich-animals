@@ -14,7 +14,8 @@ from animal_id.embedding.backbones import (
 from animal_id.embedding.models import EmbeddingNet
 
 # (BackboneType, expected num_features, input_size)
-TIMM_CNN_BACKBONES = [
+TIMM_BACKBONES = [
+    (BackboneType.DINOV2_B, 768, 224),
     (BackboneType.CONVNEXTV2_TINY, 768, 224),
     (BackboneType.CONVNEXTV2_NANO, 640, 224),
     (BackboneType.EFFICIENTNETV2_RW_M, 2152, 224),
@@ -73,15 +74,15 @@ def test_torchvision_embedding_contract(backbone_type, num_features, input_size)
     _assert_embedding_contract(backbone_type, input_size)
 
 
-@pytest.mark.parametrize("backbone_type,num_features,input_size", TIMM_CNN_BACKBONES)
-def test_timm_cnn_backbones_flat_contract(backbone_type, num_features, input_size):
+@pytest.mark.parametrize("backbone_type,num_features,input_size", TIMM_BACKBONES)
+def test_timm_backbones_flat_contract(backbone_type, num_features, input_size):
     fe, nf = get_backbone(backbone_type, pretrained=False)
     assert nf == num_features
     _assert_flat_features(fe, nf, input_size)
 
 
-@pytest.mark.parametrize("backbone_type,num_features,input_size", TIMM_CNN_BACKBONES)
-def test_timm_cnn_embedding_contract(backbone_type, num_features, input_size):
+@pytest.mark.parametrize("backbone_type,num_features,input_size", TIMM_BACKBONES)
+def test_timm_embedding_contract(backbone_type, num_features, input_size):
     _assert_embedding_contract(backbone_type, input_size)
 
 

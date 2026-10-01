@@ -20,6 +20,7 @@ IMG_SIZE = DATA_CONFIG.img_size
         BackboneType.MOBILENET_V3_SMALL,
         BackboneType.RESNET50,
         BackboneType.CONVNEXT_TINY,
+        BackboneType.DINOV2_B,
     ],
 )
 def test_onnx_embedding_parity(tmp_path, backbone):

@@ -49,7 +49,6 @@ def test_train_embedding(mock_image_dataset, tmp_path):
         full_epochs=1,
         head_lr=0.001,
         backbone_lr=0.0001,
-        full_lr=0.001,
         patience=1,
     )
 

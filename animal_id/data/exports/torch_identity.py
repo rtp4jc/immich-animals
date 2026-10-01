@@ -58,7 +58,11 @@ def splits(
     data_prefix = DATA_DIR.relative_to(PROJECT_ROOT)
     rows_by_label = [
         [
-            {"file_path": (data_prefix / p).as_posix(), "identity_label": label}
+            {
+                "file_path": (data_prefix / p).as_posix(),
+                "identity_label": label,
+                "source": identity[0],
+            }
             | ({"crop": source_box} if source_box else {})
             for p, source_box in paths_by_identity[identity]
         ]
@@ -87,9 +91,9 @@ def splits(
     return splits
 
 
-def write(samples: list[Sample], paths: dict[str, Path]) -> None:
+def write(samples: list[Sample], paths: dict[str, Path], min_images: int = 5) -> None:
     """Writes each split's rows to ``paths[split]``, cropping boxed identities first."""
-    for split, rows in splits(samples).items():
+    for split, rows in splits(samples, min_images).items():
         for row in rows:
             if "crop" not in row:
                 continue

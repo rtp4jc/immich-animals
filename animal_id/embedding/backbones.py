@@ -31,6 +31,9 @@ class BackboneType(Enum):
     EFFICIENTNETV2_RW_M = "efficientnetv2_rw_m"
     TF_EFFICIENTNETV2_M = "tf_efficientnetv2_m"
 
+    # timm ViT, self-supervised LVD-142M weights, Apache
+    DINOV2_B = "dinov2_b"
+
     # timm Swin, HF-hosted animal-pretrained weights (MegaDescriptor)
     MEGADESCRIPTOR_T_224 = "megadescriptor_t_224"
     MEGADESCRIPTOR_L_384 = "megadescriptor_l_384"
@@ -75,10 +78,10 @@ def _torchvision_resnet50(pretrained: bool):
     return feature_extractor, num_features
 
 
-def _timm_backbone(model_name: str):
-    """Loader for a vanilla timm model (ImageNet weights).
+def _timm_backbone(model_name: str, **kwargs):
+    """Loader for a vanilla timm model; ``kwargs`` go to ``timm.create_model``.
 
-    ``num_classes=0, global_pool='avg'`` makes timm return a flat pooled vector.
+    ``num_classes=0`` plus a ``global_pool`` makes timm return a flat pooled vector.
     """
 
     def loader(pretrained: bool):
@@ -88,7 +91,7 @@ def _timm_backbone(model_name: str):
             model_name,
             pretrained=pretrained,
             num_classes=0,
-            global_pool="avg",
+            **({"global_pool": "avg"} | kwargs),
         )
         return model, model.num_features
 
@@ -159,6 +162,14 @@ _BACKBONE_REGISTRY: dict[BackboneType, BackboneSpec] = {
     ),
     BackboneType.TF_EFFICIENTNETV2_M: BackboneSpec(
         _timm_backbone("tf_efficientnetv2_m"), LicenseTier.PERMISSIVE
+    ),
+    # The CLS token is DINOv2's trained embedding; img_size fixes the position
+    # grid at 224 (16x16 patches) so the ONNX graph has no interpolation.
+    BackboneType.DINOV2_B: BackboneSpec(
+        _timm_backbone(
+            "vit_base_patch14_dinov2.lvd142m", global_pool="token", img_size=224
+        ),
+        LicenseTier.PERMISSIVE,
     ),
     BackboneType.MEGADESCRIPTOR_T_224: BackboneSpec(
         _timm_hf_backbone("BVRA/MegaDescriptor-T-224"),
