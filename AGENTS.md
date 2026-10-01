@@ -2,6 +2,20 @@
 
 Read [README.md](README.md) first: setup, commands, architecture, and the script map live there. The rules below are the ones you can't infer from the repo.
 
+## Tenets
+
+When two goals conflict, these decide.
+
+- **Recall over precision, within limits.** A missed dog is worse than an occasional false detection, as long as false positives stay rare enough not to clutter the People tab.
+- **Over-fragment rather than over-merge.** Merging two people in Immich is easy; splitting one is not.
+- **Don't regress existing classes to ship a new one.** A new species waits until the classes we already support hold their numbers.
+- **Keep the Immich integration thin until there is an official one.** Immich changes quickly and the models are what matter, so the sidecar does the minimum and avoids anything that would conflict with upstream.
+- **State of the art within Immich's model budget.** Aim for the best accuracy achievable at the size and latency of Immich's existing face and CLIP models.
+- **Reuse through generic contracts.** Define the problem (detection, embedding, evaluation) as contracts independent of any model or data provider, so backbones, losses and datasets plug in. Think before adding code, and restructure when the first shape turns out wrong.
+- **Benchmark on data that looks like a real library.** Select and judge models on owner-style photos of identities never seen in training, not on the training distribution.
+- **Write drift-prone details down once, where they're owned.** Metrics, model names and counts live in the model card or the config that sets them; other docs link there instead of restating them.
+- **Never harm the user's existing Immich data.** Human faces pass through untouched, and adding or removing the sidecar takes only a Refresh, never a Reset.
+
 ## Environment
 
 - **Always prefix commands with `uv run`** (`uv run pytest`, `uv run ruff check .`). Non-interactive shells don't get mise's venv activation, so a bare `pytest` fails.
