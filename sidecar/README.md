@@ -31,7 +31,7 @@ Next to your Immich `docker-compose.yml`, create `docker-compose.override.yml`:
 services:
   animal-ml:
     container_name: animal_ml
-    image: ghcr.io/rtp4jc/animal-ml:0.1.1
+    image: ghcr.io/rtp4jc/animal-ml:0.2.0
     environment:
       UPSTREAM_ML_URL: http://immich-machine-learning:3003
     restart: always
@@ -71,7 +71,8 @@ Dogs you photograph a lot cluster well. In testing, a dog with 673 photos put
 - **Dogs with under ~15 photos** may not group at all
 - **Similar-looking dogs** get mixed together — two black curly-coated dogs are
   genuinely hard
-- **Cats** are detected as people about one photo in seven.
+- **Cats** are detected as people about one photo in nine, and wolves and foxes
+  most of the time.
 
 Merging two people in Immich is easy, but splitting one is not, so the defaults
 lean towards leaving you a few extra clusters rather than wrongly combining two
@@ -99,7 +100,7 @@ Add them under `environment:` in the `docker-compose.override.yml` from step 1, 
 | `UPSTREAM_ML_URL` | — | Your existing Immich ML container. Required: search and OCR are forwarded to it. |
 | `KEEP_HUMAN_FACES` | `true` | `false` serves dogs only and stops detecting human faces. A refresh will delete all human face edits you have made |
 | `DOG_MIN_SCORE` | `0.3` | How confident the detector must be. Lower finds more dogs and more cats. Just requires a refresh. |
-| `DOG_MAX_DISTANCE` | `0.35` | **SEE NOTE BELOW** How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
+| `DOG_MAX_DISTANCE` | `0.4` | **SEE NOTE BELOW** How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
 | `IMMICH_MAX_DISTANCE` | `0.5` | The Max Distance in your Immich settings. Change only if you changed that. |
 
 **NOTE**: `DOG_MAX_DISTANCE` is tricky to change. You can't just do a refresh after changing 
@@ -109,12 +110,8 @@ then adding the sidecard again with the new configuration and refreshing. This w
 only the named dogs being lost and the human faces remaining unchanged.
 
 ### From Immich UI
-Immich's face-model setting picks the embedder: `buffalo_l` and anything
-larger uses the more accurate ConvNeXt model, `buffalo_m` and `buffalo_s` use a faster 
-ResNet50. Changing it requires a **Face Detection → Reset** run (not just Refresh),
-since embeddings from the two are not compatible. You could hypothetically follow the same procedure
-as changing the `DOG_MAX_DISTANCE` above, but human face embeddings technically need to be 
-reset too when you change this setting so I wouldn't.
+Immich's face-model setting only affects people. Dogs always use the same
+embedder, whatever model is picked there.
 
 ## Trouble
 
@@ -128,7 +125,7 @@ forwarded to Immich's own ML container.
 looks at photos that have never been scanned. Run it as **Refresh**.
 
 **Too many near-duplicate people** — merge them, or raise `DOG_MAX_DISTANCE` to
-`0.4` and run Facial Recognition → Reset, which re-clusters everything and drops
+`0.45` and run Facial Recognition → Reset, which re-clusters everything and drops
 names.
 
 ---
@@ -138,7 +135,7 @@ names.
 The main [README](../README.md) covers the models and training. This section is
 only what is specific to the sidecar.
 
-`serve.py` is the whole integration, in about 200 lines. Immich talks to machine
+`serve.py` is the whole integration, in about 250 lines. Immich talks to machine
 learning over HTTP, so this needs no fork of Immich and no patched image — just
 a service that answers `POST /predict` and `GET /ping` the way Immich expects.
 
@@ -157,10 +154,10 @@ by `MODEL_TAG` and checks them against `SHA256SUMS`.
 
 ```bash
 # from the repo root
-docker buildx build -f sidecar/Dockerfile --load -t ghcr.io/rtp4jc/animal-ml:0.1.1 .
+docker buildx build -f sidecar/Dockerfile --load -t ghcr.io/rtp4jc/animal-ml:0.2.0 .
 
 # with the models already on disk
-docker buildx build -f sidecar/Dockerfile --build-arg MODEL_SOURCE=local --load -t ghcr.io/rtp4jc/animal-ml:0.1.1 .
+docker buildx build -f sidecar/Dockerfile --build-arg MODEL_SOURCE=local --load -t ghcr.io/rtp4jc/animal-ml:0.2.0 .
 ```
 
 Building under the published tag shadows the released image locally, so the
@@ -189,8 +186,8 @@ both are tuned for people. Rather than make users retune them:
 - **Detection score.** Immich only forwards `minScore` to the ML server and never
   re-filters, so dogs use `DOG_MIN_SCORE` and the user's setting continues to
   govern human faces upstream. At Immich's 0.7 default we would lose about half
-  the dogs; at 0.3 we find ~80% of them.
-- **Max Distance.** Our embeddings cluster best around 0.35, so the sidecar
+  the dogs; at 0.3 we find ~90% of them.
+- **Max Distance.** Our embeddings cluster best around 0.4, so the sidecar
   stretches its own vector space to spread those distances out and land on
   Immich's 0.5 default. `DOG_MAX_DISTANCE` and `IMMICH_MAX_DISTANCE` set the two
   ends of that mapping. Human embeddings are passed through untouched, so

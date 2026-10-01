@@ -10,24 +10,30 @@ training the models.
 
 ## Model card
 
+Release 0.2.0. The better value in each row is bold.
+
 ### Embedding
-| Embedder | Top-1 | Top-5 | MRR | mAP | TAR@FAR=1% | Params | CPU |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| ConvNeXt-Tiny (default) | 0.953 | 0.983 | 0.967 | 0.624 | 0.826 | 28.7 M | 29 ms |
-| ResNet50 (`buffalo_m` and below) | 0.857 | 0.945 | 0.896 | 0.494 | 0.621 | 25.1 M | 23 ms |
+| Embedder | DogReID top-1 | Top-5 | MRR | TAR@FAR=1% | Params | CPU, 4 threads |
+| --- | --- | --- | --- | --- | --- | --- |
+| DINOv2-B/14 + ArcFace (0.2.0) | **0.543** | **0.764** | **0.642** | **0.761** | 87 M | 128 ms |
+| ConvNeXt-Tiny + ArcFace (0.1.x) | 0.254 | 0.478 | 0.368 | 0.483 | **29 M** | **34 ms** |
 
-Every variation is in [`embedding_benchmarks.csv`](embedding_benchmarks.csv)
-
-**Test set**: DogFaceNet held-out split, 1078 queries over 149
-identities. Tight, mostly frontal face crops.
+**Test set**: [DogReID-1553](https://doi.org/10.7910/DVN/LVTRLG) open-set test,
+777 dogs filmed by their owners on phones. Each query is matched against a
+gallery from a different scene, cropped to the ground-truth box plus 10%. The
+earlier DogFaceNet-based backbone ablation is in
+[`embedding_benchmarks.csv`](embedding_benchmarks.csv).
 
 ### Detection
+| Detector (conf >= 0.3) | DogReID recall | Commons + MPDD recall | Dog-free photos with a detection |
+| --- | --- | --- | --- |
+| YOLO11n fine-tuned with DogReID (0.2.0) | **0.946** | **0.882** | 0.216 |
+| YOLO11n (0.1.1) | 0.826 | 0.851 | **0.156** |
 
-80% of in-the-wild dog photos were observed to get a detection with 99% being detected when the dog was a significant portion of the frame. False positives were observed on near-neighbor
-quadrupeds: 40% of wolves and dingoes, 14% of cats.
-
-**Test set**: YOLO11n, held out on 1524 photos of 121 individual dogs plus 450
-dog-free photos with a min detection score of 30%.
+**Test sets**: the DogReID-1553 open-set test frames (3,755, IoU >= 0.5), and
+`sidecar-validation`: 1,196 photos of 88 named dogs plus 450 dog-free photos.
+Most false positives are other quadrupeds: 71% of wolves and foxes, 11% of
+cats, and goats, deer and sheep.
 
 ## Architecture
 
@@ -35,7 +41,7 @@ dog-free photos with a min detection score of 30%.
 
 1. **Detector** (`ONNXDetector`): YOLO11n, outputs animal bounding boxes.
 2. **Keypoint estimator** (`ONNXKeypoint`): YOLO11n-pose, finds 4 facial landmarks (eyes, nose, throat) to refine the crop. **Off by default**: benchmarks are better without it.
-3. **Embedder** (`ONNXEmbedding`): ConvNeXt-Tiny + ArcFace (a ResNet50 variant also ships), 512-dim L2-normalised vectors compared by cosine similarity, matching Immich's face-embedding contract.
+3. **Embedder** (`ONNXEmbedding`): DINOv2-B/14 + ArcFace, 512-dim L2-normalised vectors compared by cosine similarity, matching Immich's face-embedding contract.
 
 `pipeline/onnx_models.py` wraps the three models and `pipeline/models.py` defines the `DetectionModel`, `KeypointModel`, and `EmbeddingModel` Protocols they satisfy.
 

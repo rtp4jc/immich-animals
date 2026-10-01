@@ -11,20 +11,18 @@
 ARG MODEL_SOURCE=remote
 
 FROM alpine:3.21 AS models-remote
-ARG MODEL_TAG=sidecar-v0.1.1
+ARG MODEL_TAG=sidecar-v0.2.0
 ARG MODEL_URL=https://github.com/rtp4jc/immich-animals/releases/download
 WORKDIR /models
 COPY sidecar/SHA256SUMS .
-RUN for f in detector.onnx embedding.onnx embedding.json \
-             embedding_resnet50.onnx embedding_resnet50.json; do \
+RUN for f in detector.onnx embedding.onnx embedding.json; do \
         wget -q "${MODEL_URL}/${MODEL_TAG}/$f" || exit 1; \
     done && sha256sum -c SHA256SUMS
 
 FROM alpine:3.21 AS models-local
 WORKDIR /models
 COPY sidecar/SHA256SUMS .
-COPY models/onnx/detector.onnx models/onnx/embedding.onnx models/onnx/embedding.json \
-     models/onnx/embedding_resnet50.onnx models/onnx/embedding_resnet50.json ./
+COPY models/onnx/detector.onnx models/onnx/embedding.onnx models/onnx/embedding.json ./
 RUN sha256sum -c SHA256SUMS
 
 FROM models-${MODEL_SOURCE} AS models
@@ -43,7 +41,7 @@ RUN uv sync --frozen --no-dev
 
 COPY sidecar/serve.py .
 COPY --from=models /models/detector.onnx /models/embedding.onnx /models/embedding.json \
-     /models/embedding_resnet50.onnx /models/embedding_resnet50.json /app/models/onnx/
+     /app/models/onnx/
 
 ENV MODEL_DIR=/app/models/onnx \
     PATH=/app/.venv/bin:$PATH

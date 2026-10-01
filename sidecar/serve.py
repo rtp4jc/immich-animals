@@ -29,8 +29,6 @@ from fastapi.responses import ORJSONResponse, PlainTextResponse, Response
 
 TASK = "facial-recognition"
 BBOX_PAD = 0.1  # matches AnimalPipeline's crop, which the embedder was tuned on
-# Immich's smaller face models; its picker doubles as ours.
-SMALL_FACE_MODELS = {"buffalo_s", "buffalo_m"}
 
 MODEL_DIR = Path(os.environ.get("MODEL_DIR", "models/onnx"))
 UPSTREAM_URL = os.environ.get("UPSTREAM_ML_URL", "").rstrip("/")
@@ -42,7 +40,7 @@ KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
 # Immich's default suits people; dogs need roughly 0.3 or half of them are lost.
 DOG_MIN_SCORE = float(os.environ.get("DOG_MIN_SCORE", "0.3"))
 # Where our embeddings cluster best, and the Max Distance Immich is set to.
-DOG_MAX_DISTANCE = float(os.environ.get("DOG_MAX_DISTANCE", "0.35"))
+DOG_MAX_DISTANCE = float(os.environ.get("DOG_MAX_DISTANCE", "0.4"))
 IMMICH_MAX_DISTANCE = float(os.environ.get("IMMICH_MAX_DISTANCE", "0.5"))
 
 
@@ -84,13 +82,7 @@ def _load_embedder(stem: str) -> _Embedder:
 
 
 detector, _det_input, _det_size = _session("detector.onnx")
-_large = _load_embedder("embedding")
-_small = _load_embedder("embedding_resnet50")
-
-
-def _embedder_for(face_model: str) -> _Embedder:
-    """Follow Immich's face-model choice: smaller model, faster embedder."""
-    return _small if face_model in SMALL_FACE_MODELS else _large
+embedder = _load_embedder("embedding")
 
 
 def _blob(image: np.ndarray, size: tuple[int, int], interpolation: int) -> np.ndarray:
@@ -162,7 +154,7 @@ def _rescale(vector: np.ndarray) -> np.ndarray:
     return _unit(mixed).astype(np.float32)
 
 
-def _embed(crop: np.ndarray, embedder: _Embedder) -> np.ndarray:
+def _embed(crop: np.ndarray) -> np.ndarray:
     blob = _blob(crop, embedder.size, cv2.INTER_AREA)
     blob = (blob - embedder.mean) / embedder.std
     vector = embedder.session.run(None, {embedder.input_name: blob})[0][0]
@@ -210,7 +202,6 @@ async def predict(request: Request) -> Response:
             media_type=upstream.headers.get("content-type"),
         )
 
-    embedder = _embedder_for(entries[TASK].get("recognition", {}).get("modelName", ""))
     buffer = np.frombuffer(await form["image"].read(), np.uint8)
     decoded = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
     if decoded is None:
@@ -229,7 +220,7 @@ async def predict(request: Request) -> Response:
                 "boundingBox": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
                 # Immich expects the vector as a JSON string, not an array.
                 "embedding": orjson.dumps(
-                    _embed(crop, embedder), option=orjson.OPT_SERIALIZE_NUMPY
+                    _embed(crop), option=orjson.OPT_SERIALIZE_NUMPY
                 ).decode(),
                 "score": score,
             }
