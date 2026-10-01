@@ -22,9 +22,9 @@ class IdentityDataset(Dataset):
                 row for row in json.load(f) if source is None or row["source"] == source
             ]
 
-        # Get max label value for ArcFace (not just unique count)
+        # Labels may be sparse, so the head needs max + 1 classes, not the unique count.
         all_labels = [item["identity_label"] for item in self.annotations]
-        self.num_classes = max(all_labels) + 1  # +1 because labels are 0-indexed
+        self.num_classes = max(all_labels) + 1
 
         # Data augmentations
         if is_training:

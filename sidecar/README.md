@@ -64,7 +64,7 @@ When completed, name and modify a dog the way you would a person!
 
 ## What works, what does not
 
-Dogs you photograph a lot cluster well. In a simulation of 300 households on
+Dogs you photograph a lot cluster well. In 0.2.0's simulation of 300 households on
 dogs the models never saw, 47 of every 100 dogs ended up as one correct person,
 27 were never grouped, and 10 were merged with another dog from the same home.
 
@@ -135,7 +135,7 @@ looks at photos that have never been scanned. Run it as **Refresh**.
 The main [README](../README.md) covers the models and training. This section is
 only what is specific to the sidecar.
 
-`serve.py` is the whole integration, in about 250 lines. Immich talks to machine
+`serve.py` is the whole integration. Immich talks to machine
 learning over HTTP, so this needs no fork of Immich and no patched image — just
 a service that answers `POST /predict` and `GET /ping` the way Immich expects.
 
@@ -173,8 +173,8 @@ including that `embedding` is a JSON *string* — Immich casts it to a pgvector.
 uv run --project sidecar python sidecar/smoke_test.py dog.jpg --url http://localhost:3003
 ```
 
-For tuning, `scripts/fetch_validation_set.py` builds a held-out set (88
-individual dogs, 1,196 photos, 450 dog-free negatives) and
+For tuning, `scripts/fetch_validation_set.py` builds a held-out set of named
+dogs and dog-free negatives, and
 `scripts/evaluate_sidecar.py` sweeps detection recall against the false-positive
 rate and clusters the embeddings the way Immich does.
 
@@ -185,9 +185,9 @@ both are tuned for people. Rather than make users retune them:
 
 - **Detection score.** Immich only forwards `minScore` to the ML server and never
   re-filters, so dogs use `DOG_MIN_SCORE` and the user's setting continues to
-  govern human faces upstream. At Immich's 0.7 default we would lose about half
-  the dogs; at 0.3 we find ~90% of them.
-- **Max Distance.** Our embeddings cluster best around 0.4, so the sidecar
+  govern human faces upstream. Immich's 0.7 default, tuned for faces, would miss
+  many dogs.
+- **Max Distance.** Our embeddings cluster best at `DOG_MAX_DISTANCE`, so the sidecar
   stretches its own vector space to spread those distances out and land on
   Immich's 0.5 default. `DOG_MAX_DISTANCE` and `IMMICH_MAX_DISTANCE` set the two
   ends of that mapping. Human embeddings are passed through untouched, so

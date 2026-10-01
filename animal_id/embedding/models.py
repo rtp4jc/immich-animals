@@ -66,9 +66,7 @@ class EmbeddingNet(nn.Module):
 
 
 class AnimalEmbeddingModel(nn.Module):
-    """
-    Complete animal embedding model with ArcFace loss.
-    """
+    """Embedding network plus an optional train-time margin head."""
 
     def __init__(
         self,

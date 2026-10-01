@@ -52,7 +52,7 @@ class EmbeddingTrainer:
         )
 
     def train_epoch(self, optimizer, scheduler=None):
-        """Train for one epoch using ArcFace loss."""
+        """Train for one epoch with the margin head."""
         self.model.train()
         total_loss = 0.0
         num_batches = 0
@@ -89,7 +89,7 @@ class EmbeddingTrainer:
 
         CRITICAL: We cannot use CrossEntropyLoss for validation because the validation
         set contains identities (classes) that the model has never seen (Open-Set).
-        The ArcFace head only knows about training identities.
+        The margin head only knows about training identities.
 
         Instead, we generate embeddings for all validation images and measure how well
         they cluster by identity using cosine similarity.

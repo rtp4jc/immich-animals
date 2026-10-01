@@ -37,9 +37,9 @@ cats, and goats, deer and sheep.
 
 `AnimalPipeline` in `animal_id/pipeline/animal_pipeline.py` runs three ONNX models:
 
-1. **Detector** (`ONNXDetector`): YOLO11n, outputs animal bounding boxes.
-2. **Keypoint estimator** (`ONNXKeypoint`): YOLO11n-pose, finds 4 facial landmarks (eyes, nose, throat) to refine the crop. **Off by default**: benchmarks are better without it.
-3. **Embedder** (`ONNXEmbedding`): DINOv2-B/14 + ArcFace, 512-dim L2-normalised vectors compared by cosine similarity, matching Immich's face-embedding contract.
+1. **Detector** (`ONNXDetector`): YOLO, outputs animal bounding boxes.
+2. **Keypoint estimator** (`ONNXKeypoint`): YOLO-pose, finds 4 facial landmarks (eyes, nose, throat) to refine the crop. **Off by default**: benchmarks are better without it.
+3. **Embedder** (`ONNXEmbedding`): a backbone from `embedding/backbones.py` trained with a margin head, 512-dim L2-normalised vectors compared by cosine similarity, matching Immich's face-embedding contract.
 
 `pipeline/onnx_models.py` wraps the three models and `pipeline/models.py` defines the `DetectionModel`, `KeypointModel`, and `EmbeddingModel` Protocols they satisfy.
 
@@ -51,7 +51,7 @@ animal_id/
 ├── data/            # Sample contract, source adapters, exports, contact sheets
 ├── detection/       # YOLO detector training (Ultralytics)
 ├── keypoint/        # YOLO-pose training on Stanford Dogs keypoints
-├── embedding/       # PyTorch embedding model: backbones.py, models.py (ArcFace head), losses.py, trainer.py
+├── embedding/       # PyTorch embedding model: backbones.py, models.py, losses.py (margin heads), trainer.py
 ├── identification/  # Immich-like clustering (cosine DBSCAN) + cluster metrics
 ├── benchmark/       # MRR, top-k accuracy, TAR@FAR
 ├── tracking/        # Weights & Biases logger
