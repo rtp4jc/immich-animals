@@ -19,6 +19,7 @@ PHASE1_MODELS_DIR = MODELS_DIR / "phase1"
 # Detector
 DETECTOR_RUN_NAME = "detector_run"
 DETECTOR_PROJECT_DIR = PHASE1_MODELS_DIR
+DETECTION_YAML = "data/detector/detection.yaml"  # relative to PROJECT_ROOT
 
 # Keypoint
 KEYPOINT_RUN_NAME = "keypoint_run"

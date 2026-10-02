@@ -11,7 +11,11 @@ from typing import Any
 import torch
 from ultralytics import YOLO
 
-from animal_id.common.constants import DETECTOR_PROJECT_DIR, DETECTOR_RUN_NAME
+from animal_id.common.constants import (
+    DETECTION_YAML,
+    DETECTOR_PROJECT_DIR,
+    DETECTOR_RUN_NAME,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +38,7 @@ class DetectionTrainer:
     def _get_default_config(self) -> dict[str, Any]:
         """Get default training configuration."""
         return {
-            "data": "data/detector/dogs_detection.yaml",
+            "data": DETECTION_YAML,
             "epochs": 100,
             "imgsz": 640,
             "batch": 16,

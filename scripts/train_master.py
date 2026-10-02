@@ -28,6 +28,7 @@ from animal_id.benchmark.evaluator import BenchmarkEvaluator
 from animal_id.benchmark.metrics import evaluate_embedding_model
 from animal_id.common.constants import (
     DATA_DIR,
+    DETECTION_YAML,
     DETECTOR_PROJECT_DIR,
     DETECTOR_RUN_NAME,
     MODELS_DIR,
@@ -210,14 +211,14 @@ def run_full_pipeline_benchmark(
     return True
 
 
-DETECTION_YAML = "data/detector/dogs_detection.yaml"
 DETECTION_SOURCES = (
+    Source.CAT_INDIVIDUALS,
     Source.COCO,
     Source.DOGREID,
     Source.STANFORD_DOGS,
     Source.OXFORD_PETS,
 )
-DETECTION_CLASSES = ("dog",)
+DETECTION_CLASSES = ("dog", "cat")
 # Uncapped, COCO's ~119K dog-free images would outnumber the ~25K dog images 5:1.
 DETECTION_MAX_NEGATIVES = {Source.COCO: 17000}
 # DogReID's ~3.3K owner photos are the target domain but <8% of the mix; 3x
@@ -281,7 +282,10 @@ def run_detector_export(model_path: Path):
     from ultralytics import YOLO
 
     model = YOLO(model_path)
-    exported_path_str = model.export(format="onnx", opset=12, nms=True)
+    # Class-agnostic: one animal must never come back as both a dog and a cat face.
+    exported_path_str = model.export(
+        format="onnx", opset=12, nms=True, agnostic_nms=True
+    )
     exported_path = Path(exported_path_str)
 
     ONNX_DETECTOR_PATH.parent.mkdir(parents=True, exist_ok=True)

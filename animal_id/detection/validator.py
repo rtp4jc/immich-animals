@@ -11,6 +11,8 @@ from pathlib import Path
 
 from ultralytics import YOLO
 
+from animal_id.common.constants import DETECTION_YAML
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,7 +49,7 @@ class DetectionValidator:
         self.model = YOLO(self.model_path)
 
     def validate_model(
-        self, data_yaml: str = "data/detector/dogs_detection.yaml"
+        self, data_yaml: str = DETECTION_YAML
     ) -> tuple[YOLO, dict[str, float]]:
         """Run validation on the model and return metrics."""
         if self.model is None:
@@ -91,7 +93,7 @@ class DetectionValidator:
 
 
 def validate_latest_detector(
-    data_yaml: str = "data/detector/dogs_detection.yaml",
+    data_yaml: str = DETECTION_YAML,
 ) -> tuple[YOLO, dict[str, float]]:
     """Convenience function to validate the latest trained detector."""
     validator = DetectionValidator()
