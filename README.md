@@ -135,7 +135,7 @@ Benchmarks log to Weights & Biases by default; pass `--no-wandb` to disable. In 
 |---|---|
 | 02 | Inspect COCO- and YOLO-format exports (keypoint and detection) |
 | 04, 05, 12 | Keypoint data prep, training, ONNX export |
-| `data.py` | `parse` sources into manifests; `inspect` prints a per-source summary and writes a contact sheet to `outputs/data_inspect/` |
+| `data.py` | `fetch` / `prepare` a source's images, `parse` sources into manifests; `inspect` prints a per-source summary and writes a contact sheet to `outputs/data_inspect/` |
 | 09 | Validate embeddings |
 | 14, 15 | Model I/O inspection, two-stage inference |
 | 16, 17 | Immich container integration (needs a local Immich fork at `immich-clone/`, not included) |
@@ -178,7 +178,9 @@ After adding a source, check it parsed correctly with
 | [MPDD](https://doi.org/10.17632/v5j6m8dzhv.1) | `data/mpdd/MPDD/pytorch/` | Identity embedding (whole-body); its test identities also go into `sidecar-validation` |
 | [Stanford Dogs](http://vision.stanford.edu/aditya86/ImageNetDogs/) | `data/stanford_dogs/images/`, `data/stanford_dogs/annotation/` | Detection, keypoints |
 | [StanfordExtra](https://www.kaggle.com/datasets/ollieboyne/stanfordextra-dogs-dataset) | `data/stanford_dogs/stanford_extra_keypoints.json` | Keypoint labels |
-| [Oxford Pets](https://www.robots.ox.ac.uk/~vgg/data/pets/) | `data/oxford_pets/images/`, `data/oxford_pets/annotations/` | Detection negatives (cats) |
+| [Oxford Pets](https://www.robots.ox.ac.uk/~vgg/data/pets/) | `data/oxford_pets/images/`, `data/oxford_pets/annotations/` | Detection (cats and dogs, boxed from the trimaps) |
+| [Cat Individual Images](https://www.kaggle.com/datasets/timost1234/cat-individuals) | unzip to `data/cat_individuals/cat_individuals_dataset/`, then `data.py prepare cat_individuals` | Cat detection and identity embedding; a quarter of the cats are held out as the benchmark |
+| [Open Images V7](https://storage.googleapis.com/openimages/web/index.html) | `data.py fetch open_images --max-per-class N` | Cat and dog detection (not in the default mix) |
 
 ## Notice of AI usage
 

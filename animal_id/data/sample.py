@@ -13,10 +13,12 @@ from pathlib import Path
 class Source(StrEnum):
     """Every dataset with an adapter or a written manifest; the value names its manifest."""
 
+    CAT_INDIVIDUALS = "cat_individuals"
     COCO = "coco"
     DOGFACENET = "dogfacenet"
     DOGREID = "dogreid"
     MPDD = "mpdd"
+    OPEN_IMAGES = "open_images"
     OXFORD_PETS = "oxford_pets"
     STANFORD_DOGS = "stanford_dogs"
 

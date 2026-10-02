@@ -46,8 +46,17 @@ COCO 2017 — https://cocodataset.org
     Detection. Annotations are CC BY 4.0; images carry their Flickr licences,
     some of them non-commercial.
 
+Open Images V7 — https://storage.googleapis.com/openimages/web/index.html
+    Detection (cats and dogs). Annotations are CC BY 4.0 (Google LLC); images
+    are CC BY 2.0, with each author and Flickr page listed per image in the
+    dataset's image CSV.
+
 Oxford-IIIT Pet (CC BY-SA 4.0) — https://www.robots.ox.ac.uk/~vgg/data/pets/
-    Detection negatives (cats).
+    Detection (cats and dogs, boxed from the segmentation trimaps).
+
+Cat Individual Images (CC BY 4.0) — https://www.kaggle.com/datasets/timost1234/cat-individuals
+    Cat detection and identity embedding. Boxes are pseudo-labels from COCO
+    YOLO11x.
 
 Because of the training data terms above, the models are offered for
 non-commercial research and personal use. This is a narrower grant than the

@@ -1,5 +1,6 @@
 import json
 
+import numpy as np
 import pytest
 import yaml
 from PIL import Image
@@ -9,10 +10,12 @@ from animal_id.data import sources, visualize
 from animal_id.data.exports import torch_identity, yolo
 from animal_id.data.sample import Box, Sample, read_manifest, write_manifest
 from animal_id.data.sources import (
+    cat_individuals,
     coco,
     dogfacenet,
     dogreid,
     mpdd,
+    open_images,
     oxford_pets,
     stanford_dogs,
 )
@@ -80,6 +83,36 @@ def test_dogreid_loads_only_open_set_train_frames(tmp_path):
     (sample,) = dogreid.load(tmp_path)
     assert sample.path == "dogreid/images/rex/rex-v1.jpg"
     assert sample.boxes == (Box("dog", (0.25, 0.2, 0.75, 0.8), "rex"),)
+
+
+def test_open_images_keeps_only_whole_photo_labelled_upright_images(tmp_path):
+    root = tmp_path / open_images.ROOT
+    (root / "images/train").mkdir(parents=True)
+    (root / "boxes.csv").write_text(
+        "ImageID,LabelName,XMin,XMax,YMin,YMax,IsGroupOf,IsDepiction\n"
+        "a,/m/01yrx,0.1,0.5,0.2,0.6,0,0\n"
+        "a,/m/0bt9lr,0.5,1.0,0.0,1.0,0,0\n"
+        "b,/m/0bt9lr,0.1,0.5,0.2,0.6,0,0\n"
+        "b,/m/01yrx,0.5,1.0,0.0,1.0,0,1\n"
+        "c,/m/0bt9lr,0.0,1.0,0.0,1.0,1,0\n"
+        "d,/m/0bt9lr,0.0,1.0,0.0,1.0,0,0\n"
+        "e,/m/0bt9lr,0.0,1.0,0.0,1.0,0,0\n"
+    )
+    cc_by = "https://creativecommons.org/licenses/by/2.0/"
+    (root / "images.csv").write_text(
+        "ImageID,Subset,License,Rotation\n"
+        + "".join(f"{i},train,{cc_by},0.0\n" for i in "abce")
+        + f"d,train,{cc_by},90.0\n"
+    )
+    for i in "abcd":  # e was never downloaded
+        (root / f"images/train/{i}.jpg").touch()
+    (sample,) = open_images.load(tmp_path)
+    assert sample.path == "open_images/images/train/a.jpg"
+    assert sample.license == "CC BY 2.0"
+    assert sample.boxes == (
+        Box("cat", (0.1, 0.2, 0.5, 0.6)),
+        Box("dog", (0.5, 0, 1, 1)),
+    )
 
 
 def test_boxed_identities_are_exported_as_padded_crops(tmp_path, monkeypatch):
@@ -241,14 +274,37 @@ def test_stanford_dogs_yields_every_dog_box(tmp_path):
     assert [b.xyxy for b in sample.boxes] == [(0, 0, 0.5, 1), (0.5, 0, 1, 1)]
 
 
-def test_oxford_pets_labels_species_without_location(tmp_path):
-    (tmp_path / "oxford_pets/annotations").mkdir(parents=True)
-    (tmp_path / "oxford_pets/annotations/list.txt").write_text(
+def test_cat_individuals_holds_out_benchmark_cats_and_ambiguous_photos(tmp_path):
+    cats = ["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"]
+    box = {"xyxy": [0.1, 0.2, 0.5, 0.6], "cats": 1}
+    boxes = {f"images/{c}/{c}_000.jpg": box for c in cats}
+    boxes["images/0001/0001_001.jpg"] = None  # no cat found
+    boxes["images/0001/0001_002.jpg"] = {**box, "cats": 2}  # which one is 0001?
+    (tmp_path / "cat_individuals").mkdir()
+    (tmp_path / "cat_individuals/boxes.json").write_text(json.dumps(boxes))
+    train = list(cat_individuals.load(tmp_path))
+    held_out = list(cat_individuals.load(tmp_path, benchmark=True))
+    assert len(train) + len(held_out) == len(cats) and held_out
+    assert {s.boxes[0].identity for s in held_out} == {
+        c for c in cats if cat_individuals.is_benchmark(c)
+    }
+    assert train[0].boxes == (Box("cat", (0.1, 0.2, 0.5, 0.6), identity="0001"),)
+
+
+def test_oxford_pets_boxes_the_largest_trimap_blob(tmp_path):
+    root = tmp_path / "oxford_pets/annotations"
+    (root / "trimaps").mkdir(parents=True)
+    (root / "list.txt").write_text(
         "#Image CLASS-ID SPECIES BREED ID\nAbyssinian_1 1 1 1\nbeagle_1 13 2 2\n"
     )
+    cat = np.full((10, 20), 2, np.uint8)  # 2 is background
+    cat[2:6, 4:12] = 1
+    cat[9, 19] = 3  # a stray speck must not stretch the box
+    Image.fromarray(cat).save(root / "trimaps/Abyssinian_1.png")
+    Image.fromarray(np.full((10, 20), 2, np.uint8)).save(root / "trimaps/beagle_1.png")
     assert [s.boxes for s in oxford_pets.load(tmp_path)] == [
-        (Box("cat"),),
-        (Box("dog"),),
+        (Box("cat", (0.2, 0.2, 0.6, 0.6)),),
+        (Box("dog"),),  # an all-background trimap leaves the pet unlocated
     ]
 
 

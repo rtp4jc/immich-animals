@@ -6,12 +6,12 @@ training splits: does it find the dog in a photo, and does it *avoid* firing on
 photos with no dog (every false positive becomes a junk "person" in Immich).
 
     data/sidecar-validation/
-      identities/<slug>/*.jpg   photos of one individual dog
+      identities/<slug>/*.jpg   photos of one individual dog (or cat-<slug>: cat)
       negatives/*.jpg           photos with no dog at all
-      manifest.json             every file, its label, source URL and licence
+      manifest.json             every file, its label, species, source URL and licence
 
-Sources: hand-picked Wikimedia Commons categories for named individual dogs
-(free licences, but noisy — see NON_PHOTO), Commons "Quality images" categories
+Sources: hand-picked Wikimedia Commons categories for named individual dogs and
+cats (free licences, but noisy — see NON_PHOTO), Commons "Quality images" categories
 for negatives, and the embedder's MPDD test identities (``data/mpdd``) for a
 second opinion on identity. MPDD images are reID-style crops, not snapshots, so
 the manifest tags every file with its source and the evaluator scores them apart.
@@ -27,7 +27,7 @@ import logging
 import re
 import shutil
 import time
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 
 import requests
@@ -113,6 +113,72 @@ IDENTITY_CATEGORIES = {
     "rob-roy-coolidge": "Category:Rob Roy (dog)",
     "paul-pry-coolidge": "Category:Paul Pry (dog)",
     "prudence-prim-coolidge": "Category:Prudence Prim (dog)",
+}
+
+# Same selection rules, from Category:Individual cats / Famous cats / Cats of
+# Wikipedians. Groups ("Nikita and Mika"), pairs, fictional cats, mascots and
+# statue-only categories are out.
+CAT_CATEGORIES = {
+    "cat-alpha": "Category:Alpha (cat)",
+    "cat-bella": "Category:Bella (cat)",
+    "cat-caramel": "Category:Caramel (red tabby cat)",
+    "cat-chocolate-bangkok": "Category:Chocolate Bangkok cat",
+    "cat-cola": "Category:Cola (solid black cat)",
+    "cat-combat": "Category:Combat (cat)",
+    "cat-ellie": "Category:Ellie (cat)",
+    "cat-erik-skaelskor": "Category:Erik the cat (Skælskør)",
+    "cat-fiumi": "Category:Fiumi (cat)",
+    "cat-foss": "Category:Foss (cat)",
+    "cat-francine": "Category:Francine (cat)",
+    "cat-george-de-jolival": "Category:George de Jolival",
+    "cat-gillie": "Category:Gillie (cat)",
+    "cat-gladstone": "Category:Gladstone (cat)",
+    "cat-grumpy": "Category:Grumpy Cat",
+    "cat-india-bush": "Category:India (cat)",
+    "cat-jule": "Category:Jule (female tuxedo patterned red bloched tabby and white cat)",
+    "cat-kater-stanislaus": "Category:Kater Stanislaus",
+    "cat-larry": "Category:Larry the cat",
+    "cat-leerie": "Category:Leerie (Asian cat)",
+    "cat-loki": "Category:Loki (cat)",
+    "cat-mikan-station": "Category:Mikan (cat)",
+    "cat-miss-kitty": "Category:Miss Kitty (black silver cat)",
+    "cat-miss-stevie-nicks": "Category:Miss Stevie Nicks (cat)",
+    "cat-miss-truffles": "Category:Miss Truffles (cat)",
+    "cat-miyako": "Category:Miyako (cat)",
+    "cat-ms-squeaky": "Category:Ms. Squeaky (cat)",
+    "cat-nanouk": "Category:Nanouk (cat)",
+    "cat-naro": "Category:Naro (cat)",
+    "cat-oiseau": "Category:Oiseau (cat)",
+    "cat-onapromise-pyanfar": "Category:Onapromise Pyanfar (cat)",
+    "cat-osiris": "Category:Osiris (Bengal cat)",
+    "cat-palmerston": "Category:Palmerston (cat)",
+    "cat-peach": "Category:Peach (red tabby and white cat)",
+    "cat-poseidon": "Category:Poseidon (cat)",
+    "cat-prickles": "Category:Prickles (Asian cat)",
+    "cat-rambo": "Category:Rambo (cat)",
+    "cat-romeo": "Category:Romeo (male tuxedo patterned red blotched tabby and white cat)",
+    "cat-rum-tum-tugger": "Category:Rum Tum Tugger (red tabby cat)",
+    "cat-samourai": "Category:Samouraï (cat)",
+    "cat-socks-clinton": "Category:Socks (cat)",
+    "cat-stephanie": "Category:Stephanie (cat)",
+    "cat-suzieq": "Category:SuzieQ (cat)",
+    "cat-tama-station": "Category:Tama (cat)",
+    "cat-tesla": "Category:Tesla (Ragdoll cat)",
+    "cat-tomcat-matata": "Category:Tomcat Matata (cat)",
+    "cat-uthello": "Category:Uthello (Sphynx cat)",
+    "cat-vikingur": "Category:Víkingur (NFO cat)",
+    "cat-willow-biden": "Category:Willow (Joe Biden's cat)",
+    "cat-tiger-coolidge": "Category:Tiger (pet cat of Grace Coolidge)",
+    "cat-misty-malarky-ying-yang": "Category:Misty Malarky Ying Yang",
+    "cat-trim": "Category:Trim (cat)",
+    "cat-mrs-chippy": "Category:Mrs. Chippy",
+}
+
+# Domestic-cat negatives stay labelled "negative" so dog scoring is unchanged,
+# but are tagged species "cat" for cat scoring.
+CAT_NEGATIVE_CATEGORIES = {
+    "Category:Quality images of cats",
+    "Category:Featured pictures of cats",
 }
 
 # (category, max files, subcategory depth). Cats and other quadrupeds first:
@@ -249,14 +315,26 @@ def is_photo(title: str, info: dict) -> bool:
     )
 
 
-def record(title: str, info: dict, path: Path, label: str, category: str) -> dict:
+def source_url(title: str) -> str:
+    return f"https://commons.wikimedia.org/wiki/{title.replace(' ', '_')}"
+
+
+def record(
+    title: str,
+    info: dict,
+    path: Path,
+    label: str,
+    category: str,
+    species: str | None,
+) -> dict:
     meta = info.get("extmetadata", {})
     artist = re.sub(r"<[^>]+>", "", meta.get("Artist", {}).get("value", "")).strip()
     return {
         "path": str(path.relative_to(OUT_DIR)),
         "label": label,
+        "species": species,
         "source": "commons",
-        "source_url": f"https://commons.wikimedia.org/wiki/{title.replace(' ', '_')}",
+        "source_url": source_url(title),
         "licence": meta.get("LicenseShortName", {}).get("value", "unknown"),
         "credit": artist,
         "category": category,
@@ -301,9 +379,11 @@ def download(url: str, dest: Path) -> bool:
     return False
 
 
-def fetch_identities(limit: int | None, per_identity: int) -> list[dict]:
+def fetch_identities(
+    categories: dict[str, str], species: str, limit: int | None, per_identity: int
+) -> list[dict]:
     records = []
-    for slug, category in list(IDENTITY_CATEGORIES.items())[:limit]:
+    for slug, category in list(categories.items())[:limit]:
         titles = category_files(category)
         infos = file_info(titles)
         keep = [t for t in titles if t in infos and is_photo(t, infos[t])]
@@ -315,7 +395,7 @@ def fetch_identities(limit: int | None, per_identity: int) -> list[dict]:
             info = infos[title]
             dest = OUT_DIR / "identities" / slug / filename(title)
             if download(info.get("thumburl") or info["url"], dest):
-                got.append(record(title, info, dest, slug, category))
+                got.append(record(title, info, dest, slug, category, species))
         if len(got) < MIN_PHOTOS:
             logger.warning(f"{slug}: only {len(got)} downloaded, skipping")
             continue
@@ -324,7 +404,7 @@ def fetch_identities(limit: int | None, per_identity: int) -> list[dict]:
     return records
 
 
-def fetch_negatives(limit: int) -> list[dict]:
+def fetch_negatives(limit: int, identity_urls: set[str]) -> list[dict]:
     records, seen = [], set()
     per_category = {c: n for c, n, _ in NEGATIVE_CATEGORIES}
     for category, cap, depth in NEGATIVE_CATEGORIES:
@@ -332,6 +412,7 @@ def fetch_negatives(limit: int) -> list[dict]:
             break
         titles = [t for t in category_files(category, depth) if t not in seen]
         titles = [t for t in titles if not DOG_WORDS.search(t)]
+        titles = [t for t in titles if source_url(t) not in identity_urls]
         infos = file_info(titles[: cap * 4])  # headroom for the ones we reject
         taken = 0
         for title in titles:
@@ -346,7 +427,8 @@ def fetch_negatives(limit: int) -> list[dict]:
             seen.add(title)
             dest = OUT_DIR / "negatives" / filename(title)
             if download(info.get("thumburl") or info["url"], dest):
-                records.append(record(title, info, dest, "negative", category))
+                species = "cat" if category in CAT_NEGATIVE_CATEGORIES else None
+                records.append(record(title, info, dest, "negative", category, species))
                 taken += 1
         logger.info(f"{category}: {taken} negatives")
     return records
@@ -369,6 +451,7 @@ def fetch_mpdd(limit: int | None) -> list[dict]:
                 {
                     "path": str(dest.relative_to(OUT_DIR)),
                     "label": slug,
+                    "species": "dog",
                     "source": "mpdd",
                     "source_url": "https://doi.org/10.17632/v5j6m8dzhv.1",
                     "licence": mpdd.LICENSE,
@@ -404,10 +487,17 @@ def summarise(records: list[dict]) -> None:
 def main(args: argparse.Namespace) -> None:
     global OUT_DIR  # every path is built from it, and --out has to reach them all
     OUT_DIR = Path(args.out)
-    records = fetch_identities(args.limit, args.per_identity)
+    records = fetch_identities(
+        IDENTITY_CATEGORIES, "dog", args.limit, args.per_identity
+    )
+    cats = fetch_identities(CAT_CATEGORIES, "cat", args.limit, args.per_identity)
+    # A photo filed under two cats shows both, so it labels neither.
+    shared = {u for u, n in Counter(r["source_url"] for r in cats).items() if n > 1}
+    records += [r for r in cats if r["source_url"] not in shared]
     if not args.no_mpdd:
         records += fetch_mpdd(args.limit)
-    records += fetch_negatives(args.limit or args.negatives)
+    identity_urls = {r["source_url"] for r in records}
+    records += fetch_negatives(args.limit or args.negatives, identity_urls)
 
     # Drop entries whose file vanished, so the manifest always matches disk.
     records = [r for r in records if (OUT_DIR / r["path"]).exists()]
