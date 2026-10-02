@@ -4,10 +4,9 @@ Run Identification Validator
 
 Phase-1 "Immich-like" animal identification validator:
   1. Embed a labeled gallery with the ONNX pipeline.
-  2. Cluster embeddings into discovered identities (cosine DBSCAN, mirroring
-     Immich face-clustering).
+  2. Cluster embeddings into discovered identities the way Immich assigns faces.
   3. Evaluate cluster quality vs ground-truth identity labels.
-  4. Sweep the DBSCAN eps threshold and print a tidy table.
+  4. Sweep the eps (Max Distance) threshold and print a tidy table.
   5. Save results JSON to outputs/identification/<split>_<timestamp>.json.
 
 Usage:
@@ -218,14 +217,14 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=3,
         metavar="M",
-        help="DBSCAN min_samples / Immich minFaces (default: 3).",
+        help="Immich minFaces (default: 3).",
     )
     parser.add_argument(
         "--eps",
         type=float,
         default=0.5,
         metavar="E",
-        help="DBSCAN eps for headline single-run metrics (default: 0.5).",
+        help="Max Distance for headline single-run metrics (default: 0.5).",
     )
     parser.add_argument(
         "--eps-sweep",

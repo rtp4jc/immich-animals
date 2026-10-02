@@ -24,6 +24,18 @@ CROP_DIR = "identity_crops"
 CROP_PAD = 0.1
 
 
+def crop(image: Image.Image, xyxy: list[float] | None) -> Image.Image:
+    """The animal in RGB, padded like the sidecar's crop; the whole image if unlocated."""
+    image = image.convert("RGB")
+    if xyxy is None:
+        return image
+    w, h = image.size
+    x1, y1, x2, y2 = (v * s for v, s in zip(xyxy, (w, h, w, h), strict=True))
+    pad = (x2 - x1) * CROP_PAD
+    box = (max(0, x1 - pad), max(0, y1 - pad), min(w, x2 + pad), min(h, y2 + pad))
+    return image.crop(tuple(map(int, box)))
+
+
 def splits(
     samples: list[Sample],
     min_images: int = 5,
@@ -100,18 +112,6 @@ def write(samples: list[Sample], paths: dict[str, Path], min_images: int = 5) ->
             out = PROJECT_ROOT / row["file_path"]
             out.parent.mkdir(parents=True, exist_ok=True)
             with Image.open(DATA_DIR / row["crop"]["image"]) as image:
-                w, h = image.size
-                x1, y1, x2, y2 = (
-                    v * s
-                    for v, s in zip(row["crop"]["xyxy"], (w, h, w, h), strict=True)
-                )
-                pad = (x2 - x1) * CROP_PAD
-                box = (
-                    max(0, x1 - pad),
-                    max(0, y1 - pad),
-                    min(w, x2 + pad),
-                    min(h, y2 + pad),
-                )
-                image.convert("RGB").crop(tuple(map(int, box))).save(out, quality=95)
+                crop(image, row["crop"]["xyxy"]).save(out, quality=95)
         paths[split].write_text(json.dumps(rows, indent=2))
         logger.info(f"Wrote {len(rows)} {split} rows to {paths[split]}")

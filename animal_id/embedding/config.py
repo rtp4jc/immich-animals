@@ -65,10 +65,18 @@ class DataConfig:
     train_json_path: str = "data/identity_train.json"
     val_json_path: str = "data/identity_val.json"
     test_json_path: str = "data/identity_test.json"
-    sources: tuple[Source, ...] = (Source.DOGFACENET, Source.DOGREID, Source.MPDD)
-    # Checkpoints are chosen on this source's val identities: owner phone photos,
+    sources: tuple[Source, ...] = (
+        Source.CAT_INDIVIDUALS,
+        Source.DOGFACENET,
+        Source.DOGREID,
+        Source.MPDD,
+    )
+    # Checkpoints are chosen on these sources' val identities: owner phone photos,
     # where selecting on DogFaceNet's aligned faces picked the wrong models.
-    select_on: Source = Source.DOGREID
+    select_on: tuple[Source, ...] = (Source.CAT_INDIVIDUALS, Source.DOGREID)
+    # Sources shot in near-duplicate bursts. Deduping every source cost dogs ~2pp
+    # BCubed F: DogFaceNet's similar-looking face crops are signal, not bursts.
+    dedupe: tuple[Source, ...] = (Source.CAT_INDIVIDUALS,)
     min_images: int = 2
     img_size: int = 224
     batch_size: int = 32

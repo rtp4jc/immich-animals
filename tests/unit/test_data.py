@@ -6,7 +6,7 @@ import yaml
 from PIL import Image
 
 from animal_id.common.license import LicenseTier, license_tier
-from animal_id.data import sources, visualize
+from animal_id.data import dedupe, sources, visualize
 from animal_id.data.exports import torch_identity, yolo
 from animal_id.data.sample import Box, Sample, read_manifest, write_manifest
 from animal_id.data.sources import (
@@ -371,3 +371,21 @@ def test_yolo_repeats_a_source_in_train_only(tmp_path, monkeypatch):
     assert sum("/a/" in p for p in train) == 3 * len(in_train["a"])
     assert sum("/b/" in p for p in train) == len(in_train["b"])
     assert len(val) == len(set(val))
+
+
+def test_drop_bursts_keeps_one_photo_per_burst_of_each_identity(tmp_path, monkeypatch):
+    monkeypatch.setattr(dedupe, "MANIFEST_DIR", tmp_path)
+    samples = [
+        Sample(f"{name}.jpg", "s", "CC0", (Box("cat", identity=cat),))
+        for name, cat in [("a1", "a"), ("a2", "a"), ("a3", "a"), ("b1", "b")]
+    ]
+    # a1/a2 are one burst; a3 is a different shot of a; b1 looks like a1 but is b.
+    vectors = {"a1": [1, 0], "a2": [0.99, 0.14], "a3": [0, 1], "b1": [1, 0]}
+    monkeypatch.setattr(
+        dedupe,
+        "_embed",
+        lambda group: np.array([vectors[s.path[:2]] for s in group], np.float32),
+    )
+    kept = [s.path for s in dedupe.drop_bursts(samples, ("s",))]
+    assert kept == ["a1.jpg", "a3.jpg", "b1.jpg"]
+    assert (tmp_path / "s.bursts.json").exists()

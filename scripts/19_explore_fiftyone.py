@@ -5,7 +5,7 @@ FiftyOne Explorer for Animal-ID Embeddings
 Phase-2 visual companion to scripts/18_run_identification.py.
 
 Loads the gallery images into a FiftyOne dataset, attaches ground-truth identity
-labels and predicted DBSCAN cluster labels, computes a 2-D embedding visualization
+labels and predicted cluster labels, computes a 2-D embedding visualization
 (UMAP → t-SNE → PCA fallback chain) and a similarity index, then (optionally)
 launches the FiftyOne App.
 
@@ -149,9 +149,7 @@ def main(args: argparse.Namespace) -> None:
         logger.error("No embeddings produced — cannot proceed. Exiting.")
         return
 
-    logger.info(
-        f"Clustering with DBSCAN (eps={args.eps}, min_samples={args.min_samples})..."
-    )
+    logger.info(f"Clustering (eps={args.eps}, min_samples={args.min_samples})...")
     pred = cluster(embeddings, eps=args.eps, min_samples=args.min_samples)
     num_clusters = int(np.max(pred)) + 1 if np.any(pred >= 0) else 0
     num_noise = int(np.sum(pred == -1))
@@ -205,7 +203,7 @@ def main(args: argparse.Namespace) -> None:
         print(f"  Dataset name  : {dataset_name}")
         print(f"  Samples       : {len(dataset)}")
         print(f"  Split         : {args.split}")
-        print(f"  DBSCAN eps    : {args.eps}  min_samples: {args.min_samples}")
+        print(f"  eps           : {args.eps}  min_samples: {args.min_samples}")
         print(f"  Clusters      : {num_clusters}  Noise: {num_noise}")
         print(f"  Brain keys    : {', '.join(brain_keys)}")
         print(f"  Viz method    : {actual_method}")
@@ -223,7 +221,7 @@ def _print_app_tips(sim_key: str, viz_key: str) -> None:
     print("App tips:")
     print("  - Open the Embeddings panel and select brain key:", viz_key)
     print("  - Color by 'ground_truth' to see true identity clusters")
-    print("  - Color by 'pred_cluster' to see DBSCAN-discovered clusters")
+    print("  - Color by 'pred_cluster' to see discovered clusters")
     print(
         f"  - Use 'Sort by similarity' (brain key: {sim_key}) on any selected"
         " sample to find similar animals"
@@ -235,7 +233,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Visual explorer for animal-ID embeddings using FiftyOne. "
-            "Loads gallery images, attaches ground-truth + DBSCAN cluster labels, "
+            "Loads gallery images, attaches ground-truth + cluster labels, "
             "computes similarity + 2-D visualization, then (optionally) launches the App."
         ),
     )
@@ -257,14 +255,14 @@ def parse_args() -> argparse.Namespace:
         type=float,
         default=0.4,
         metavar="E",
-        help="DBSCAN eps threshold (default: 0.4, empirically-best operating point).",
+        help="Max Distance (eps) threshold (default: 0.4, empirically-best operating point).",
     )
     parser.add_argument(
         "--min-samples",
         type=int,
         default=3,
         metavar="M",
-        help="DBSCAN min_samples (default: 3).",
+        help="Immich minFaces (default: 3).",
     )
     parser.add_argument(
         "--viz-method",

@@ -16,10 +16,10 @@ class IdentityDataset(Dataset):
     """
 
     def __init__(self, json_path, img_size=224, is_training=True, source=None):
-        """``source`` keeps only that source's rows (e.g. to select checkpoints on it)."""
+        """``source`` keeps only those sources' rows (e.g. to select checkpoints on them)."""
         with open(json_path) as f:
             self.annotations = [
-                row for row in json.load(f) if source is None or row["source"] == source
+                row for row in json.load(f) if source is None or row["source"] in source
             ]
 
         # Labels may be sparse, so the head needs max + 1 classes, not the unique count.

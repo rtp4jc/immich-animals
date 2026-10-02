@@ -36,6 +36,8 @@ def parse(name: Source) -> None:
         raise FileNotFoundError(f"No samples for '{name}' under {DATA_DIR}")
     path = MANIFEST_DIR / f"{name}.jsonl"
     write_manifest(samples, path)
+    # Burst decisions are per photo of the old manifest; recompute on next export.
+    (MANIFEST_DIR / f"{name}.bursts.json").unlink(missing_ok=True)
     logger.info(f"Parsed {len(samples)} {name} samples into {path}")
 
 

@@ -34,6 +34,9 @@ from animal_id.common.constants import DATA_DIR, ONNX_EMBEDDING_PATH
 from animal_id.common.datasets import IdentityDataset
 from animal_id.common.logging_config import setup_logging
 from animal_id.common.seed import set_seed, worker_init_fn
+from animal_id.data import dedupe, sources
+from animal_id.data.exports import torch_identity
+from animal_id.data.sample import Source
 from animal_id.embedding.backbones import BackboneType, get_backbone_input_size
 from animal_id.embedding.config import DATA_CONFIG, TRAINING_CONFIG
 from animal_id.embedding.export import export_embedding_onnx
@@ -49,6 +52,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "ablation"
 FINAL_CSV = OUTPUT_DIR / "final.csv"
 NO_EARLY_STOP = 10**6
+SPLITS = ("train", "val", "test")
 
 
 def _rel(path: Path) -> str:
@@ -123,7 +127,7 @@ def verify_export(model, onnx_path: Path, img_size: int) -> dict:
 
 
 def tune_eps(embeddings, labels) -> tuple[float, list[dict]]:
-    """Pick the DBSCAN threshold to ship with this model.
+    """Pick the clustering threshold to ship with this model.
 
     ``eps`` is Immich's ``maxDistance``, and the right value depends on the
     embedding geometry, so it cannot be inherited across a backbone swap. Note
@@ -140,11 +144,11 @@ def tune_eps(embeddings, labels) -> tuple[float, list[dict]]:
     return best["eps"], sweep
 
 
-def build_combined_json(out_path: Path) -> Path:
+def build_combined_json(data_dir: Path, out_path: Path) -> Path:
     """train + val in one file. Identity labels are global, so no remapping."""
     merged = []
     for name in ("identity_train.json", "identity_val.json"):
-        merged += json.loads((DATA_DIR / name).read_text())
+        merged += json.loads((data_dir / name).read_text())
     out_path.write_text(json.dumps(merged))
     return out_path
 
@@ -186,7 +190,29 @@ def main():
         help="Export an existing best_model.pt instead of training a new one.",
     )
     parser.add_argument("--output", default=None, help="ONNX destination.")
+    parser.add_argument(
+        "--sources",
+        nargs="+",
+        type=Source,
+        default=None,
+        help="Train on these sources; their splits go to data/processed/<names>/.",
+    )
+    parser.add_argument(
+        "--select-on", nargs="+", type=Source, default=DATA_CONFIG.select_on
+    )
     args = parser.parse_args()
+    data_dir = DATA_DIR
+    if args.sources:
+        data_dir = DATA_DIR / "processed" / "+".join(sorted(args.sources))
+        data_dir.mkdir(parents=True, exist_ok=True)
+        torch_identity.write(
+            dedupe.drop_bursts(
+                [s for name in args.sources for s in sources.load(name)],
+                DATA_CONFIG.dedupe,
+            ),
+            {split: data_dir / f"identity_{split}.json" for split in SPLITS},
+            DATA_CONFIG.min_images,
+        )
 
     backbone = BackboneType(args.backbone)
     head = HeadType(args.head)
@@ -205,17 +231,17 @@ def main():
         # Record what the checkpoint path can substantiate, and nothing more.
         source = Path(args.checkpoint).parent.name
         trained_on = f"checkpoint:{source}"
-        train_json = DATA_DIR / "identity_train.json"
+        train_json = data_dir / "identity_train.json"
         match = re.search(r"_s(\d+)$", source)
         recorded_seed = match.group(1) if match else ""
         if args.include_val:
             print("--include-val ignored: --checkpoint does not retrain.")
     elif args.include_val:
-        train_json = build_combined_json(run_dir / "identity_trainval.json")
+        train_json = build_combined_json(data_dir, run_dir / "identity_trainval.json")
         trained_on = "train+val"
         recorded_seed = args.seed
     else:
-        train_json = DATA_DIR / "identity_train.json"
+        train_json = data_dir / "identity_train.json"
         trained_on = "train"
         recorded_seed = args.seed
 
@@ -231,14 +257,14 @@ def main():
         )
     # Monitoring only when val is folded in — it is no longer held out.
     _, val_loader = loader_for(
-        DATA_DIR / "identity_val.json",
+        data_dir / "identity_val.json",
         img_size,
         batch_size,
         False,
-        source=DATA_CONFIG.select_on,
+        source=args.select_on,
     )
     _, test_loader = loader_for(
-        DATA_DIR / "identity_test.json", img_size, batch_size, False
+        data_dir / "identity_test.json", img_size, batch_size, False
     )
 
     print(

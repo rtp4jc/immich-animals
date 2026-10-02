@@ -1,4 +1,4 @@
-"""Cluster-quality metrics comparing DBSCAN assignments to ground-truth identities."""
+"""Cluster-quality metrics comparing cluster assignments to ground-truth identities."""
 
 from collections import Counter
 

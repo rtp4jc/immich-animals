@@ -41,7 +41,7 @@ from animal_id.common.identity_loader import IdentityLoader
 from animal_id.common.logging_config import setup_logging
 from animal_id.common.seed import set_seed, worker_init_fn
 from animal_id.common.utils import find_latest_run, find_latest_timestamped_run
-from animal_id.data import sources
+from animal_id.data import dedupe, sources
 from animal_id.data.exports import torch_identity, yolo
 from animal_id.data.sample import Source
 from animal_id.detection.trainer import DetectionTrainer
@@ -299,7 +299,7 @@ def run_embedding_data_prep():
 
     samples = [s for name in DATA_CONFIG.sources for s in sources.load(name)]
     torch_identity.write(
-        samples,
+        dedupe.drop_bursts(samples, DATA_CONFIG.dedupe),
         {
             "train": PROJECT_ROOT / DATA_CONFIG.train_json_path,
             "val": PROJECT_ROOT / DATA_CONFIG.val_json_path,

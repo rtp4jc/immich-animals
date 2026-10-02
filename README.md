@@ -52,7 +52,7 @@ animal_id/
 ├── detection/       # YOLO detector training (Ultralytics)
 ├── keypoint/        # YOLO-pose training on Stanford Dogs keypoints
 ├── embedding/       # PyTorch embedding model: backbones.py, models.py, losses.py (margin heads), trainer.py
-├── identification/  # Immich-like clustering (cosine DBSCAN) + cluster metrics
+├── identification/  # Immich-style clustering + cluster metrics
 ├── benchmark/       # MRR, top-k accuracy, TAR@FAR
 ├── tracking/        # Weights & Biases logger
 └── common/          # constants.py (single source of truth for paths), datasets, seeding, shared YOLO converter
@@ -122,7 +122,7 @@ accuracy: `BackboneSpec.license_tier` records it and `summarize_ablation.py`
 treats anything non-permissive as a reference ceiling rather than a candidate.
 
 Each exported embedder writes a `.json` sidecar beside it holding the
-preprocessing recipe, test metrics, ONNX parity and the DBSCAN `eps` to cluster
+preprocessing recipe, test metrics, ONNX parity and the clustering `eps` to cluster
 at. That `eps` is swept per model (it depends on embedding geometry, so it
 cannot be inherited across a backbone swap) and is selected on the test split,
 so the clustering scores are best-case; retrieval metrics involve no tuning.
@@ -149,7 +149,7 @@ Benchmarks log to Weights & Biases by default; pass `--no-wandb` to disable. In 
 
 Exported models land in `models/onnx/` as `detector.onnx`, `keypoint.onnx`, and
 `embedding.onnx`, each embedder alongside a `.json` sidecar recording its
-backbone, preprocessing recipe, test metrics and DBSCAN `eps`. The embedder is
+backbone, preprocessing recipe, test metrics and clustering `eps`. The embedder is
 trained on ImageNet-normalised input while the YOLO stages take raw `[0, 1]`, so
 `ONNXEmbedding` normalises and the others do not. `copy_models.sh` and `reload_immich.sh` push them into the `immich-clone/` fork.
 
