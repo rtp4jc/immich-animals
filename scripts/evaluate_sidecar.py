@@ -3,14 +3,16 @@
 
 Answers the two questions that pick Immich's settings:
 
-  Min Detection Score — recall on identity photos versus the false-positive rate
-  on dog-free photos. Every false positive becomes a junk "person" in the
-  library, so the sweep has to show both sides.
-  Max Distance — DBSCAN eps over the returned embeddings, scored the same way as
-  the sweep in models/onnx/embedding.json.
+  Min Detection Score — recall per species and source on animal photos versus the
+  false-positive rate on animal-free photos. Every false positive becomes a junk
+  "person" in the library, so the sweep has to show both sides.
+  Max Distance — Immich-style clustering of the returned embeddings, per species
+  and over all species together to count clusters that mix them (Immich can't
+  tell them apart).
 
 Predictions are fetched once at the lowest threshold in the sweep and cached;
 the sidecar returns a score per detection, so the rest of the sweep is free.
+Give each sidecar configuration its own --cache name.
 
     uv run python scripts/evaluate_sidecar.py --url http://localhost:3005
 """
@@ -82,17 +84,16 @@ def _hits(detections: list[dict], threshold: float) -> list[dict]:
 
 
 def score_sweep(records: list[dict], preds: dict) -> None:
-    """Recall on dogs and false-positive rate on non-dogs, per minScore."""
+    """Recall on animal photos and false-positive rate on animal-free ones, per minScore."""
     groups = defaultdict(list)
     for rec in records:
         if rec["path"] not in preds:
             continue
-        key = "negative" if rec["label"] == "negative" else f"identity/{rec['source']}"
+        # Unnamed cat photos are labelled "negative" but still contain a cat.
+        key = f"{rec['species']}/{rec['source']}" if rec["species"] else "negative"
         groups[key].append(preds[rec["path"]])
 
-    header = f"{'minScore':>9}  " + "  ".join(
-        f"{k.split('/')[-1][:10]:>18}" for k in sorted(groups)
-    )
+    header = f"{'minScore':>9}  " + "  ".join(f"{k[:18]:>18}" for k in sorted(groups))
     print("\nDetection: share of photos with at least one detection")
     print(header)
     print("-" * len(header))
@@ -110,10 +111,10 @@ def score_sweep(records: list[dict], preds: dict) -> None:
 
 
 def negative_breakdown(records: list[dict], preds: dict, threshold: float) -> None:
-    """Which kinds of non-dog photo the detector actually fires on."""
+    """Which kinds of animal-free photo the detector actually fires on."""
     by_category = defaultdict(lambda: [0, 0])
     for rec in records:
-        if rec["label"] != "negative" or rec["path"] not in preds:
+        if rec["species"] or rec["path"] not in preds:
             continue
         name = rec["category"].replace("Category:Quality images of ", "")
         name = name.replace("Category:Featured pictures of ", "")
@@ -127,11 +128,15 @@ def negative_breakdown(records: list[dict], preds: dict, threshold: float) -> No
         print(f"  {name:<28} {fired:>3}/{total:<4} {fired / max(total, 1):>6.3f}")
 
 
-def eps_sweep(records: list[dict], preds: dict, threshold: float, source: str) -> None:
+def eps_sweep(
+    records: list[dict], preds: dict, threshold: float, species: str, source: str
+) -> None:
     """Cluster the best detection per identity photo, scored against the labels."""
-    vectors, labels = [], []
+    vectors, labels, kinds = [], [], []
     for rec in records:
         if rec["label"] == "negative" or rec["path"] not in preds:
+            continue
+        if species != "all" and rec["species"] != species:
             continue
         if source != "all" and rec["source"] != source:
             continue
@@ -140,40 +145,50 @@ def eps_sweep(records: list[dict], preds: dict, threshold: float, source: str) -
             continue  # a miss is already counted by the detection sweep
         vectors.append(max(hits, key=lambda d: d["score"])["embedding"])
         labels.append(rec["label"])
+        kinds.append(rec["species"])
     if not vectors:
         return
 
     embeddings = np.asarray(vectors, dtype=np.float32)
     header = (
         f"{'eps':>6}  {'clusters':>8}  {'true_ids':>8}  {'homog':>7}  "
-        f"{'compl':>7}  {'v_meas':>7}  {'purity':>7}  {'noise':>7}"
+        f"{'compl':>7}  {'v_meas':>7}  {'purity':>7}  {'noise':>7}  {'mixed':>5}"
     )
-    print(f"\nClustering [{source}]: {len(labels)} crops, minScore {threshold}")
+    print(
+        f"\nClustering [{species}/{source}]: {len(labels)} crops, minScore {threshold}"
+    )
     print(header)
     print("-" * len(header))
     for eps in EPS_SWEEP:
-        m = cluster_quality(labels, cluster(embeddings, eps=eps, min_samples=3))
+        pred = cluster(embeddings, eps=eps, min_samples=3)
+        m = cluster_quality(labels, pred)
+        members = defaultdict(set)
+        for c, kind in zip(pred, kinds):
+            members[c].add(kind)
+        mixed = sum(len(v) > 1 for c, v in members.items() if c != -1)
         print(
             f"{eps:>6.2f}  {m['num_clusters']:>8d}  {m['num_true_identities']:>8d}  "
             f"{m['homogeneity']:>7.4f}  {m['completeness']:>7.4f}  "
-            f"{m['v_measure']:>7.4f}  {m['purity']:>7.4f}  {m['noise_rate']:>7.4f}"
+            f"{m['v_measure']:>7.4f}  {m['purity']:>7.4f}  {m['noise_rate']:>7.4f}  "
+            f"{mixed:>5d}"
         )
 
 
 def main(args: argparse.Namespace) -> None:
     root = Path(args.data)
     records = json.loads((root / "manifest.json").read_text())["files"]
-    preds = collect(
-        args.url, records, root, root / ".cache" / "predictions.json", args.refresh
-    )
+    cache = root / ".cache" / f"{args.cache}.json"
+    preds = collect(args.url, records, root, cache, args.refresh)
     logger.info(f"{len(preds)} of {len(records)} files predicted")
 
     score_sweep(records, preds)
     negative_breakdown(records, preds, args.min_score)
-    for source in sorted({r["source"] for r in records if r["label"] != "negative"}) + [
-        "all"
-    ]:
-        eps_sweep(records, preds, args.min_score, source)
+    identities = [r for r in records if r["label"] != "negative"]
+    for species in sorted({r["species"] for r in identities}):
+        sources = sorted({r["source"] for r in identities if r["species"] == species})
+        for source in sources + ["all"] if len(sources) > 1 else sources:
+            eps_sweep(records, preds, args.min_score, species, source)
+    eps_sweep(records, preds, args.min_score, "all", "all")
 
 
 if __name__ == "__main__":
@@ -185,6 +200,11 @@ if __name__ == "__main__":
         type=float,
         default=0.3,
         help="threshold for the clustering and breakdown tables",
+    )
+    parser.add_argument(
+        "--cache",
+        default="predictions",
+        help="cache file name, one per sidecar configuration",
     )
     parser.add_argument(
         "--refresh", action="store_true", help="ignore cached predictions"

@@ -1,17 +1,18 @@
-"""Answer Immich's machine-learning HTTP contract with dog models.
+"""Answer Immich's machine-learning HTTP contract with animal models.
 
-Immich has one face-detection pipeline, so dogs ride along in it: we answer the
-facial-recognition task with dogs and forward it upstream for people as well.
+Immich has one face-detection pipeline, so animals ride along in it: we answer
+the facial-recognition task with animals and forward it upstream for people as well.
 Every other task (CLIP, OCR) is passed through untouched, because Immich's
 `urls` list is failover rather than routing — whichever server answers has to
 answer everything.
 
 Immich's own Min Detection Score and Max Distance stay at whatever the user has
-them set to. Dogs want different values, so the sidecar applies its own
-threshold and maps its embeddings onto Immich's, rather than asking the user to
+them set to. Each species wants different values, so the sidecar applies its own
+thresholds and maps its embeddings onto Immich's, rather than asking the user to
 retune settings that are already right for people.
 """
 
+import ast
 import hashlib
 import json
 import logging
@@ -37,10 +38,10 @@ KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
     "true",
     "yes",
 }
-# Immich's default suits people; dogs need roughly 0.3 or half of them are lost.
-DOG_MIN_SCORE = float(os.environ.get("DOG_MIN_SCORE", "0.3"))
-# Where our embeddings cluster best, and the Max Distance Immich is set to.
-DOG_MAX_DISTANCE = float(os.environ.get("DOG_MAX_DISTANCE", "0.4"))
+# (<SPECIES>_MIN_SCORE, <SPECIES>_MAX_DISTANCE) defaults. Immich's min score suits
+# people; dogs need roughly 0.3 or half of them are lost. Max distance is where
+# that species' embeddings cluster best. Detector classes not listed are ignored.
+SPECIES_DEFAULTS = {"dog": (0.3, 0.4), "cat": (0.3, 0.35)}
 IMMICH_MAX_DISTANCE = float(os.environ.get("IMMICH_MAX_DISTANCE", "0.5"))
 
 
@@ -81,8 +82,42 @@ def _load_embedder(stem: str) -> _Embedder:
     )
 
 
+class _Species(NamedTuple):
+    name: str
+    min_score: float
+    max_distance: float
+    embedder_stem: str
+    # Mixing a unit vector with an independent random one maps cosine distance
+    # affinely: d' = (1 - a) + a*d, since random high-dimensional vectors are nearly
+    # orthogonal. Solving d' = IMMICH_MAX_DISTANCE at d = max_distance gives a.
+    shift: float
+
+
+def _species(name: str) -> _Species:
+    min_score, max_distance = SPECIES_DEFAULTS[name]
+    prefix = name.upper()
+    max_distance = float(os.environ.get(f"{prefix}_MAX_DISTANCE", max_distance))
+    stem = f"embedding_{name}"
+    return _Species(
+        name,
+        float(os.environ.get(f"{prefix}_MIN_SCORE", min_score)),
+        max_distance,
+        stem if (MODEL_DIR / f"{stem}.onnx").exists() else "embedding",
+        (1 - IMMICH_MAX_DISTANCE) / (1 - max_distance),
+    )
+
+
 detector, _det_input, _det_size = _session("detector.onnx")
-embedder = _load_embedder("embedding")
+# Ultralytics writes class names as a Python dict literal, e.g. "{0: 'dog'}".
+_class_names = ast.literal_eval(detector.get_modelmeta().custom_metadata_map["names"])
+species = {
+    class_id: _species(name)
+    for class_id, name in _class_names.items()
+    if name in SPECIES_DEFAULTS
+}
+embedders = {
+    stem: _load_embedder(stem) for stem in {s.embedder_stem for s in species.values()}
+}
 
 
 def _blob(image: np.ndarray, size: tuple[int, int], interpolation: int) -> np.ndarray:
@@ -114,8 +149,8 @@ def _letterbox(
     )
 
 
-def _detect(rgb: np.ndarray) -> list[tuple[float, list[int]]]:
-    """Detections above DOG_MIN_SCORE, as (score, bbox) in source pixels."""
+def _detect(rgb: np.ndarray) -> list[tuple[float, list[int], _Species]]:
+    """Known-species detections above that species' min score, bbox in source pixels."""
     height, width = rgb.shape[:2]
     blob, scale, left, top = _letterbox(rgb, _det_size)
     raw = detector.run(None, {_det_input: blob})
@@ -128,17 +163,11 @@ def _detect(rgb: np.ndarray) -> list[tuple[float, list[int]]]:
                 int(np.clip((x2 - left) / scale, 0, width)),
                 int(np.clip((y2 - top) / scale, 0, height)),
             ],
+            species[int(class_id)],
         )
-        for x1, y1, x2, y2, score, _ in raw[0][0]
-        if score >= DOG_MIN_SCORE
+        for x1, y1, x2, y2, score, class_id in raw[0][0]
+        if int(class_id) in species and score >= species[int(class_id)].min_score
     ]
-
-
-# Mixing a unit vector with an independent random one maps cosine distance
-# affinely: d' = (1 - a) + a*d, since random high-dimensional vectors are nearly
-# orthogonal. Solving d' = IMMICH_MAX_DISTANCE at d = DOG_MAX_DISTANCE gives a.
-_SHIFT = (1 - IMMICH_MAX_DISTANCE) / (1 - DOG_MAX_DISTANCE)
-_RESCALE = 0 < _SHIFT < 1
 
 
 def _unit(vector: np.ndarray) -> np.ndarray:
@@ -146,19 +175,20 @@ def _unit(vector: np.ndarray) -> np.ndarray:
     return vector / norm if norm else vector
 
 
-def _rescale(vector: np.ndarray) -> np.ndarray:
+def _rescale(vector: np.ndarray, shift: float) -> np.ndarray:
     """Move our distances onto Immich's threshold, deterministically per face."""
     seed = hashlib.blake2b(vector.tobytes(), digest_size=8).digest()
     noise = np.random.default_rng(int.from_bytes(seed, "big")).normal(size=vector.shape)
-    mixed = np.sqrt(_SHIFT) * _unit(vector) + np.sqrt(1 - _SHIFT) * _unit(noise)
+    mixed = np.sqrt(shift) * _unit(vector) + np.sqrt(1 - shift) * _unit(noise)
     return _unit(mixed).astype(np.float32)
 
 
-def _embed(crop: np.ndarray) -> np.ndarray:
+def _embed(crop: np.ndarray, kind: _Species) -> np.ndarray:
+    embedder = embedders[kind.embedder_stem]
     blob = _blob(crop, embedder.size, cv2.INTER_AREA)
     blob = (blob - embedder.mean) / embedder.std
     vector = embedder.session.run(None, {embedder.input_name: blob})[0][0]
-    return _rescale(vector) if _RESCALE else vector
+    return _rescale(vector, kind.shift) if 0 < kind.shift < 1 else vector
 
 
 def _pad(bbox: list[int], width: int, height: int) -> tuple[int, int, int, int]:
@@ -174,12 +204,15 @@ def _pad(bbox: list[int], width: int, height: int) -> tuple[int, int, int, int]:
 
 app = FastAPI()
 logging.getLogger("uvicorn.error").info(
-    "animal-ml: people=%s, dog min score %.2f, Max Distance %.2f acts as %.2f, upstream=%s",
+    "animal-ml: people=%s, upstream=%s, %s",
     KEEP_HUMAN_FACES,
-    DOG_MIN_SCORE,
-    IMMICH_MAX_DISTANCE,
-    DOG_MAX_DISTANCE if _RESCALE else IMMICH_MAX_DISTANCE,
     UPSTREAM_URL or "unset",
+    "; ".join(
+        f"{s.name}: min score {s.min_score:.2f}, Max Distance {IMMICH_MAX_DISTANCE:.2f}"
+        f" acts as {s.max_distance if 0 < s.shift < 1 else IMMICH_MAX_DISTANCE:.2f},"
+        f" {s.embedder_stem}.onnx"
+        for s in species.values()
+    ),
 )
 
 
@@ -210,7 +243,7 @@ async def predict(request: Request) -> Response:
     height, width = rgb.shape[:2]
 
     faces = []
-    for score, bbox in _detect(rgb):
+    for score, bbox, kind in _detect(rgb):
         x1, y1, x2, y2 = _pad(bbox, width, height)
         crop = rgb[y1:y2, x1:x2]
         if crop.size == 0:
@@ -220,7 +253,7 @@ async def predict(request: Request) -> Response:
                 "boundingBox": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
                 # Immich expects the vector as a JSON string, not an array.
                 "embedding": orjson.dumps(
-                    _embed(crop), option=orjson.OPT_SERIALIZE_NUMPY
+                    _embed(crop, kind), option=orjson.OPT_SERIALIZE_NUMPY
                 ).decode(),
                 "score": score,
             }

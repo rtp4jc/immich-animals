@@ -102,9 +102,11 @@ Add them under `environment:` in the `docker-compose.override.yml` from step 1, 
 | `KEEP_HUMAN_FACES` | `true` | `false` serves dogs only and stops detecting human faces. A refresh will delete all human face edits you have made |
 | `DOG_MIN_SCORE` | `0.3` | How confident the detector must be. Lower finds more dogs and more cats. Just requires a refresh. |
 | `DOG_MAX_DISTANCE` | `0.4` | **SEE NOTE BELOW** How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
+| `CAT_MIN_SCORE` | `0.3` | Experimental: as `DOG_MIN_SCORE`, for cats. Only used with a detector that has a cat class. |
+| `CAT_MAX_DISTANCE` | `0.35` | Experimental: as `DOG_MAX_DISTANCE`, for cats. |
 | `IMMICH_MAX_DISTANCE` | `0.5` | The Max Distance in your Immich settings. Change only if you changed that. |
 
-**NOTE**: `DOG_MAX_DISTANCE` is tricky to change. You can't just do a refresh after changing 
+**NOTE**: `DOG_MAX_DISTANCE` (and `CAT_MAX_DISTANCE`) is tricky to change. You can't just do a refresh after changing 
 it because previously detected faces do not get a new embedding on refresh. If you need to change it, I would suggest 
 disabling the sidecar temporarily, refreshing the face detection again (**Face Detection → Refresh**),
 then adding the sidecar again with the new configuration and refreshing. This will result in 
@@ -173,6 +175,9 @@ including that `embedding` is a JSON *string* — Immich casts it to a pgvector.
 uv run --project sidecar python sidecar/smoke_test.py dog.jpg --url http://localhost:3003
 ```
 
+`test_serve.py` runs `serve.py` against tiny fake models, so it needs no
+downloads: `uv run --project sidecar pytest sidecar`.
+
 For tuning, `scripts/fetch_validation_set.py` builds a held-out set of named
 dogs and dog-free negatives, and
 `scripts/evaluate_sidecar.py` sweeps detection recall against the false-positive
@@ -181,7 +186,11 @@ rate and clusters the embeddings the way Immich does.
 ## How the thresholds are handled
 
 Immich applies one Min Detection Score and one Max Distance to every face, and
-both are tuned for people. Rather than make users retune them:
+both are tuned for people. Rather than make users retune them, each species the
+detector reports (class names come from its ONNX metadata; unknown classes are
+ignored) gets its own `<SPECIES>_MIN_SCORE` and `<SPECIES>_MAX_DISTANCE`, and its
+own embedder when `embedding_<species>.onnx` sits next to the shared
+`embedding.onnx`. Cats are experimental. For dogs:
 
 - **Detection score.** Immich only forwards `minScore` to the ML server and never
   re-filters, so dogs use `DOG_MIN_SCORE` and the user's setting continues to

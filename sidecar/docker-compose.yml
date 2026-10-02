@@ -13,5 +13,7 @@ services:
       # KEEP_HUMAN_FACES: "true"
       # DOG_MIN_SCORE: "0.3"
       # DOG_MAX_DISTANCE: "0.4"
+      # CAT_MIN_SCORE: "0.3"     # experimental, needs a detector with a cat class
+      # CAT_MAX_DISTANCE: "0.35"
       # IMMICH_MAX_DISTANCE: "0.5"
     restart: always

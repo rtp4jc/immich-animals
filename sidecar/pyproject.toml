@@ -25,3 +25,9 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
 ignore = ["E501"]
+
+[dependency-groups]
+dev = [
+    "onnx>=1.23.1",
+    "pytest>=9.1.1",
+]
