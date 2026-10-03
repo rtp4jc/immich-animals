@@ -10,6 +10,17 @@ from torchvision import transforms
 logger = logging.getLogger(__name__)
 
 
+def eval_transform(img_size: int = 224) -> transforms.Compose:
+    """PIL image to the normalised tensor the embedder sees at evaluation."""
+    return transforms.Compose(
+        [
+            transforms.Resize((img_size, img_size)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]
+    )
+
+
 class IdentityDataset(Dataset):
     """
     Enhanced dataset with built-in data augmentations for animal identity training.
@@ -47,15 +58,7 @@ class IdentityDataset(Dataset):
                 ]
             )
         else:
-            self.transform = transforms.Compose(
-                [
-                    transforms.Resize((img_size, img_size)),
-                    transforms.ToTensor(),
-                    transforms.Normalize(
-                        mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-                    ),
-                ]
-            )
+            self.transform = eval_transform(img_size)
 
     def __len__(self):
         return len(self.annotations)

@@ -34,7 +34,6 @@ from animal_id.common.constants import DATA_DIR, ONNX_EMBEDDING_PATH
 from animal_id.common.datasets import IdentityDataset
 from animal_id.common.logging_config import setup_logging
 from animal_id.common.seed import set_seed, worker_init_fn
-from animal_id.data import dedupe, sources
 from animal_id.data.exports import torch_identity
 from animal_id.data.sample import Source
 from animal_id.embedding.backbones import BackboneType, get_backbone_input_size
@@ -207,13 +206,11 @@ def main():
     if args.sources:
         data_dir = DATA_DIR / "processed" / "+".join(sorted(args.sources))
         data_dir.mkdir(parents=True, exist_ok=True)
-        torch_identity.write(
-            dedupe.drop_bursts(
-                [s for name in args.sources for s in sources.load(name)],
-                DATA_CONFIG.dedupe,
-            ),
+        torch_identity.export(
+            args.sources,
             {split: data_dir / f"identity_{split}.json" for split in SPLITS},
             DATA_CONFIG.min_images,
+            DATA_CONFIG.dedupe,
         )
 
     backbone = BackboneType(args.backbone)

@@ -388,4 +388,4 @@ def test_drop_bursts_keeps_one_photo_per_burst_of_each_identity(tmp_path, monkey
     )
     kept = [s.path for s in dedupe.drop_bursts(samples, ("s",))]
     assert kept == ["a1.jpg", "a3.jpg", "b1.jpg"]
-    assert (tmp_path / f"s.bursts-{dedupe.THRESHOLD}.json").exists()
+    assert len(list(tmp_path.glob("s.bursts-*.json"))) == 1
