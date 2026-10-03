@@ -55,9 +55,12 @@ def _license(url: str) -> str:
 def _usable(root: Path) -> Iterator[tuple[dict, tuple[Box, ...]]]:
     """Each listed image whose boxes can train a photo detector, with those boxes."""
     rows = defaultdict(list)
-    for row in csv.DictReader(open(root / "boxes.csv")):
-        rows[row["ImageID"]].append(row)
-    for image in csv.DictReader(open(root / "images.csv")):
+    with open(root / "boxes.csv") as f:
+        for row in csv.DictReader(f):
+            rows[row["ImageID"]].append(row)
+    with open(root / "images.csv") as f:
+        images = list(csv.DictReader(f))
+    for image in images:
         image_rows = rows[image["ImageID"]]
         # A group-of box covers several animals with one box, and a depiction is a
         # drawing or toy; neither should be learnt, and dropping just the box would
@@ -107,17 +110,22 @@ def _filter_csvs(csv_dir: Path, root: Path) -> None:
         writer = csv.DictWriter(out, BOX_COLUMNS, extrasaction="ignore")
         writer.writeheader()
         for boxes_csv, _ in OFFICIAL_CSVS.values():
-            for row in csv.DictReader(open(csv_dir / Path(boxes_csv).name)):
-                if row["LabelName"] in CLASSES:
-                    writer.writerow(row)
-                    ids.add(row["ImageID"])
-    with open(root / "images.csv", "w", newline="") as out:
+            with open(csv_dir / Path(boxes_csv).name) as f:
+                for row in csv.DictReader(f):
+                    if row["LabelName"] in CLASSES:
+                        writer.writerow(row)
+                        ids.add(row["ImageID"])
+    # images.csv marks the filter done, so an interrupted run must not leave it.
+    partial = root / "images.csv.part"
+    with open(partial, "w", newline="") as out:
         writer = csv.DictWriter(out, IMAGE_COLUMNS, extrasaction="ignore")
         writer.writeheader()
         for _, images_csv in OFFICIAL_CSVS.values():
-            for row in csv.DictReader(open(csv_dir / Path(images_csv).name)):
-                if row["ImageID"] in ids:
-                    writer.writerow(row)
+            with open(csv_dir / Path(images_csv).name) as f:
+                for row in csv.DictReader(f):
+                    if row["ImageID"] in ids:
+                        writer.writerow(row)
+    partial.rename(root / "images.csv")
 
 
 def _fetch_image(session: requests.Session, url: str, path: Path) -> None:
