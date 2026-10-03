@@ -178,6 +178,10 @@ backbone, preprocessing recipe, test metrics and clustering `eps`. The embedder 
 trained on ImageNet-normalised input while the YOLO stages take raw `[0, 1]`, so
 `ONNXEmbedding` normalises and the others do not. `copy_models.sh` and `reload_immich.sh` push them into the `immich-clone/` fork.
 
+Each release's files live in `models/onnx/<version>/release/` (what the sidecar
+image ships, matching `sidecar/SHA256SUMS` for the current version), with any
+candidates that were compared beside it, e.g. `models/onnx/0.3.0/seed_13/`.
+
 ## Testing and CI
 
 ```bash

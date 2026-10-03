@@ -157,7 +157,7 @@ by `MODEL_TAG` and checks them against `SHA256SUMS`.
 # from the repo root
 docker buildx build -f sidecar/Dockerfile --load -t ghcr.io/rtp4jc/animal-ml:0.3.0 .
 
-# with the models already on disk
+# with the models already on disk in models/onnx/<VERSION>/release/
 docker buildx build -f sidecar/Dockerfile --build-arg MODEL_SOURCE=local --load -t ghcr.io/rtp4jc/animal-ml:0.3.0 .
 ```
 
