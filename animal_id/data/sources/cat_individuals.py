@@ -29,12 +29,21 @@ def is_benchmark(cat: str) -> bool:
 
 
 def load(data_dir: Path) -> Iterator[Sample]:
+    return _samples(data_dir, held_out=False)
+
+
+def benchmark(data_dir: Path) -> list[Sample]:
+    """The held-out cats' photos, bursts included."""
+    return list(_samples(data_dir, held_out=True))
+
+
+def _samples(data_dir: Path, held_out: bool) -> Iterator[Sample]:
     boxes = json.loads((data_dir / ROOT / BOXES).read_text())
     for rel, box in sorted(boxes.items()):
         cat = Path(rel).parent.name
         # An unboxed photo is no confirmed negative, and two cats leave the
         # identity ambiguous.
-        if box is None or box["cats"] > 1 or is_benchmark(cat):
+        if box is None or box["cats"] > 1 or is_benchmark(cat) != held_out:
             continue
         yield Sample(
             path=f"{ROOT}/{rel}",

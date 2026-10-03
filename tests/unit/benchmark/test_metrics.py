@@ -3,7 +3,11 @@ from unittest.mock import MagicMock
 import numpy as np
 import torch
 
-from animal_id.benchmark.metrics import calculate_tar_at_far, evaluate_embedding_model
+from animal_id.benchmark.metrics import (
+    calculate_tar_at_far,
+    evaluate_embedding_model,
+    retrieval_metrics,
+)
 
 
 def test_calculate_tar_at_far_no_positive_pairs():
@@ -40,3 +44,11 @@ def test_evaluate_embedding_model_empty_dataloader():
     metrics = evaluate_embedding_model(mock_model, empty_dataloader, device)
 
     assert metrics == {}
+
+
+def test_retrieval_against_a_gallery_skips_queries_without_a_match():
+    embeddings = np.eye(3)[[0, 1, 2, 0, 2]].astype(float)
+    labels = np.array(["a", "b", "c", "a", "z"])
+    gallery = np.array([False, False, False, True, True])
+    mrr, top_k, n = retrieval_metrics(embeddings, labels, gallery=gallery)
+    assert (mrr, top_k[1], n) == (1.0, 1.0, 1)

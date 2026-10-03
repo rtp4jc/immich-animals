@@ -23,6 +23,7 @@ When two goals conflict, these decide.
 - **Add dependencies with `uv add <pkg>`** (or `uv add --group dev <pkg>`). Never hand-edit version pins in `pyproject.toml`.
 - **Never commit absolute paths.** The repo is cloned on several machines; use paths relative to the repo root or `animal_id/common/constants.py`.
 - **`.planning/` holds dated design docs, not instructions.** Rationale, stage descriptions, and decisions go there (or in the PR), never in code files.
+- **Model card numbers come from `scripts/evaluate_release.py`; metric definitions live in `animal_id/identification/households.py`.** Never quote a number from elsewhere.
 
 ## Writing code
 

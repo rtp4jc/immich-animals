@@ -129,5 +129,10 @@ class ONNXEmbedding(_ONNXModel, EmbeddingModel):
 
     def predict(self, image: np.ndarray) -> np.ndarray:
         """Generate embedding for image."""
-        embedding_input, _ = self._preprocess(image)
-        return self._run(embedding_input)
+        return self.predict_batch([image])[0]
+
+    def predict_batch(self, images: list[np.ndarray]) -> np.ndarray:
+        """Embeds several crops in one session run."""
+        batch = np.concatenate([self._preprocess(image)[0] for image in images])
+        name = self.session.get_inputs()[0].name
+        return self.session.run(None, {name: batch})[0]

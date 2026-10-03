@@ -10,6 +10,7 @@ from animal_id.identification import (
     cluster_quality,
     embed_gallery,
 )
+from animal_id.identification.households import score_home
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -216,3 +217,14 @@ class TestEmbedGallery:
         )
         _, labels, _ = embed_gallery(pipeline, items, show_progress=False)
         assert labels == [7, 8]
+
+
+def test_household_outcomes_per_pet():
+    labels = np.array(list("aaabbcccddds"))
+    person = np.array([0, 0, 0, 0, 0, 1, 1, 1, -1, -1, -1, 0])
+    home = score_home(person, labels, own=set("abcd"))
+    pets = home["pets"]
+    assert pets["a"]["merged"] and pets["b"]["merged"] and not pets["a"]["pure"]
+    assert pets["c"]["pure"] and pets["c"]["clean"] and not pets["c"]["merged"]
+    assert pets["d"]["missed"] and not pets["d"]["pure"]
+    assert home["absorbed"] == home["strangers"] == 1

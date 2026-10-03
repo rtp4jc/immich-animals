@@ -179,17 +179,25 @@ def _calculate_map(embeddings: np.ndarray, labels: np.ndarray) -> float:
 
 
 def retrieval_metrics(
-    embeddings: np.ndarray, labels: np.ndarray, k_values=(1, 5)
+    embeddings: np.ndarray,
+    labels: np.ndarray,
+    k_values=(1, 5),
+    gallery: np.ndarray | None = None,
 ) -> tuple[float, dict[int, float], int]:
-    """Leave-one-out cosine retrieval over the gallery (= the given embeddings).
+    """Cosine retrieval, leave-one-out or, given a ``gallery`` mask, the rest against it.
 
     Returns (mrr, {k: top_k_accuracy}, num_evaluated_queries). Queries with no
     same-identity gallery item are skipped (standard open-set practice).
     """
-    similarities = embeddings @ embeddings.T
-    np.fill_diagonal(similarities, -np.inf)
-    ranked_labels = labels[np.argsort(-similarities, axis=1)]
-    matches = ranked_labels == labels[:, None]
+    if gallery is None:
+        similarities = embeddings @ embeddings.T
+        np.fill_diagonal(similarities, -np.inf)
+        queries = candidates = labels
+    else:
+        similarities = embeddings[~gallery] @ embeddings[gallery].T
+        queries, candidates = labels[~gallery], labels[gallery]
+    ranked_labels = candidates[np.argsort(-similarities, axis=1)]
+    matches = ranked_labels == queries[:, None]
 
     has_positive = matches.any(axis=1)
     matches = matches[has_positive]

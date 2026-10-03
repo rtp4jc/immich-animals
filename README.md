@@ -10,7 +10,9 @@ training the models.
 
 ## Model card
 
-Release 0.2.0. The better value in each column is bold.
+Release 0.2.0. The better value in each column is bold. The Embedding and
+Households tables come from `scripts/evaluate_release.py`, with the metric
+definitions in `animal_id/identification/households.py`.
 
 ### Embedding
 | Embedder | DogReID top-1 | Top-5 | MRR | TAR@FAR=1% | Params | CPU, 4 threads |
@@ -146,6 +148,7 @@ Benchmarks log to Weights & Biases by default; pass `--no-wandb` to disable. In 
 | `measure_latency.py` | Cost axis for every backbone on one instrument (torch + ONNX Runtime) |
 | `stage_d_validate.py` | Deploy gate: exports each finalist and checks the 512-d L2 contract |
 | `train_final.py` | Trains and exports the production model, with eps sweep and provenance sidecar |
+| `evaluate_release.py` | Model-card Embedding and Households numbers for shipped ONNX embedders |
 
 Exported models land in `models/onnx/` as `detector.onnx`, `keypoint.onnx`, and
 `embedding.onnx`, each embedder alongside a `.json` sidecar recording its
@@ -174,7 +177,7 @@ After adding a source, check it parsed correctly with
 |---|---|---|
 | [COCO 2017](https://cocodataset.org/#download) | `data/coco/images/{train2017,val2017}/` | Detection |
 | [DogFaceNet](https://github.com/GuillaumeMougeot/DogFaceNet#dataset) | `data/dogfacenet/DogFaceNet_224resized/`, `data/dogfacenet/DogFaceNet_alignment/` | Identity embedding |
-| [DogReID-1553](https://doi.org/10.7910/DVN/LVTRLG) | `data/dogreid/images/` (unzip `Images.zip`, rename to lowercase `images`), `data/dogreid/{splits,bounding_boxes}.tab` | Detection and identity embedding (owner phone photos); only the open-set `train` frames are loaded, so its query/gallery test stays held out |
+| [DogReID-1553](https://doi.org/10.7910/DVN/LVTRLG) | `data/dogreid/images/` (unzip `Images.zip`, rename to lowercase `images`), `data/dogreid/{splits,bounding_boxes,breeds}.tab` | Detection and identity embedding (owner phone photos); only the open-set `train` frames are loaded, so its query/gallery test stays held out |
 | [MPDD](https://doi.org/10.17632/v5j6m8dzhv.1) | `data/mpdd/MPDD/pytorch/` | Identity embedding (whole-body); its test identities also go into `sidecar-validation` |
 | [Stanford Dogs](http://vision.stanford.edu/aditya86/ImageNetDogs/) | `data/stanford_dogs/images/`, `data/stanford_dogs/annotation/` | Detection, keypoints |
 | [StanfordExtra](https://www.kaggle.com/datasets/ollieboyne/stanfordextra-dogs-dataset) | `data/stanford_dogs/stanford_extra_keypoints.json` | Keypoint labels |
