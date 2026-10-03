@@ -201,6 +201,8 @@ def main():
         "--select-on", nargs="+", type=Source, default=DATA_CONFIG.select_on
     )
     args = parser.parse_args()
+    if args.sources and not set(args.select_on) & set(args.sources):
+        parser.error("--select-on needs at least one of the --sources")
     data_dir = DATA_DIR
     if args.sources:
         data_dir = DATA_DIR / "processed" / "+".join(sorted(args.sources))

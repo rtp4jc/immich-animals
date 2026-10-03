@@ -37,7 +37,8 @@ def parse(name: Source) -> None:
     path = MANIFEST_DIR / f"{name}.jsonl"
     write_manifest(samples, path)
     # Burst decisions are per photo of the old manifest; recompute on next export.
-    (MANIFEST_DIR / f"{name}.bursts.json").unlink(missing_ok=True)
+    for cache in MANIFEST_DIR.glob(f"{name}.bursts-*.json"):
+        cache.unlink()
     logger.info(f"Parsed {len(samples)} {name} samples into {path}")
 
 

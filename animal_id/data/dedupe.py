@@ -33,7 +33,7 @@ def drop_bursts(samples: list[Sample], sources: tuple[str, ...]) -> list[Sample]
             by_source[sample.source].append(sample)
     dropped = set()
     for source, group in by_source.items():
-        cache = MANIFEST_DIR / f"{source}.bursts.json"
+        cache = MANIFEST_DIR / f"{source}.bursts-{THRESHOLD}.json"
         if not cache.exists():
             cache.write_text(json.dumps(sorted(_bursts(group))))
         bursts = set(json.loads(cache.read_text()))
