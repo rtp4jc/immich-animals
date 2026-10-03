@@ -100,7 +100,7 @@ Add them under `environment:` in the `docker-compose.override.yml` from step 1, 
 | `UPSTREAM_ML_URL` | — | Your existing Immich ML container. Required: search and OCR are forwarded to it. |
 | `KEEP_HUMAN_FACES` | `true` | `false` serves pets only and stops detecting human faces. A refresh will delete all human face edits you have made |
 | `DOG_MIN_SCORE` | `0.3` | How confident the detector must be for a dog. Lower finds more dogs and more wolves and foxes. Just requires a refresh. |
-| `DOG_MAX_DISTANCE` | `0.4` | **SEE NOTE BELOW** How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
+| `DOG_MAX_DISTANCE` | `0.375` | **SEE NOTE BELOW** How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
 | `CAT_MIN_SCORE` | `0.3` | As `DOG_MIN_SCORE`, for cats. |
 | `CAT_MAX_DISTANCE` | `0.35` | As `DOG_MAX_DISTANCE`, for cats, whose embeddings sit closer together. |
 | `IMMICH_MAX_DISTANCE` | `0.5` | The Max Distance in your Immich settings. Change only if you changed that. |
@@ -127,7 +127,7 @@ forwarded to Immich's own ML container.
 looks at photos that have never been scanned. Run it as **Refresh**.
 
 **Too many near-duplicate people** — merge them, or raise `DOG_MAX_DISTANCE` to
-`0.45` (`CAT_MAX_DISTANCE` to `0.4`) following the note under [Settings](#settings).
+`0.425` (`CAT_MAX_DISTANCE` to `0.4`) following the note under [Settings](#settings).
 
 ---
 
