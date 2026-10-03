@@ -49,6 +49,14 @@ Immich. Two dog-only retrains with different seeds differ by 1.5pp clean,
 - Deduping DogFaceNet and MPDD (31% and 35% "bursts") cost dogs ~2pp F: their
   similar-looking crops are signal. Only cats are deduped.
 - Sub-center ArcFace (k=3) was within noise of ArcFace.
+- DogReID top-1 across seeds (scratch PyTorch harness, before
+  `scripts/evaluate_release.py`): two dog-only retrains of the 0.2.0 recipe
+  scored 0.539 and 0.488; four 0.3.0 seeds scored 0.515-0.529. The release seed
+  (13) was picked on validation mAP (0.570 vs 0.567 for the others).
+- Release Max Distance for dogs: 0.375. At 0.4 the 0.3.0 embedder merges like
+  0.2.0 did (~10% of pets merged with a sibling); 0.375 cuts that ~2 points with
+  the same share in one correct person, for ~9 points more dogs never grouped.
+  0.35 would reach 0.1.1's merge rate but leave ~41% never grouped.
 - Cats cluster tighter than dogs: `CAT_MAX_DISTANCE` 0.35 is the knee (1%
   merged in households, Commons purity ~0.87; 0.4 doubles merges).
 - Dogs and cats almost never share a cluster (≤0.3% of clusters).

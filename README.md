@@ -17,24 +17,24 @@ with the metric definitions in `animal_id/identification/households.py`.
 ### Embedding
 | Embedder | DogReID top-1 | Top-5 | MRR | TAR@FAR=1% | Cat top-1 | Cat TAR@FAR=1% | Params | CPU, 4 threads |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| DINOv2-B/14 + ArcFace, dogs and cats (0.3.0) | 0.516 | 0.759 | 0.628 | 0.760 | **0.959** | **0.825** | 87 M | 128 ms |
-| DINOv2-B/14 + ArcFace, dogs (0.2.0) | **0.543** | **0.764** | **0.642** | **0.761** | 0.919 | 0.559 | 87 M | 128 ms |
+| DINOv2-B/14 + ArcFace, dogs and cats (0.3.0) | 0.512 | 0.758 | 0.625 | **0.762** | **0.962** | **0.837** | 87 M | 128 ms |
+| DINOv2-B/14 + ArcFace, dogs (0.2.0) | **0.534** | **0.766** | **0.638** | 0.758 | 0.923 | 0.564 | 87 M | 128 ms |
 
 **Test sets**: [DogReID-1553](https://doi.org/10.7910/DVN/LVTRLG) open-set test,
 777 dogs filmed by their owners on phones; each query is matched against a
 gallery from a different scene, cropped to the ground-truth box plus 10%. Cats:
 123 held-out shelter cats from [Cat Individual Images](https://www.kaggle.com/datasets/timost1234/cat-individuals),
-one photo per near-duplicate burst (632 photos), leave-one-out.
+one photo per near-duplicate burst (667 photos), leave-one-out.
 
-Retraining the 0.2.0 recipe with another seed moves DogReID top-1 between 0.488
-and 0.539; four seeds of 0.3.0 scored 0.515-0.529. The 0.3.0 seed was chosen on
-validation identities only.
+Retraining the 0.2.0 recipe with another seed moved DogReID top-1 by about 5
+points, more than the gap between these rows (`.planning/10-2-2026-cats/`). The
+0.3.0 seed was chosen on validation identities only.
 
 ### Households
 | At the shipped Max Distance | Dogs in one correct person | Never grouped | Merged with another pet | Cats in one correct person | Merged |
 | --- | --- | --- | --- | --- | --- |
-| 0.3.0 | 46% | 33% | **8%** | **71%** | **1%** |
-| 0.2.0 | 46% | **28%** | 10% | 23% | 10% |
+| 0.3.0 | 46% | 34% | **8%** | **70%** | **1%** |
+| 0.2.0 | **47%** | **27%** | 10% | 23% | 8% |
 
 **Simulation**: 300 homes per half of the held-out pets, each with 1-4 own pets
 (3-15 photos) and 20-200 one-off strangers, clustered the way Immich assigns
