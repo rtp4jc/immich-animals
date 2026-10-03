@@ -41,7 +41,7 @@ KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
 # (<SPECIES>_MIN_SCORE, <SPECIES>_MAX_DISTANCE) defaults. Immich's min score suits
 # people; dogs need roughly 0.3 or half of them are lost. Max distance is where
 # that species' embeddings cluster best. Detector classes not listed are ignored.
-SPECIES_DEFAULTS = {"dog": (0.3, 0.4), "cat": (0.3, 0.35)}
+SPECIES_DEFAULTS = {"dog": (0.3, 0.375), "cat": (0.3, 0.35)}
 IMMICH_MAX_DISTANCE = float(os.environ.get("IMMICH_MAX_DISTANCE", "0.5"))
 
 

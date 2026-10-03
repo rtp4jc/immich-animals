@@ -3,15 +3,18 @@
 #
 #   docker build -f sidecar/Dockerfile -t animal-ml .
 #
-# With the models on disk (maintainers), skip the download:
+# With the models on disk under models/onnx/<VERSION>/release/ (maintainers),
+# skip the download:
 #
 #   docker build -f sidecar/Dockerfile --build-arg MODEL_SOURCE=local -t animal-ml .
 #
 # Only the selected stage is built, so the other one's inputs need not exist.
 ARG MODEL_SOURCE=remote
+ARG VERSION=0.3.0
 
 FROM alpine:3.21 AS models-remote
-ARG MODEL_TAG=sidecar-v0.2.0
+ARG VERSION
+ARG MODEL_TAG=sidecar-v${VERSION}
 ARG MODEL_URL=https://github.com/rtp4jc/immich-animals/releases/download
 WORKDIR /models
 COPY sidecar/SHA256SUMS .
@@ -20,9 +23,10 @@ RUN for f in detector.onnx embedding.onnx embedding.json; do \
     done && sha256sum -c SHA256SUMS
 
 FROM alpine:3.21 AS models-local
+ARG VERSION
 WORKDIR /models
 COPY sidecar/SHA256SUMS .
-COPY models/onnx/detector.onnx models/onnx/embedding.onnx models/onnx/embedding.json ./
+COPY models/onnx/${VERSION}/release/detector.onnx models/onnx/${VERSION}/release/embedding.onnx models/onnx/${VERSION}/release/embedding.json ./
 RUN sha256sum -c SHA256SUMS
 
 FROM models-${MODEL_SOURCE} AS models

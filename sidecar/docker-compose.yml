@@ -4,7 +4,7 @@
 services:
   animal-ml:
     container_name: animal_ml
-    image: ghcr.io/rtp4jc/animal-ml:0.2.0
+    image: ghcr.io/rtp4jc/animal-ml:0.3.0
     environment:
       # Everything that isn't facial-recognition is forwarded here.
       UPSTREAM_ML_URL: http://immich-machine-learning:3003
@@ -12,8 +12,8 @@ services:
       # Min Detection Score and Max Distance stay as they are.
       # KEEP_HUMAN_FACES: "true"
       # DOG_MIN_SCORE: "0.3"
-      # DOG_MAX_DISTANCE: "0.4"
-      # CAT_MIN_SCORE: "0.3"     # experimental, needs a detector with a cat class
+      # DOG_MAX_DISTANCE: "0.375"
+      # CAT_MIN_SCORE: "0.3"
       # CAT_MAX_DISTANCE: "0.35"
       # IMMICH_MAX_DISTANCE: "0.5"
     restart: always
