@@ -3,15 +3,16 @@
 uv run python scripts/data.py prepare cat_individuals   # after unzipping the download
 """
 
-import hashlib
 import json
 from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 from pathlib import Path
 
 from PIL import Image
 
-from animal_id.data.sample import Box, Sample, Source
+from animal_id.data.images import shrink
+from animal_id.data.sample import Box, Sample, Source, hash_fraction
 
 ROOT = "cat_individuals"
 LICENSE = "CC BY 4.0"  # kaggle.com/datasets/timost1234/cat-individuals
@@ -19,23 +20,21 @@ ORIGINALS = "cat_individuals_dataset"
 # The dataset has no boxes; these are COCO YOLO11x's largest cat per photo.
 BOXES = "boxes.json"
 COCO_CAT = 15
-MAX_SIDE = 1280
 BENCHMARK_FRACTION = 0.25
 
 
 def is_benchmark(cat: str) -> bool:
     """Held-out cats, like DogReID's query/gallery: out of every training export."""
-    digest = int(hashlib.sha1(cat.encode()).hexdigest()[:8], 16)
-    return digest / 16**8 < BENCHMARK_FRACTION
+    return hash_fraction(cat) < BENCHMARK_FRACTION
 
 
-def load(data_dir: Path, benchmark: bool = False) -> Iterator[Sample]:
+def load(data_dir: Path) -> Iterator[Sample]:
     boxes = json.loads((data_dir / ROOT / BOXES).read_text())
     for rel, box in sorted(boxes.items()):
+        cat = Path(rel).parent.name
         # An unboxed photo is no confirmed negative, and two cats leave the
         # identity ambiguous.
-        cat = Path(rel).parent.name
-        if box is None or box["cats"] > 1 or is_benchmark(cat) != benchmark:
+        if box is None or box["cats"] > 1 or is_benchmark(cat):
             continue
         yield Sample(
             path=f"{ROOT}/{rel}",
@@ -45,7 +44,7 @@ def load(data_dir: Path, benchmark: bool = False) -> Iterator[Sample]:
         )
 
 
-def prepare(data_dir: Path, workers: int = 8) -> None:
+def prepare(data_dir: Path) -> None:
     """Writes 1280px copies under images/ and YOLO11x boxes for them."""
     from ultralytics import YOLO
 
@@ -55,9 +54,8 @@ def prepare(data_dir: Path, workers: int = 8) -> None:
         for p in (root / ORIGINALS).glob("*/*")
         if p.suffix.lower() in {".jpg", ".jpeg", ".png"}
     )
-    # Decoding the 16MP originals every epoch starved detector training of CPU.
-    with ProcessPoolExecutor(workers) as pool:
-        resized = list(pool.map(_resize, originals, [root] * len(originals)))
+    with ProcessPoolExecutor() as pool:
+        resized = list(pool.map(partial(_resize, root=root), originals))
     model = YOLO("yolo11x.pt")
     boxes = {}
     for start in range(0, len(resized), 32):
@@ -85,8 +83,5 @@ def _resize(original: Path, root: Path) -> str:
     if not out.exists():
         out.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(original) as image:
-            image.draft("RGB", (MAX_SIDE, MAX_SIDE))  # JPEG decode at reduced size
-            image = image.convert("RGB")
-            image.thumbnail((MAX_SIDE, MAX_SIDE))
-            image.save(out, quality=92)
+            shrink(image).save(out, quality=92)
     return rel.as_posix()

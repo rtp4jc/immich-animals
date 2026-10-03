@@ -275,20 +275,16 @@ def test_stanford_dogs_yields_every_dog_box(tmp_path):
 
 
 def test_cat_individuals_holds_out_benchmark_cats_and_ambiguous_photos(tmp_path):
-    cats = ["0001", "0002", "0003", "0004", "0005", "0006", "0007", "0008"]
     box = {"xyxy": [0.1, 0.2, 0.5, 0.6], "cats": 1}
-    boxes = {f"images/{c}/{c}_000.jpg": box for c in cats}
+    boxes = {f"images/{c}/{c}_000.jpg": box for c in ("0001", "0005")}
     boxes["images/0001/0001_001.jpg"] = None  # no cat found
     boxes["images/0001/0001_002.jpg"] = {**box, "cats": 2}  # which one is 0001?
     (tmp_path / "cat_individuals").mkdir()
     (tmp_path / "cat_individuals/boxes.json").write_text(json.dumps(boxes))
-    train = list(cat_individuals.load(tmp_path))
-    held_out = list(cat_individuals.load(tmp_path, benchmark=True))
-    assert len(train) + len(held_out) == len(cats) and held_out
-    assert {s.boxes[0].identity for s in held_out} == {
-        c for c in cats if cat_individuals.is_benchmark(c)
-    }
-    assert train[0].boxes == (Box("cat", (0.1, 0.2, 0.5, 0.6), identity="0001"),)
+    assert cat_individuals.is_benchmark("0005")
+    assert [s.boxes for s in cat_individuals.load(tmp_path)] == [
+        (Box("cat", (0.1, 0.2, 0.5, 0.6), identity="0001"),)
+    ]
 
 
 def test_oxford_pets_boxes_the_largest_trimap_blob(tmp_path):

@@ -16,6 +16,7 @@ import requests
 from PIL import Image
 from tqdm import tqdm
 
+from animal_id.data.images import MAX_SIDE, shrink
 from animal_id.data.sample import Box, Sample, Source, normalised_xyxy
 
 logger = logging.getLogger(__name__)
@@ -41,9 +42,6 @@ BOX_COLUMNS = "ImageID,LabelName,XMin,XMax,YMin,YMax,IsGroupOf,IsDepiction".spli
 IMAGE_COLUMNS = "ImageID,Subset,OriginalLandingURL,License,Author,Rotation".split(",")
 XYXY = ("XMin", "YMin", "XMax", "YMax")
 IMAGE_URL = "https://open-images-dataset.s3.amazonaws.com/{split}/{id}.jpg"
-# The bucket mostly serves ~1024 px copies; the cap guards the rest, as decoding
-# huge JPEGs starved detector training.
-MAX_SIDE = 1280
 
 
 def _license(url: str) -> str:
@@ -133,9 +131,7 @@ def _fetch_image(session: requests.Session, url: str, path: Path) -> None:
     response.raise_for_status()
     image = Image.open(io.BytesIO(response.content))
     if max(image.size) > MAX_SIDE:
-        image = image.convert("RGB")
-        image.thumbnail((MAX_SIDE, MAX_SIDE))
-        image.save(path.with_suffix(".part"), "JPEG", quality=90)
+        shrink(image).save(path.with_suffix(".part"), "JPEG", quality=90)
     else:
         path.with_suffix(".part").write_bytes(response.content)
     path.with_suffix(".part").rename(path)

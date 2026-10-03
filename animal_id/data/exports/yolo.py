@@ -3,7 +3,6 @@
 yolo.write(samples, ("dog",), DATA_DIR / "detector/dogs.yaml", max_negatives={Source.COCO: 17000})
 """
 
-import hashlib
 import logging
 import random
 from collections import defaultdict
@@ -12,7 +11,7 @@ from pathlib import Path
 import yaml
 
 from animal_id.common.constants import DATA_DIR
-from animal_id.data.sample import Sample
+from animal_id.data.sample import Sample, hash_fraction
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +62,7 @@ def write(
                 for x1, y1, x2, y2 in [b.xyxy]
             )
         )
-        # Hashing the path keeps a split stable when sources are added or removed.
-        bucket = int(hashlib.sha1(sample.path.encode()).hexdigest()[:8], 16) / 16**8
-        if bucket < val_fraction:
+        if hash_fraction(sample.path) < val_fraction:
             lists["val"].append(image)
         else:
             lists["train"] += [image] * repeats.get(sample.source, 1)
