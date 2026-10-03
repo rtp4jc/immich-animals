@@ -2,7 +2,7 @@
 # Standalone on purpose: the sidecar ships as a container and must not drag in
 # torch or anything else from the training project.
 name = "animal-ml-sidecar"
-version = "0.2.0"
+version = "0.3.0"
 description = "Serves Immich's machine-learning HTTP contract with our dog models"
 requires-python = ">=3.12"
 dependencies = [
