@@ -1,18 +1,17 @@
 # animal-ml sidecar
 
-Adds your dogs to Immich's **People** tab. Immich already detects human faces and
-groups them into people and this adds an additional dog detector on top of the
-existing models. Human face detection and recognition should work the same as
-before.
+Adds your dogs and cats to Immich's **People** tab. Immich already detects human
+faces and groups them into people and this adds an additional animal detector on
+top of the existing models. Human face detection and recognition should work the
+same as before.
 
-Dogs appear as people, mixed in with the humans. There is no separate animals
-section.
+Dogs and cats appear as people, mixed in with the humans. There is no separate
+animals section.
 
 ![Immich's People page: a grid of circular face thumbnails, the first five named dogs — Rex, Shadow, Sofi, Baron, Gunny — followed by rows of unnamed dog and human faces.](../docs/images/people-page.webp)
 
-**Testing in beta with a focus on dogs.** Cats and other animals are not supported
-yet. A cat will occasionally be detected, but that is not the goal of this
-release or a focus in this round of model training.
+**Testing in beta: dogs and cats.** Cats are new in 0.3.0. Other animals are not
+supported; wolves and foxes are often detected as dogs.
 
 **Use Refresh, not Reset** on the Face Detection queue. Refresh keeps every
 face already in your library, so names, merges and hidden people survive both
@@ -31,7 +30,7 @@ Next to your Immich `docker-compose.yml`, create `docker-compose.override.yml`:
 services:
   animal-ml:
     container_name: animal_ml
-    image: ghcr.io/rtp4jc/animal-ml:0.2.0
+    image: ghcr.io/rtp4jc/animal-ml:0.3.0
     environment:
       UPSTREAM_ML_URL: http://immich-machine-learning:3003
     restart: always
@@ -48,9 +47,9 @@ docker compose up -d animal-ml
 
 That is the only setting to change. Leave **Min Detection Score** and **Max
 Distance** where they are: they are tuned for human faces and still apply to
-them. Dogs need different values, so the sidecar uses its own thresholds.
+them. Pets need different values, so the sidecar uses its own thresholds.
 
-## 3. Find the dogs
+## 3. Find the pets
 
 **Administration → Job Queues → Face Detection → Refresh**.
 
@@ -58,32 +57,32 @@ Expect this to take up to several hours depending on the size of your library.
 The full face detection queue must empty before face recognition starts so 
 you will not see partial results until the detection queue is empty.
 
-When completed, name and modify a dog the way you would a person!
+When completed, name and modify a dog or cat the way you would a person!
 
 ![An Immich person page titled Rex, 521 assets, showing a grid of photographs of a Cavalier King Charles Spaniel.](../docs/images/person-page.webp)
 
 ## What works, what does not
 
-Dogs you photograph a lot cluster well. In 0.2.0's simulation of 300 households on
-dogs the models never saw, 47 of every 100 dogs ended up as one correct person,
-27 were never grouped, and 10 were merged with another dog from the same home.
+Pets you photograph a lot cluster well. How often a pet ends up as one correct
+person, is never grouped, or is merged with another pet from the same home is in
+the [model card](../README.md#households).
 
-- **Dogs with plenty of photos** get one large cluster plus a few strays to merge
-- **Dogs with only a handful of photos** may not group at all
-- **Similar-looking dogs** get mixed together — two black curly-coated dogs are
-  genuinely hard
-- **Cats** are detected as people about one photo in nine, and wolves and foxes
-  most of the time.
+- **Pets with plenty of photos** get one large cluster plus a few strays to merge
+- **Pets with only a handful of photos** may not group at all
+- **Similar-looking pets** get mixed together — two black curly-coated dogs, or
+  two grey tabbies, are genuinely hard
+- **Dogs and cats** are kept apart; a dog and a cat almost never share a person
+- **Wolves and foxes** are detected as dogs most of the time
 
 Merging two people in Immich is easy, but splitting one is not, so the defaults
 lean towards leaving you a few extra clusters rather than wrongly combining two
-dogs.
+pets.
 
 ## Turning it off
 
 Point the Machine Learning URL back at `http://immich-machine-learning:3003` and
-run **Face Detection → Refresh**. The dog faces will be removed, but
-human faces will be untouched. Dog names are not kept, so turning it on again requires
+run **Face Detection → Refresh**. The dog and cat faces will be removed, but
+human faces will be untouched. Pet names are not kept, so turning it on again requires
 you to add names again.
 
 ## Settings
@@ -99,21 +98,21 @@ Add them under `environment:` in the `docker-compose.override.yml` from step 1, 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `UPSTREAM_ML_URL` | — | Your existing Immich ML container. Required: search and OCR are forwarded to it. |
-| `KEEP_HUMAN_FACES` | `true` | `false` serves dogs only and stops detecting human faces. A refresh will delete all human face edits you have made |
-| `DOG_MIN_SCORE` | `0.3` | How confident the detector must be. Lower finds more dogs and more cats. Just requires a refresh. |
+| `KEEP_HUMAN_FACES` | `true` | `false` serves pets only and stops detecting human faces. A refresh will delete all human face edits you have made |
+| `DOG_MIN_SCORE` | `0.3` | How confident the detector must be for a dog. Lower finds more dogs and more wolves and foxes. Just requires a refresh. |
 | `DOG_MAX_DISTANCE` | `0.4` | **SEE NOTE BELOW** How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
-| `CAT_MIN_SCORE` | `0.3` | Experimental: as `DOG_MIN_SCORE`, for cats. Only used with a detector that has a cat class. |
-| `CAT_MAX_DISTANCE` | `0.35` | Experimental: as `DOG_MAX_DISTANCE`, for cats. |
+| `CAT_MIN_SCORE` | `0.3` | As `DOG_MIN_SCORE`, for cats. |
+| `CAT_MAX_DISTANCE` | `0.35` | As `DOG_MAX_DISTANCE`, for cats, whose embeddings sit closer together. |
 | `IMMICH_MAX_DISTANCE` | `0.5` | The Max Distance in your Immich settings. Change only if you changed that. |
 
 **NOTE**: `DOG_MAX_DISTANCE` (and `CAT_MAX_DISTANCE`) is tricky to change. You can't just do a refresh after changing 
 it because previously detected faces do not get a new embedding on refresh. If you need to change it, I would suggest 
 disabling the sidecar temporarily, refreshing the face detection again (**Face Detection → Refresh**),
 then adding the sidecar again with the new configuration and refreshing. This will result in 
-only the named dogs being lost and the human faces remaining unchanged.
+only the named pets being lost and the human faces remaining unchanged.
 
 ### From Immich UI
-Immich's face-model setting only affects people. Dogs always use the same
+Immich's face-model setting only affects people. Pets always use the same
 embedder, whatever model is picked there.
 
 ## Trouble
@@ -124,11 +123,11 @@ not on Immich's docker network. Check `docker logs animal_ml`.
 **Search stopped working** — `UPSTREAM_ML_URL` is wrong. Text search is
 forwarded to Immich's own ML container.
 
-**No dogs at all** — Face Detection was probably run as **Missing**, which only
+**No pets at all** — Face Detection was probably run as **Missing**, which only
 looks at photos that have never been scanned. Run it as **Refresh**.
 
 **Too many near-duplicate people** — merge them, or raise `DOG_MAX_DISTANCE` to
-`0.45` following the note under [Settings](#settings).
+`0.45` (`CAT_MAX_DISTANCE` to `0.4`) following the note under [Settings](#settings).
 
 ---
 
@@ -156,10 +155,10 @@ by `MODEL_TAG` and checks them against `SHA256SUMS`.
 
 ```bash
 # from the repo root
-docker buildx build -f sidecar/Dockerfile --load -t ghcr.io/rtp4jc/animal-ml:0.2.0 .
+docker buildx build -f sidecar/Dockerfile --load -t ghcr.io/rtp4jc/animal-ml:0.3.0 .
 
 # with the models already on disk
-docker buildx build -f sidecar/Dockerfile --build-arg MODEL_SOURCE=local --load -t ghcr.io/rtp4jc/animal-ml:0.2.0 .
+docker buildx build -f sidecar/Dockerfile --build-arg MODEL_SOURCE=local --load -t ghcr.io/rtp4jc/animal-ml:0.3.0 .
 ```
 
 Building under the published tag shadows the released image locally, so the
@@ -179,7 +178,7 @@ uv run --project sidecar python sidecar/smoke_test.py dog.jpg --url http://local
 downloads: `uv run --project sidecar pytest sidecar`.
 
 For tuning, `scripts/fetch_validation_set.py` builds a held-out set of named
-dogs and dog-free negatives, and
+dogs and cats and animal-free negatives, and
 `scripts/evaluate_sidecar.py` sweeps detection recall against the false-positive
 rate and clusters the embeddings the way Immich does.
 
@@ -190,7 +189,7 @@ both are tuned for people. Rather than make users retune them, each species the
 detector reports (class names come from its ONNX metadata; unknown classes are
 ignored) gets its own `<SPECIES>_MIN_SCORE` and `<SPECIES>_MAX_DISTANCE`, and its
 own embedder when `embedding_<species>.onnx` sits next to the shared
-`embedding.onnx`. Cats are experimental. For dogs:
+`embedding.onnx`. Cats work the same way; for dogs:
 
 - **Detection score.** Immich only forwards `minScore` to the ML server and never
   re-filters, so dogs use `DOG_MIN_SCORE` and the user's setting continues to
