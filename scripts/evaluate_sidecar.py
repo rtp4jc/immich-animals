@@ -186,7 +186,9 @@ def main(args: argparse.Namespace) -> None:
     identities = [r for r in records if r["label"] != "negative"]
     for species in sorted({r["species"] for r in identities}):
         sources = sorted({r["source"] for r in identities if r["species"] == species})
-        for source in sources + ["all"] if len(sources) > 1 else sources:
+        if len(sources) > 1:
+            sources.append("all")
+        for source in sources:
             eps_sweep(records, preds, args.min_score, species, source)
     eps_sweep(records, preds, args.min_score, "all", "all")
 
