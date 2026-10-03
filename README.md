@@ -38,10 +38,9 @@ validation identities only.
 (3-15 photos) and 20-200 one-off strangers, clustered the way Immich assigns
 faces (`identification.cluster`, minFaces 3). A pet is in one correct person
 when the person holding most of its photos is at least 90% that pet. Dogs use
-DogReID and Max Distance
-0.4; cats use the held-out cats above and 0.35. Every pet is cropped from its
-labelled box, so this measures the embedder alone; 0.2.0's detector finds only
-8% of cats in the first place.
+DogReID and Max Distance 0.4; cats use the held-out cats above and 0.35. Every
+pet is cropped from its labelled box, so this measures the embedder alone;
+0.2.0's detector finds only 8% of cats in the first place.
 
 ### Detection
 | Detector (conf >= 0.3) | DogReID dogs | Commons + MPDD dogs | Owner cats | Commons cats | Dog- and cat-free photos with a detection |
