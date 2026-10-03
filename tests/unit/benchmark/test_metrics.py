@@ -52,3 +52,10 @@ def test_retrieval_against_a_gallery_skips_queries_without_a_match():
     gallery = np.array([False, False, False, True, True])
     mrr, top_k, n = retrieval_metrics(embeddings, labels, gallery=gallery)
     assert (mrr, top_k[1], n) == (1.0, 1.0, 1)
+
+
+def test_leave_one_out_skips_identities_with_a_single_photo():
+    embeddings = np.eye(3)[[0, 0, 1]].astype(float)
+    labels = np.array(["a", "a", "b"])  # "b" has nothing to retrieve
+    mrr, top_k, n = retrieval_metrics(embeddings, labels)
+    assert (mrr, top_k[1], n) == (1.0, 1.0, 2)

@@ -198,6 +198,10 @@ def retrieval_metrics(
         queries, candidates = labels[~gallery], labels[gallery]
     ranked_labels = candidates[np.argsort(-similarities, axis=1)]
     matches = ranked_labels == queries[:, None]
+    if gallery is None:
+        # Each query ranks itself last (-inf); counting it would give every
+        # single-photo identity a guaranteed miss instead of skipping it.
+        matches = matches[:, :-1]
 
     has_positive = matches.any(axis=1)
     matches = matches[has_positive]
