@@ -33,12 +33,14 @@ validation identities only.
 ### Households
 | At the shipped Max Distance | Dogs in one correct person | Never grouped | Merged with another pet | Cats in one correct person | Merged |
 | --- | --- | --- | --- | --- | --- |
-| 0.3.0 | **31%** | **24%** | 10% | **56%** | **1%** |
-| 0.2.0 | 28% | 28% | 10% | 21% | 10% |
+| 0.3.0 | **48%** | **24%** | 10% | **71%** | **1%** |
+| 0.2.0 | 46% | 28% | 10% | 23% | 10% |
 
 **Simulation**: 300 homes per half of the held-out pets, each with 1-4 own pets
 (3-15 photos) and 20-200 one-off strangers, clustered the way Immich assigns
-faces (`identification.cluster`, minFaces 3). Dogs use DogReID and Max Distance
+faces (`identification.cluster`, minFaces 3). A pet is in one correct person
+when the person holding most of its photos is at least 90% that pet. Dogs use
+DogReID and Max Distance
 0.4; cats use the held-out cats above and 0.35. Every pet is cropped from its
 labelled box, so this measures the embedder alone; 0.2.0's detector finds only
 8% of cats in the first place.
