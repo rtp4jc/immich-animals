@@ -1,5 +1,6 @@
 """ONNX runtime wrappers for the three pipeline stages."""
 
+import ast
 from typing import Any
 
 import cv2
@@ -35,6 +36,12 @@ class _ONNXModel:
 class ONNXDetector(_ONNXModel, DetectionModel):
     """ONNX detection model wrapper."""
 
+    def __init__(self, model_path: str):
+        super().__init__(model_path)
+        # Ultralytics records the class names as a dict literal, e.g. "{0: 'dog'}".
+        names = self.session.get_modelmeta().custom_metadata_map["names"]
+        self.classes = {i: AnimalClass(n) for i, n in ast.literal_eval(names).items()}
+
     def _preprocess(
         self, image: np.ndarray
     ) -> tuple[np.ndarray, tuple[float, int, int]]:
@@ -60,7 +67,7 @@ class ONNXDetector(_ONNXModel, DetectionModel):
         detector_input, (scale, left, top) = self._preprocess(image)
 
         results = []
-        for x1, y1, x2, y2, conf, _ in self._run(detector_input):
+        for x1, y1, x2, y2, conf, class_id in self._run(detector_input):
             if conf < DETECTION_CONF_THRESHOLD:
                 continue
 
@@ -73,7 +80,7 @@ class ONNXDetector(_ONNXModel, DetectionModel):
                         int(np.clip((y2 - top) / scale, 0, h)),
                     ],
                     "confidence": float(conf),
-                    "class": AnimalClass.DOG,
+                    "class": self.classes[int(class_id)],
                 }
             )
 

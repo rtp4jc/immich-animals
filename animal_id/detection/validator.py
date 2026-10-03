@@ -1,7 +1,7 @@
 """
 Validation utilities for YOLO detection models.
 
-Provides model validation and inference functionality for dog detection models.
+Provides model validation and inference functionality for animal detection models.
 """
 
 import glob

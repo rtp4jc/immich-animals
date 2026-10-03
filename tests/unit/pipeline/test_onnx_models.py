@@ -22,7 +22,11 @@ class TestONNXDetector:
         """A 1200x800 photo fills the width and is padded top and bottom, not squashed."""
         mock_input = MagicMock()
         mock_input.shape = [1, 3, 640, 640]
-        mock_session_class.return_value.get_inputs.return_value = [mock_input]
+        mock_session = mock_session_class.return_value
+        mock_session.get_inputs.return_value = [mock_input]
+        mock_session.get_modelmeta.return_value.custom_metadata_map = {
+            "names": "{0: 'dog'}"
+        }
 
         detector = ONNXDetector("dummy_path.onnx")
         processed_image, (scale, left, top) = detector._preprocess(sample_image)
@@ -42,12 +46,15 @@ class TestONNXDetector:
         mock_input.shape = [1, 3, 640, 640]
         mock_session = mock_session_class.return_value
         mock_session.get_inputs.return_value = [mock_input]
+        mock_session.get_modelmeta.return_value.custom_metadata_map = {
+            "names": "{0: 'dog', 1: 'cat'}"
+        }
         # Rows are x1, y1, x2, y2, conf, class_id in letterboxed input pixels.
         mock_session.run.return_value = [
             [
                 np.array(
                     [
-                        [100, 200, 200, 300, 0.9, 0],
+                        [100, 200, 200, 300, 0.9, 1],
                         [300, 350, 400, 450, 0.05, 0],  # below the floor
                     ]
                 )
@@ -58,7 +65,7 @@ class TestONNXDetector:
 
         scale, top = 640 / 1200, (640 - 427) // 2
         assert len(results) == 1
-        assert results[0]["class"] == AnimalClass.DOG
+        assert results[0]["class"] == AnimalClass.CAT
         assert results[0]["confidence"] == pytest.approx(0.9)
         assert results[0]["bbox"] == [
             int(100 / scale),

@@ -1,7 +1,7 @@
 """
 Training utilities for YOLO detection models.
 
-Provides configuration and training functionality for dog detection models.
+Provides configuration and training functionality for animal detection models.
 """
 
 import logging
