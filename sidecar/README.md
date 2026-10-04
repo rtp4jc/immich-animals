@@ -8,7 +8,7 @@ same as before.
 Dogs and cats appear as people, mixed in with the humans. There is no separate
 animals section.
 
-![Immich's People page: a grid of circular face thumbnails, the first five named dogs — Rex, Shadow, Sofi, Baron, Gunny — followed by rows of unnamed dog and human faces.](../docs/images/people-page.webp)
+![Immich's People page: a grid of circular face thumbnails. The first row is named dogs and cats — Rex, Shadow, Sofi, Domino, Gunny, Baron, Pepper, Socks, Marmalade — followed by rows of unnamed dog and human faces.](../docs/images/people-page.webp)
 
 **Testing in beta: dogs and cats.** Cats are new in 0.3.0. Other animals are not
 supported; wolves and foxes are often detected as dogs.
