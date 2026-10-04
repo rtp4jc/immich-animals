@@ -5,7 +5,7 @@ Metric definitions live in animal_id/identification/households.py.
 """
 
 import argparse
-import json
+import hashlib
 from pathlib import Path
 
 import numpy as np
@@ -37,9 +37,10 @@ def held_out(species: str) -> tuple[list, np.ndarray | None]:
 
 
 def embed(embedder: Path, species: str, samples: list) -> np.ndarray:
-    """The ONNX embedder on each sample's padded box, cached per model version."""
-    version = json.loads((embedder / "embedding.json").read_text())["version"]
-    cache = CACHE / version / f"{species}.npz"
+    """The ONNX embedder on each sample's padded box, cached per model file."""
+    with open(embedder / "embedding.onnx", "rb") as f:
+        digest = hashlib.file_digest(f, "sha256").hexdigest()[:12]
+    cache = CACHE / digest / f"{species}.npz"
     paths = np.array([s.path for s in samples])
     if cache.exists() and np.array_equal(np.load(cache)["paths"], paths):
         return np.load(cache)["embeddings"]
