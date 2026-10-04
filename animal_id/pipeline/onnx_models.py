@@ -30,7 +30,7 @@ class _ONNXModel:
 
     def _run(self, model_input: np.ndarray) -> np.ndarray:
         name = self.session.get_inputs()[0].name
-        return self.session.run(None, {name: model_input})[0][0]
+        return self.session.run(None, {name: model_input})[0]
 
 
 class ONNXDetector(_ONNXModel, DetectionModel):
@@ -67,7 +67,7 @@ class ONNXDetector(_ONNXModel, DetectionModel):
         detector_input, (scale, left, top) = self._preprocess(image)
 
         results = []
-        for x1, y1, x2, y2, conf, class_id in self._run(detector_input):
+        for x1, y1, x2, y2, conf, class_id in self._run(detector_input)[0]:
             if conf < DETECTION_CONF_THRESHOLD:
                 continue
 
@@ -95,7 +95,7 @@ class ONNXKeypoint(_ONNXModel, KeypointModel):
         keypoint_input, (ch, cw) = self._preprocess(image)
 
         results = []
-        for det in self._run(keypoint_input):
+        for det in self._run(keypoint_input)[0]:
             if len(det) < 7:
                 continue
             keypoints = det[6:].reshape((4, 3))
@@ -133,6 +133,4 @@ class ONNXEmbedding(_ONNXModel, EmbeddingModel):
 
     def predict_batch(self, images: list[np.ndarray]) -> np.ndarray:
         """Embeds several crops in one session run."""
-        batch = np.concatenate([self._preprocess(image)[0] for image in images])
-        name = self.session.get_inputs()[0].name
-        return self.session.run(None, {name: batch})[0]
+        return self._run(np.concatenate([self._preprocess(i)[0] for i in images]))

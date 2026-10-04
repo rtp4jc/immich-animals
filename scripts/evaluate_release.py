@@ -42,8 +42,10 @@ def embed(embedder: Path, species: str, samples: list) -> np.ndarray:
         digest = hashlib.file_digest(f, "sha256").hexdigest()[:12]
     cache = CACHE / digest / f"{species}.npz"
     paths = np.array([s.path for s in samples])
-    if cache.exists() and np.array_equal(np.load(cache)["paths"], paths):
-        return np.load(cache)["embeddings"]
+    if cache.exists():
+        with np.load(cache) as cached:
+            if np.array_equal(cached["paths"], paths):
+                return cached["embeddings"]
     model = ONNXEmbedding(str(embedder / "embedding.onnx"))
     batches = []
     for start in range(0, len(samples), 32):
@@ -66,15 +68,17 @@ def main() -> None:
     parser.add_argument("--sweep", action="store_true", help=f"households at {SWEEP}")
     args = parser.parse_args()
 
-    sets = {species: held_out(species) for species in ("dog", "cat")}
-    ids = {s: np.array([x.boxes[0].identity for x in sets[s][0]]) for s in sets}
+    samples, gallery = {}, {}
+    for s in ("dog", "cat"):
+        samples[s], gallery[s] = held_out(s)
+    ids = {s: np.array([x.boxes[0].identity for x in samples[s]]) for s in samples}
     # Half 1 at seed 2 are the homes the 0.3.0 model card was first published on.
     breeds = {"dog": dogreid.breeds(DATA_DIR), "cat": None}
     homes = {
         s: households.sample_homes(
             ids[s], households.halves(ids[s])[1], 300, 2, breeds[s]
         )
-        for s in sets
+        for s in samples
     }
     print(
         f"dog frames {len(ids['dog'])}, cats {len(set(ids['cat']))} with {len(ids['cat'])} photos"
@@ -86,12 +90,13 @@ def main() -> None:
     print("| --- | --- | --- | --- | --- | --- | --- |")
     embeddings = {}
     for embedder in args.embedder:
-        e = embeddings[embedder] = {s: embed(embedder, s, sets[s][0]) for s in sets}
+        e = {s: embed(embedder, s, samples[s]) for s in samples}
+        embeddings[embedder] = e
         dog_mrr, dog_top, _ = retrieval_metrics(
-            e["dog"], ids["dog"], gallery=sets["dog"][1]
+            e["dog"], ids["dog"], gallery=gallery["dog"]
         )
-        _, cat_top, _ = retrieval_metrics(e["cat"], ids["cat"])
-        tar = {s: calculate_tar_at_far(e[s], ids[s], 0.01)[0] for s in sets}
+        _, cat_top, _ = retrieval_metrics(e["cat"], ids["cat"], gallery=gallery["cat"])
+        tar = {s: calculate_tar_at_far(e[s], ids[s], 0.01)[0] for s in samples}
         print(
             f"| {embedder} | {dog_top[1]:.3f} | {dog_top[5]:.3f} | {dog_mrr:.3f} "
             f"| {tar['dog']:.3f} | {cat_top[1]:.3f} | {tar['cat']:.3f} |"

@@ -15,12 +15,12 @@ LICENSE = "CC0 1.0"  # doi:10.7910/DVN/LVTRLG
 def load(data_dir: Path) -> Iterator[Sample]:
     # Query/gallery frames are the published open-set benchmark, scene-disjoint
     # by construction; they stay out of every training export.
-    return (sample for sample, _ in _frames(data_dir, test=False))
+    return (sample for sample, _ in _frames(data_dir, train=True))
 
 
 def benchmark(data_dir: Path) -> list[tuple[Sample, str]]:
     """The open-set test frames, each with its role: "query" or "gallery"."""
-    return list(_frames(data_dir, test=True))
+    return list(_frames(data_dir, train=False))
 
 
 def breeds(data_dir: Path) -> dict[str, str]:
@@ -29,14 +29,14 @@ def breeds(data_dir: Path) -> dict[str, str]:
         return {r["DOG_ID"]: r["BREED"] for r in csv.DictReader(f)}
 
 
-def _frames(data_dir: Path, test: bool) -> Iterator[tuple[Sample, str]]:
+def _frames(data_dir: Path, train: bool) -> Iterator[tuple[Sample, str]]:
     root = data_dir / ROOT
     boxes = {
         r["VIDEO_ID"]: r for r in csv.DictReader(open(root / "bounding_boxes.tab"))
     }
     for row in csv.DictReader(open(root / "splits.tab")):
         role = row["SPLIT_OPEN_SET"]
-        if (role != "train") != test:
+        if (role == "train") != train:
             continue
         dog, video = row["DOG_ID"], row["VIDEO_ID"]
         path = f"{ROOT}/images/{dog}/{dog}-{video}.jpg"

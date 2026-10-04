@@ -192,16 +192,15 @@ def retrieval_metrics(
     if gallery is None:
         similarities = embeddings @ embeddings.T
         np.fill_diagonal(similarities, -np.inf)
+        # Each query ranks itself last; counting it would give every
+        # single-photo identity a guaranteed miss instead of skipping it.
+        order = np.argsort(-similarities, axis=1)[:, :-1]
         queries = candidates = labels
     else:
         similarities = embeddings[~gallery] @ embeddings[gallery].T
+        order = np.argsort(-similarities, axis=1)
         queries, candidates = labels[~gallery], labels[gallery]
-    ranked_labels = candidates[np.argsort(-similarities, axis=1)]
-    matches = ranked_labels == queries[:, None]
-    if gallery is None:
-        # Each query ranks itself last (-inf); counting it would give every
-        # single-photo identity a guaranteed miss instead of skipping it.
-        matches = matches[:, :-1]
+    matches = candidates[order] == queries[:, None]
 
     has_positive = matches.any(axis=1)
     matches = matches[has_positive]

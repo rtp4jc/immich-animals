@@ -42,10 +42,7 @@ def sample_homes(
     seed: int,
     breeds: dict[str, str] | None = None,
 ) -> list[tuple[np.ndarray, set]]:
-    """(photo indices, own pets) per home: 1-4 own pets with 3-15 photos, 20-200 strangers with 1-2.
-
-    With ``breeds``, 30% of multi-pet homes own pets of a single breed, the hardest case.
-    """
+    """(photo indices, own pets) per home; with ``breeds``, 30% of multi-pet homes share one."""
     photos = defaultdict(list)
     for i, pet in enumerate(ids):
         if pet in pets:
@@ -61,9 +58,9 @@ def sample_homes(
         n_own = int(rng.integers(1, 5))
         own = None
         if n_own >= 2 and rng.random() < 0.3:
-            breed = sorted(b for b, v in by_breed.items() if len(v) >= n_own)
-            if breed:
-                breed = breed[rng.integers(len(breed))]
+            options = sorted(b for b, v in by_breed.items() if len(v) >= n_own)
+            if options:
+                breed = options[rng.integers(len(options))]
                 own = list(rng.choice(by_breed[breed], n_own, replace=False))
         if own is None:
             own = list(rng.choice(eligible, n_own, replace=False))
@@ -144,5 +141,4 @@ def simulate(embeddings: np.ndarray, ids: np.ndarray, homes: list, eps: float) -
         "precision": float(precision.mean()),
         "recall": float(recall.mean()),
         "f1": float(np.mean(2 * precision * recall / (precision + recall))),
-        "pets": len(pets),
     }
