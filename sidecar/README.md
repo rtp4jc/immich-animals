@@ -98,6 +98,7 @@ Add them under `environment:` in the `docker-compose.override.yml` from step 1, 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `UPSTREAM_ML_URL` | — | Your existing Immich ML container. Required: search and OCR are forwarded to it. |
+| `UPSTREAM_TIMEOUT` | `120` | How many seconds the sidecar will wait for a response from the Upstream ML container before failing. Increasing allows more time for slower systems/models. |
 | `KEEP_HUMAN_FACES` | `true` | `false` serves pets only and stops detecting human faces. A refresh will delete all human face edits you have made |
 | `DOG_MIN_SCORE` | `0.3` | How confident the detector must be for a dog. Lower finds more dogs and more wolves and foxes. Just requires a refresh. |
 | `DOG_MAX_DISTANCE` | `0.375` | **SEE NOTE BELOW** How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
