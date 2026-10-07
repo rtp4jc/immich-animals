@@ -33,6 +33,7 @@ BBOX_PAD = 0.1  # matches AnimalPipeline's crop, which the embedder was tuned on
 
 MODEL_DIR = Path(os.environ.get("MODEL_DIR", "models/onnx"))
 UPSTREAM_URL = os.environ.get("UPSTREAM_ML_URL", "").rstrip("/")
+UPSTREAM_TIMEOUT = float(os.environ.get("UPSTREAM_TIMEOUT", "120"))
 KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
     "1",
     "true",
@@ -270,7 +271,7 @@ async def predict(request: Request) -> Response:
 async def _post_upstream(body: bytes, content_type: str) -> httpx.Response:
     if not UPSTREAM_URL:
         raise HTTPException(503, "UPSTREAM_ML_URL is not set")
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as client:
         return await client.post(
             f"{UPSTREAM_URL}/predict",
             content=body,
