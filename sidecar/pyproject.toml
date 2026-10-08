@@ -10,7 +10,6 @@ dependencies = [
     "uvicorn>=0.30.0",
     "httpx>=0.27.0",
     "numpy>=1.24.0",
-    "onnxruntime>=1.15.0",
     "opencv-python-headless>=4.8.0",
     "orjson>=3.10.0",
     "python-multipart>=0.0.9",
@@ -18,6 +17,9 @@ dependencies = [
 
 [tool.uv]
 package = false
+# Both install the `onnxruntime` module; the Dockerfile picks one per image variant.
+conflicts = [[{ group = "cpu" }, { group = "openvino" }]]
+default-groups = ["dev", "cpu"]
 
 [tool.ruff]
 target-version = "py312"
@@ -27,6 +29,8 @@ select = ["E", "F", "I", "UP"]
 ignore = ["E501"]
 
 [dependency-groups]
+cpu = ["onnxruntime>=1.15.0"]
+openvino = ["onnxruntime-openvino>=1.24.1"]
 dev = [
     "onnx>=1.23.1",
     "pytest>=9.1.1",

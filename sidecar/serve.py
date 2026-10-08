@@ -45,10 +45,22 @@ SPECIES_DEFAULTS = {"dog": (0.3, 0.375), "cat": (0.3, 0.35)}
 IMMICH_MAX_DISTANCE = float(os.environ.get("IMMICH_MAX_DISTANCE", "0.5"))
 
 
+# Only the openvino image ships this provider; there the models run on the Intel GPU
+# (OPENVINO_DEVICE=CPU lets CI smoke-test the image on a runner without one).
+PROVIDERS = (
+    [
+        (
+            "OpenVINOExecutionProvider",
+            {"device_type": os.environ.get("OPENVINO_DEVICE", "GPU")},
+        )
+    ]
+    if "OpenVINOExecutionProvider" in ort.get_available_providers()
+    else ["CPUExecutionProvider"]
+)
+
+
 def _session(name: str) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
-    session = ort.InferenceSession(
-        str(MODEL_DIR / name), providers=["CPUExecutionProvider"]
-    )
+    session = ort.InferenceSession(str(MODEL_DIR / name), providers=PROVIDERS)
     spec = session.get_inputs()[0]
     return session, spec.name, tuple(spec.shape[2:])
 
@@ -204,7 +216,8 @@ def _pad(bbox: list[int], width: int, height: int) -> tuple[int, int, int, int]:
 
 app = FastAPI()
 logging.getLogger("uvicorn.error").info(
-    "animal-ml: people=%s, upstream=%s, %s",
+    "animal-ml: %s, people=%s, upstream=%s, %s",
+    detector.get_providers()[0],
     KEEP_HUMAN_FACES,
     UPSTREAM_URL or "unset",
     "; ".join(

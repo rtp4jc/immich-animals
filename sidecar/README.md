@@ -165,6 +165,19 @@ Building under the published tag shadows the released image locally, so the
 setup in step 1 runs your build without edits. `docker pull` it again to go
 back.
 
+### Intel GPU (OpenVINO)
+
+`--build-arg VARIANT=openvino` builds an amd64 image that runs both models on an
+Intel GPU through OpenVINO, the way Immich's `-openvino` image does. Give the
+container the GPU with `devices: ["/dev/dri:/dev/dri"]`; without it the models
+fail to load. `OPENVINO_DEVICE` (default `GPU`) picks another OpenVINO device,
+e.g. `CPU` to smoke-test the image on a machine without one. On an Intel N100 a
+photo with one cat takes about 0.23 s instead of 1.0 s on the CPU.
+
+The embeddings differ from the CPU build's in the last digits, so the
+`_rescale` noise differs too: switching variants mid-library is safe for
+clustering but, like any embedder change, best followed by a Refresh.
+
 ## Test
 
 `smoke_test.py` posts images exactly as Immich does and asserts the reply shape,
