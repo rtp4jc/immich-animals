@@ -43,7 +43,7 @@ WORKDIR /app
 COPY sidecar/pyproject.toml sidecar/uv.lock ./
 RUN uv sync --frozen --no-dev
 
-COPY sidecar/serve.py .
+COPY sidecar/serve.py sidecar/preprocess.py ./
 COPY --from=models /models/detector.onnx /models/embedding.onnx /models/embedding.json \
      /app/models/onnx/
 

@@ -118,7 +118,9 @@ embedder, whatever model is picked there.
 ## Trouble
 
 **"Machine learning server became unhealthy"** — `animal-ml` is not running, or
-not on Immich's docker network. Check `docker logs animal_ml`.
+not on Immich's docker network, or it cannot reach `UPSTREAM_ML_URL`: its
+`/ping` fails while Immich's own ML container is down, since search, OCR and
+human faces need it. Check `docker logs animal_ml`.
 
 **Search stopped working** — `UPSTREAM_ML_URL` is wrong. Text search is
 forwarded to Immich's own ML container.
@@ -136,7 +138,9 @@ looks at photos that have never been scanned. Run it as **Refresh**.
 The main [README](../README.md) covers the models and training. This section is
 only what is specific to the sidecar.
 
-`serve.py` is the whole integration. Immich talks to machine
+`serve.py` is the whole integration, with the model input tensors in
+`preprocess.py` (tested against `animal_id`'s pipeline from the repo root's
+`tests/unit/test_sidecar_preprocessing.py`). Immich talks to machine
 learning over HTTP, so this needs no fork of Immich and no patched image — just
 a service that answers `POST /predict` and `GET /ping` the way Immich expects.
 
