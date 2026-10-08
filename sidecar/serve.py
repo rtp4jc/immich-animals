@@ -13,6 +13,7 @@ retune settings that are already right for people.
 """
 
 import ast
+import asyncio
 import hashlib
 import json
 import logging
@@ -27,6 +28,7 @@ import onnxruntime as ort
 import orjson
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import ORJSONResponse, PlainTextResponse, Response
+from starlette.concurrency import run_in_threadpool
 
 TASK = "facial-recognition"
 BBOX_PAD = 0.1  # matches AnimalPipeline's crop, which the embedder was tuned on
@@ -235,13 +237,27 @@ async def predict(request: Request) -> Response:
             media_type=upstream.headers.get("content-type"),
         )
 
-    buffer = np.frombuffer(await form["image"].read(), np.uint8)
-    decoded = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+    rgb = await run_in_threadpool(_decode, await form["image"].read())
+    # ONNX runs in a worker thread so the event loop keeps serving pings, CLIP and
+    # the upstream face request while animals are inferred.
+    animals, humans = await asyncio.gather(
+        run_in_threadpool(_animal_faces, rgb), _human_faces(body, content_type)
+    )
+    height, width = rgb.shape[:2]
+    return ORJSONResponse(
+        {TASK: animals + humans, "imageHeight": height, "imageWidth": width}
+    )
+
+
+def _decode(data: bytes) -> np.ndarray:
+    decoded = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
     if decoded is None:
         raise HTTPException(400, "Could not decode image")  # same status as upstream
-    rgb = cv2.cvtColor(decoded, cv2.COLOR_BGR2RGB)
-    height, width = rgb.shape[:2]
+    return cv2.cvtColor(decoded, cv2.COLOR_BGR2RGB)
 
+
+def _animal_faces(rgb: np.ndarray) -> list[dict]:
+    height, width = rgb.shape[:2]
     faces = []
     for score, bbox, kind in _detect(rgb):
         x1, y1, x2, y2 = _pad(bbox, width, height)
@@ -258,13 +274,15 @@ async def predict(request: Request) -> Response:
                 "score": score,
             }
         )
+    return faces
 
-    if KEEP_HUMAN_FACES and UPSTREAM_URL:
-        upstream = await _post_upstream(body, content_type)
-        upstream.raise_for_status()
-        faces += orjson.loads(upstream.content).get(TASK, [])
 
-    return ORJSONResponse({TASK: faces, "imageHeight": height, "imageWidth": width})
+async def _human_faces(body: bytes, content_type: str) -> list[dict]:
+    if not (KEEP_HUMAN_FACES and UPSTREAM_URL):
+        return []
+    upstream = await _post_upstream(body, content_type)
+    upstream.raise_for_status()
+    return orjson.loads(upstream.content).get(TASK, [])
 
 
 async def _post_upstream(body: bytes, content_type: str) -> httpx.Response:
