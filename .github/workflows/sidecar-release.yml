@@ -76,7 +76,7 @@ jobs:
       # test on their own native runner, so "supports arm64" is a measurement.
       - name: Smoke test
         run: |
-          docker run -d --rm --name smoke -p 3003:3003 animal-ml:ci
+          docker run -d --rm --name smoke -p 3003:3003 -e KEEP_HUMAN_FACES=false animal-ml:ci
           for _ in $(seq 60); do curl -sf -o /dev/null http://localhost:3003/ping && break; sleep 2; done
           sudo apt-get install -y --no-install-recommends imagemagick
           convert -size 320x240 xc:gray /tmp/blank.jpg

@@ -13,13 +13,21 @@ retune settings that are already right for people.
 """
 
 import ast
+import asyncio
+import ctypes
+import gc
 import hashlib
 import json
 import logging
 import os
+import threading
+import time
+from collections import defaultdict
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import NamedTuple
 
+import anyio
 import cv2
 import httpx
 import numpy as np
@@ -27,6 +35,8 @@ import onnxruntime as ort
 import orjson
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import ORJSONResponse, PlainTextResponse, Response
+
+from preprocess import embedder_blob, letterbox
 
 TASK = "facial-recognition"
 BBOX_PAD = 0.1  # matches AnimalPipeline's crop, which the embedder was tuned on
@@ -43,6 +53,30 @@ KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
 # that species' embeddings cluster best. Detector classes not listed are ignored.
 SPECIES_DEFAULTS = {"dog": (0.3, 0.375), "cat": (0.3, 0.35)}
 IMMICH_MAX_DISTANCE = float(os.environ.get("IMMICH_MAX_DISTANCE", "0.5"))
+UPSTREAM_ATTEMPTS = 3
+# Read covers slow first requests while upstream loads a model; connect is short so
+# an upstream that drops packets (host asleep) fails fast instead of holding a job.
+UPSTREAM_TIMEOUT = float(os.environ.get("UPSTREAM_TIMEOUT", "120"))
+UPSTREAM_CONNECT_TIMEOUT = float(os.environ.get("UPSTREAM_CONNECT_TIMEOUT", "5"))
+# ONNX Runtime already uses every core per run, so parallel runs only add memory.
+INFERENCE_CONCURRENCY = int(os.environ.get("INFERENCE_CONCURRENCY", "1"))
+# Caps the embedder batch, and with it peak memory, for photos with many animals.
+EMBED_BATCH = int(os.environ.get("EMBED_BATCH", "8"))
+# Seconds without a request after which the models are unloaded; 0 keeps them.
+MODEL_TTL = float(os.environ.get("MODEL_TTL", "0"))
+
+if KEEP_HUMAN_FACES and not UPSTREAM_URL:
+    # Answering with animals only would look like a complete result, and an Immich
+    # face refresh deletes every human face it does not find again.
+    raise SystemExit(
+        "animal-ml: UPSTREAM_ML_URL is required while KEEP_HUMAN_FACES is true"
+    )
+if INFERENCE_CONCURRENCY < 1 or EMBED_BATCH < 1:
+    # 0 would make face requests wait forever, and a negative batch would answer
+    # with empty embeddings.
+    raise SystemExit(
+        "animal-ml: INFERENCE_CONCURRENCY and EMBED_BATCH must be at least 1"
+    )
 
 
 def _session(name: str) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
@@ -107,53 +141,85 @@ def _species(name: str) -> _Species:
     )
 
 
-detector, _det_input, _det_size = _session("detector.onnx")
-# Ultralytics writes class names as a Python dict literal, e.g. "{0: 'dog'}".
-_class_names = ast.literal_eval(detector.get_modelmeta().custom_metadata_map["names"])
-species = {
-    class_id: _species(name)
-    for class_id, name in _class_names.items()
-    if name in SPECIES_DEFAULTS
-}
-embedders = {
-    stem: _load_embedder(stem) for stem in {s.embedder_stem for s in species.values()}
-}
+class _Models(NamedTuple):
+    detector: ort.InferenceSession
+    det_input: str
+    det_size: tuple[int, int]
+    species: dict[int, _Species]
+    embedders: dict[str, _Embedder]
 
 
-def _blob(image: np.ndarray, size: tuple[int, int], interpolation: int) -> np.ndarray:
-    resized = cv2.resize(image, (size[1], size[0]), interpolation=interpolation)
-    return np.transpose(resized.astype(np.float32) / 255.0, (2, 0, 1))[None]
+def _load_models() -> _Models:
+    detector, det_input, det_size = _session("detector.onnx")
+    # Ultralytics writes class names as a Python dict literal, e.g. "{0: 'dog'}".
+    names = ast.literal_eval(detector.get_modelmeta().custom_metadata_map["names"])
+    species = {
+        class_id: _species(name)
+        for class_id, name in names.items()
+        if name in SPECIES_DEFAULTS
+    }
+    embedders = {
+        stem: _load_embedder(stem)
+        for stem in {s.embedder_stem for s in species.values()}
+    }
+    return _Models(detector, det_input, det_size, species, embedders)
 
 
-def _letterbox(
-    image: np.ndarray, size: tuple[int, int]
-) -> tuple[np.ndarray, float, int, int]:
-    """The blob plus the scale and left/top padding that map boxes back to source pixels.
+# Loaded at import so bad model files fail the start, not the first photo.
+_models: _Models | None = _load_models()
+_models_lock = threading.Lock()
+_models_in_use = 0
+_models_last_used = time.monotonic()
 
-    YOLO trains on aspect-preserved images padded to square; stretched phone
-    photos cost the detector ~7pp recall on owner photos.
-    """
-    height, width = image.shape[:2]
-    scale = min(size[0] / height, size[1] / width)
-    h, w = round(height * scale), round(width * scale)
-    top, left = (size[0] - h) // 2, (size[1] - w) // 2
-    canvas = np.full((*size, 3), 114, np.uint8)  # Ultralytics' pad colour
-    canvas[top : top + h, left : left + w] = cv2.resize(
-        image, (w, h), interpolation=cv2.INTER_LINEAR
-    )
-    return (
-        np.transpose(canvas.astype(np.float32) / 255.0, (2, 0, 1))[None],
-        scale,
-        left,
-        top,
-    )
+
+def _acquire_models() -> _Models:
+    global _models, _models_in_use
+    with _models_lock:
+        if _models is None:
+            _models = _load_models()
+        _models_in_use += 1
+        return _models
+
+
+def _release_models() -> None:
+    global _models_in_use, _models_last_used
+    with _models_lock:
+        _models_in_use -= 1
+        _models_last_used = time.monotonic()
+
+
+def _unload_idle_models() -> bool:
+    global _models
+    with _models_lock:
+        idle = time.monotonic() - _models_last_used
+        if _models is None or _models_in_use or idle < MODEL_TTL:
+            return False
+        _models = None
+    # Dropping the sessions frees ONNX Runtime's arenas; glibc keeps the freed
+    # pages until asked to give them back.
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except (OSError, AttributeError):
+        pass
+    return True
+
+
+async def _unload_models_when_idle() -> None:
+    log = logging.getLogger("uvicorn.error")
+    while True:
+        await anyio.sleep(min(MODEL_TTL, 10))
+        if await anyio.to_thread.run_sync(_unload_idle_models):
+            log.info("animal-ml: models unloaded after %.0f s idle", MODEL_TTL)
 
 
 def _detect(rgb: np.ndarray) -> list[tuple[float, list[int], _Species]]:
     """Known-species detections above that species' min score, bbox in source pixels."""
     height, width = rgb.shape[:2]
-    blob, scale, left, top = _letterbox(rgb, _det_size)
-    raw = detector.run(None, {_det_input: blob})
+    models = _models  # held by _acquire_models for the whole request
+    species = models.species
+    blob, scale, left, top = letterbox(rgb, models.det_size)
+    raw = models.detector.run(None, {models.det_input: blob})
     return [
         (
             float(score),
@@ -183,12 +249,30 @@ def _rescale(vector: np.ndarray, shift: float) -> np.ndarray:
     return _unit(mixed).astype(np.float32)
 
 
-def _embed(crop: np.ndarray, kind: _Species) -> np.ndarray:
-    embedder = embedders[kind.embedder_stem]
-    blob = _blob(crop, embedder.size, cv2.INTER_AREA)
-    blob = (blob - embedder.mean) / embedder.std
-    vector = embedder.session.run(None, {embedder.input_name: blob})[0][0]
-    return _rescale(vector, kind.shift) if 0 < kind.shift < 1 else vector
+def _embed(crops: list[tuple[np.ndarray, _Species]]) -> list[np.ndarray]:
+    """One session run per embedder, however many animals the photo has."""
+    vectors: list[np.ndarray] = [np.empty(0)] * len(crops)
+    by_stem = defaultdict(list)
+    for i, (_, kind) in enumerate(crops):
+        by_stem[kind.embedder_stem].append(i)
+    for stem, all_indices in by_stem.items():
+        embedder = _models.embedders[stem]
+        for start in range(0, len(all_indices), EMBED_BATCH):
+            indices = all_indices[start : start + EMBED_BATCH]
+            batch = np.concatenate(
+                [
+                    embedder_blob(
+                        crops[i][0], embedder.size, embedder.mean, embedder.std
+                    )
+                    for i in indices
+                ]
+            )
+            for i, vector in zip(
+                indices, embedder.session.run(None, {embedder.input_name: batch})[0]
+            ):
+                shift = crops[i][1].shift
+                vectors[i] = _rescale(vector, shift) if 0 < shift < 1 else vector
+    return vectors
 
 
 def _pad(bbox: list[int], width: int, height: int) -> tuple[int, int, int, int]:
@@ -202,7 +286,33 @@ def _pad(bbox: list[int], width: int, height: int) -> tuple[int, int, int, int]:
     )
 
 
-app = FastAPI()
+_client: httpx.AsyncClient
+_limiter: anyio.CapacityLimiter | None = None
+
+
+def _inference_limiter() -> anyio.CapacityLimiter:
+    # Created on first use, inside the running event loop.
+    global _limiter
+    if _limiter is None:
+        _limiter = anyio.CapacityLimiter(INFERENCE_CONCURRENCY)
+    return _limiter
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    global _client
+    timeout = httpx.Timeout(UPSTREAM_TIMEOUT, connect=UPSTREAM_CONNECT_TIMEOUT)
+    async with httpx.AsyncClient(timeout=timeout) as _client:
+        if MODEL_TTL <= 0:
+            yield
+            return
+        async with anyio.create_task_group() as tasks:
+            tasks.start_soon(_unload_models_when_idle)
+            yield
+            tasks.cancel_scope.cancel()
+
+
+app = FastAPI(lifespan=_lifespan)
 logging.getLogger("uvicorn.error").info(
     "animal-ml: people=%s, upstream=%s, %s",
     KEEP_HUMAN_FACES,
@@ -211,13 +321,29 @@ logging.getLogger("uvicorn.error").info(
         f"{s.name}: min score {s.min_score:.2f}, Max Distance {IMMICH_MAX_DISTANCE:.2f}"
         f" acts as {s.max_distance if 0 < s.shift < 1 else IMMICH_MAX_DISTANCE:.2f},"
         f" {s.embedder_stem}.onnx"
-        for s in species.values()
+        for s in _models.species.values()
     ),
 )
 
 
+@app.get("/")
+async def root() -> ORJSONResponse:
+    # Liveness only. /ping also reports upstream, so a container health check on it
+    # would restart the sidecar whenever upstream is down.
+    return ORJSONResponse({"message": "animal-ml"})
+
+
 @app.get("/ping")
-def ping() -> PlainTextResponse:
+async def ping() -> PlainTextResponse:
+    # Immich reads a pong as "ML works"; without upstream, CLIP search, OCR and
+    # human faces would all fail, so report that rather than hide it. Immich
+    # gives the whole check 2 s by default.
+    if UPSTREAM_URL:
+        try:
+            response = await _upstream("GET", "/ping", timeout=1.5)
+            response.raise_for_status()
+        except httpx.HTTPError as error:
+            raise HTTPException(503, f"Upstream ML unavailable: {error!r}") from error
     return PlainTextResponse("pong")
 
 
@@ -235,44 +361,103 @@ async def predict(request: Request) -> Response:
             media_type=upstream.headers.get("content-type"),
         )
 
-    buffer = np.frombuffer(await form["image"].read(), np.uint8)
-    decoded = cv2.imdecode(buffer, cv2.IMREAD_COLOR)
+    rgb = await anyio.to_thread.run_sync(_decode, await form["image"].read())
+    # ONNX runs in a worker thread so the event loop keeps serving pings, CLIP and
+    # the upstream face request while animals are inferred.
+    inference = asyncio.create_task(
+        anyio.to_thread.run_sync(_animal_faces, rgb, limiter=_inference_limiter())
+    )
+    try:
+        humans = await _human_faces(body, content_type)
+    except BaseException:
+        # A photo still waiting for the limiter is dropped; one already running
+        # finishes in its thread, and its result is discarded.
+        inference.cancel()
+        await asyncio.gather(inference, return_exceptions=True)
+        raise
+    animals = await inference
+    height, width = rgb.shape[:2]
+    return ORJSONResponse(
+        {TASK: animals + humans, "imageHeight": height, "imageWidth": width}
+    )
+
+
+def _decode(data: bytes) -> np.ndarray:
+    decoded = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
     if decoded is None:
         raise HTTPException(400, "Could not decode image")  # same status as upstream
-    rgb = cv2.cvtColor(decoded, cv2.COLOR_BGR2RGB)
-    height, width = rgb.shape[:2]
+    return cv2.cvtColor(decoded, cv2.COLOR_BGR2RGB)
 
-    faces = []
+
+def _animal_faces(rgb: np.ndarray) -> list[dict]:
+    _acquire_models()
+    try:
+        return _animal_faces_with_models(rgb)
+    finally:
+        _release_models()
+
+
+def _animal_faces_with_models(rgb: np.ndarray) -> list[dict]:
+    height, width = rgb.shape[:2]
+    boxes, crops = [], []
     for score, bbox, kind in _detect(rgb):
         x1, y1, x2, y2 = _pad(bbox, width, height)
         crop = rgb[y1:y2, x1:x2]
         if crop.size == 0:
             continue
-        faces.append(
-            {
-                "boundingBox": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
-                # Immich expects the vector as a JSON string, not an array.
-                "embedding": orjson.dumps(
-                    _embed(crop, kind), option=orjson.OPT_SERIALIZE_NUMPY
-                ).decode(),
-                "score": score,
-            }
-        )
+        boxes.append(({"x1": x1, "y1": y1, "x2": x2, "y2": y2}, score))
+        crops.append((crop, kind))
+    return [
+        {
+            "boundingBox": box,
+            # Immich expects the vector as a JSON string, not an array.
+            "embedding": orjson.dumps(
+                vector, option=orjson.OPT_SERIALIZE_NUMPY
+            ).decode(),
+            "score": score,
+        }
+        for (box, score), vector in zip(boxes, _embed(crops))
+    ]
 
-    if KEEP_HUMAN_FACES and UPSTREAM_URL:
-        upstream = await _post_upstream(body, content_type)
+
+async def _human_faces(body: bytes, content_type: str) -> list[dict]:
+    if not KEEP_HUMAN_FACES:
+        return []
+    # Without the human faces the answer is incomplete, so fail the request: Immich
+    # tries its next URL, or the next Face Detection run picks the photo up again.
+    upstream = await _post_upstream(body, content_type)
+    try:
         upstream.raise_for_status()
-        faces += orjson.loads(upstream.content).get(TASK, [])
-
-    return ORJSONResponse({TASK: faces, "imageHeight": height, "imageWidth": width})
+        faces = orjson.loads(upstream.content)[TASK]
+    except (httpx.HTTPStatusError, orjson.JSONDecodeError, KeyError, TypeError):
+        faces = None
+    if not isinstance(faces, list):
+        raise HTTPException(
+            503, f"Upstream ML answered {upstream.status_code} without faces"
+        )
+    return faces
 
 
 async def _post_upstream(body: bytes, content_type: str) -> httpx.Response:
     if not UPSTREAM_URL:
         raise HTTPException(503, "UPSTREAM_ML_URL is not set")
-    async with httpx.AsyncClient(timeout=120) as client:
-        return await client.post(
-            f"{UPSTREAM_URL}/predict",
-            content=body,
-            headers={"content-type": content_type},
+    try:
+        return await _upstream(
+            "POST", "/predict", content=body, headers={"content-type": content_type}
         )
+    except httpx.TransportError as error:
+        raise HTTPException(503, f"Upstream ML unavailable: {error!r}") from error
+
+
+async def _upstream(method: str, path: str, **kwargs) -> httpx.Response:
+    # httpx drops pooled connections that upstream closed cleanly, but one that
+    # died silently (upstream killed or restarted) fails the request before any
+    # answer and leaves the pool; several can die at once. Predictions are
+    # idempotent, so try again, each time on the next connection or a new one.
+    url = f"{UPSTREAM_URL}{path}"
+    for _ in range(UPSTREAM_ATTEMPTS - 1):
+        try:
+            return await _client.request(method, url, **kwargs)
+        except (httpx.NetworkError, httpx.RemoteProtocolError):
+            pass
+    return await _client.request(method, url, **kwargs)

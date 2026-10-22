@@ -43,11 +43,17 @@ WORKDIR /app
 COPY sidecar/pyproject.toml sidecar/uv.lock ./
 RUN uv sync --frozen --no-dev
 
-COPY sidecar/serve.py .
+COPY sidecar/serve.py sidecar/preprocess.py ./
 COPY --from=models /models/detector.onnx /models/embedding.onnx /models/embedding.json \
      /app/models/onnx/
 
 ENV MODEL_DIR=/app/models/onnx \
     PATH=/app/.venv/bin:$PATH
+RUN useradd --system --no-create-home --uid 10001 animal
+USER animal
 EXPOSE 3003
+# Liveness on /, not /ping: /ping also reports upstream, and a restart does not
+# bring a stopped upstream back.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s \
+    CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3003/', timeout=4)"]
 CMD ["uvicorn", "serve:app", "--host", "0.0.0.0", "--port", "3003"]
