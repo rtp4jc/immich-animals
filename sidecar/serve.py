@@ -43,6 +43,9 @@ KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
 # that species' embeddings cluster best. Detector classes not listed are ignored.
 SPECIES_DEFAULTS = {"dog": (0.3, 0.375), "cat": (0.3, 0.35)}
 IMMICH_MAX_DISTANCE = float(os.environ.get("IMMICH_MAX_DISTANCE", "0.5"))
+# Share of the smaller box inside the larger one past which both are one animal.
+# Two pets cuddling rarely put one 90% inside the other's box.
+NESTED_OVERLAP = 0.9
 
 
 def _session(name: str) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
@@ -154,7 +157,7 @@ def _detect(rgb: np.ndarray) -> list[tuple[float, list[int], _Species]]:
     height, width = rgb.shape[:2]
     blob, scale, left, top = _letterbox(rgb, _det_size)
     raw = detector.run(None, {_det_input: blob})
-    return [
+    detections = [
         (
             float(score),
             [
@@ -168,6 +171,28 @@ def _detect(rgb: np.ndarray) -> list[tuple[float, list[int], _Species]]:
         for x1, y1, x2, y2, score, class_id in raw[0][0]
         if int(class_id) in species and score >= species[int(class_id)].min_score
     ]
+    return _drop_nested(detections)
+
+
+def _drop_nested(detections: list[tuple[float, list[int], _Species]]) -> list:
+    """Drop boxes lying mostly inside a higher-scoring one, whatever their class.
+
+    The exported NMS compares IoU at 0.7, so a cat boxed once tightly and once
+    with most of the room (IoU ~0.5) reaches Immich as two faces of one animal.
+    """
+    kept = []
+    for detection in sorted(detections, key=lambda d: d[0], reverse=True):
+        x1, y1, x2, y2 = detection[1]
+        area = max(1, (x2 - x1) * (y2 - y1))
+        if not any(
+            max(0, min(x2, k[2]) - max(x1, k[0]))
+            * max(0, min(y2, k[3]) - max(y1, k[1]))
+            / min(area, max(1, (k[2] - k[0]) * (k[3] - k[1])))
+            >= NESTED_OVERLAP
+            for _, k, _ in kept
+        ):
+            kept.append(detection)
+    return kept
 
 
 def _unit(vector: np.ndarray) -> np.ndarray:
