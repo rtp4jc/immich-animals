@@ -11,11 +11,9 @@ import numpy as np
 def letterbox(
     image: np.ndarray, size: tuple[int, int]
 ) -> tuple[np.ndarray, float, int, int]:
-    """The blob plus the scale and left/top padding that map boxes back to source pixels.
-
-    YOLO trains on aspect-preserved images padded to square; stretched phone
-    photos cost the detector ~7pp recall on owner photos.
-    """
+    """The blob plus the scale and left/top padding that map boxes back to source pixels."""
+    # YOLO trains on aspect-preserved images padded to square; stretched phone
+    # photos cost the detector ~7pp recall on owner photos.
     height, width = image.shape[:2]
     scale = min(size[0] / height, size[1] / width)
     h, w = round(height * scale), round(width * scale)
