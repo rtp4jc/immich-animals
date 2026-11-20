@@ -98,12 +98,15 @@ Add them under `environment:` in the `docker-compose.override.yml` from step 1, 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `UPSTREAM_ML_URL` | — | Your existing Immich ML container. Required: search and OCR are forwarded to it. |
+| `UPSTREAM_TIMEOUT` | `120` | How many seconds the sidecar will wait for a response from the Upstream ML container before failing. Increasing allows more time for slower systems/models. |
+| `UPSTREAM_PING_TIMEOUT` | `1.5` | How many seconds the sidecar's `/ping` waits for the Upstream ML container's `/ping`. Keep it under the ~2 s Immich allows for its own ping, or Immich gives up before the sidecar can answer. |
 | `KEEP_HUMAN_FACES` | `true` | `false` serves pets only and stops detecting human faces. A refresh will delete all human face edits you have made |
 | `DOG_MIN_SCORE` | `0.3` | How confident the detector must be for a dog. Lower finds more dogs and more wolves and foxes. Just requires a refresh. |
 | `DOG_MAX_DISTANCE` | `0.375` | **SEE NOTE BELOW** How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
 | `CAT_MIN_SCORE` | `0.3` | As `DOG_MIN_SCORE`, for cats. |
 | `CAT_MAX_DISTANCE` | `0.35` | As `DOG_MAX_DISTANCE`, for cats, whose embeddings sit closer together. |
 | `IMMICH_MAX_DISTANCE` | `0.5` | The Max Distance in your Immich settings. Change only if you changed that. |
+| `MODEL_TTL` | `300` | Seconds without a face request after which the animal models are unloaded to free memory, like Immich's `MACHINE_LEARNING_MODEL_TTL`. The next photo loads them again. `0` keeps them loaded. |
 
 **NOTE**: `DOG_MAX_DISTANCE` (and `CAT_MAX_DISTANCE`) is tricky to change. You can't just do a refresh after changing 
 it because previously detected faces do not get a new embedding on refresh. If you need to change it, I would suggest 
@@ -118,7 +121,20 @@ embedder, whatever model is picked there.
 ## Trouble
 
 **"Machine learning server became unhealthy"** — `animal-ml` is not running, or
-not on Immich's docker network. Check `docker logs animal_ml`.
+not on Immich's docker network, or it cannot reach `UPSTREAM_ML_URL`: its
+`/ping` fails while Immich's own ML container is down, since search, OCR and
+human faces need it. Check `docker logs animal_ml`.
+
+**animal-ml exits at start with "UPSTREAM_ML_URL is required"** — set
+`UPSTREAM_ML_URL`, or `KEEP_HUMAN_FACES: "false"` if you really want pets only.
+Without upstream the sidecar would answer with animals alone, and a face refresh
+in Immich deletes every human face it does not find again.
+
+**Only put sidecars in Immich's URL list** — with several Machine Learning URLs,
+Immich sends a request to the next one when the first fails or is unhealthy. If
+the next one is Immich's own ML container, that photo gets no animals, and on a
+refresh its existing animal faces are deleted. To keep a fallback, run one
+sidecar in front of each ML server and list only the sidecars.
 
 **Search stopped working** — `UPSTREAM_ML_URL` is wrong. Text search is
 forwarded to Immich's own ML container.
@@ -136,7 +152,9 @@ looks at photos that have never been scanned. Run it as **Refresh**.
 The main [README](../README.md) covers the models and training. This section is
 only what is specific to the sidecar.
 
-`serve.py` is the whole integration. Immich talks to machine
+`serve.py` is the whole integration, with the model input tensors in
+`preprocess.py` (tested against `animal_id`'s pipeline from the repo root's
+`tests/unit/test_sidecar_preprocessing.py`). Immich talks to machine
 learning over HTTP, so this needs no fork of Immich and no patched image — just
 a service that answers `POST /predict` and `GET /ping` the way Immich expects.
 

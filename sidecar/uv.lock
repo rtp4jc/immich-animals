@@ -17,6 +17,7 @@ version = "0.3.0"
 source = { virtual = "." }
 default-groups = ["cpu", "dev"]
 dependencies = [
+    { name = "anyio" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "numpy" },
@@ -40,6 +41,7 @@ openvino = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "numpy", specifier = ">=1.24.0" },
