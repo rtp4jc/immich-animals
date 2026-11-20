@@ -205,6 +205,11 @@ It needs about 2 GB of memory while loading the models, against about 0.8 GB for
 the CPU image. The models load again after every `MODEL_TTL` idle spell, so a
 memory limit has to leave room for that each time.
 
+The detector always runs in FP32, because FP16 drops animals near the min score
+and saves no memory. The embedder runs in the GPU's faster FP16, which matched the
+CPU image's accuracy in our tests; `OPENVINO_EMBEDDER_PRECISION=FP32` runs it at
+full precision for about 0.4 GB more memory and slower requests.
+
 Without access to the GPU, OpenVINO logs `Device GPU is not available` and the
 models quietly run on the CPU instead. Check that the `animal-ml:` line at the
 top of `docker logs animal_ml` names `OpenVINOExecutionProvider`.

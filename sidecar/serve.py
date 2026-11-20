@@ -78,21 +78,23 @@ if KEEP_HUMAN_FACES and not UPSTREAM_URL:
 
 # Only the openvino image ships this provider; there the models run on the Intel GPU
 # (OPENVINO_DEVICE=CPU lets CI smoke-test the image on a runner without one).
-OPENVINO = "OpenVINOExecutionProvider" in ort.get_available_providers()
+OPENVINO = "OpenVINOExecutionProvider"
 OPENVINO_DEVICE = os.environ.get("OPENVINO_DEVICE", "GPU")
+# FP32 for the embedder too costs about 0.4 GB more memory and 50% slower inference.
+OPENVINO_EMBEDDER_PRECISION = os.environ.get("OPENVINO_EMBEDDER_PRECISION", "FP16")
 
 
 def _session(
-    name: str, **openvino_options: str
+    name: str, precision: str
 ) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
     providers = (
         [
             (
-                "OpenVINOExecutionProvider",
-                {"device_type": OPENVINO_DEVICE, **openvino_options},
+                OPENVINO,
+                {"device_type": OPENVINO_DEVICE, "precision": precision},
             )
         ]
-        if OPENVINO
+        if OPENVINO in ort.get_available_providers()
         else ["CPUExecutionProvider"]
     )
     session = ort.InferenceSession(str(MODEL_DIR / name), providers=providers)
@@ -118,7 +120,7 @@ def _load_embedder(stem: str) -> _Embedder:
     ImageNet normalisation is not baked into the graph and skipping it costs
     accuracy silently, so it is read rather than assumed.
     """
-    session, input_name, size = _session(f"{stem}.onnx")
+    session, input_name, size = _session(f"{stem}.onnx", OPENVINO_EMBEDDER_PRECISION)
     prep = json.loads((MODEL_DIR / f"{stem}.json").read_text())["preprocessing"]
     return _Embedder(
         session,
@@ -163,9 +165,9 @@ class _Models(NamedTuple):
 
 
 def _load_models() -> _Models:
-    # The GPU's default FP16 moves detector scores enough to drop animals near the
-    # min score. The embedder holds up in FP16, and FP32 for both does not fit in 2 GB.
-    detector, det_input, det_size = _session("detector.onnx", precision="FP32")
+    # FP16 moves detector scores enough to drop animals near the min score, and saves
+    # no memory on the detector.
+    detector, det_input, det_size = _session("detector.onnx", "FP32")
     # Ultralytics writes class names as a Python dict literal, e.g. "{0: 'dog'}".
     names = ast.literal_eval(detector.get_modelmeta().custom_metadata_map["names"])
     species = {
