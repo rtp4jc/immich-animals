@@ -191,7 +191,7 @@ uv run pytest --cov=animal_id
 uv run ruff check . && uv run ruff format .
 ```
 
-Unit tests cover data loading, models, and converters. Integration tests run short end-to-end training for each stage. GitHub Actions runs ruff lint, ruff format check, and pytest on every push and PR to `main`.
+Unit tests cover data loading, models, and converters. Integration tests run short end-to-end training for each stage. GitHub Actions runs ruff lint, ruff format check, and pytest (root and sidecar suites) on every push and PR to `main`.
 
 ## Data
 
