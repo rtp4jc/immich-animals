@@ -247,7 +247,7 @@ def _rescale(vector: np.ndarray, shift: float) -> np.ndarray:
 def _embed(
     models: _Models, crops: list[tuple[np.ndarray, _Species]]
 ) -> list[np.ndarray]:
-    """One session run per embedder, however many animals the photo has."""
+    """One session run per embedder for every EMBED_BATCH animals in the photo."""
     vectors: list[np.ndarray] = [np.empty(0)] * len(crops)
     by_stem = defaultdict(list)
     for i, (_, kind) in enumerate(crops):
