@@ -109,7 +109,7 @@ Add them under `environment:` in the `docker-compose.override.yml` from step 1, 
 | `UPSTREAM_CONNECT_TIMEOUT` | `5` | Seconds to wait for a connection to upstream. Short, so an upstream host that is asleep fails a job quickly. |
 | `INFERENCE_CONCURRENCY` | `1` | Photos the animal models run on at the same time. Each run already uses every core; more only adds memory. |
 | `EMBED_BATCH` | `8` | Largest number of animals embedded in one run. Caps memory for photos with many animals. |
-| `MODEL_TTL` | `0` | Seconds without a request after which the animal models are unloaded, like Immich's `MACHINE_LEARNING_MODEL_TTL`. Idle memory drops from about 0.7-0.8 GB to about 0.15 GB; the next photo takes about 0.4 s longer. `0` keeps them loaded. |
+| `MODEL_TTL` | `300` | Seconds without a face request after which the animal models are unloaded to free memory, like Immich's `MACHINE_LEARNING_MODEL_TTL`. The next photo loads them again. `0` keeps them loaded. |
 
 **NOTE**: `DOG_MAX_DISTANCE` (and `CAT_MAX_DISTANCE`) is tricky to change. You can't just do a refresh after changing 
 it because previously detected faces do not get a new embedding on refresh. If you need to change it, I would suggest 

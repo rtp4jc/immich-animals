@@ -64,8 +64,9 @@ UPSTREAM_ATTEMPTS = 3
 INFERENCE_CONCURRENCY = int(os.environ.get("INFERENCE_CONCURRENCY", "1"))
 # Caps the embedder batch, and with it peak memory, for photos with many animals.
 EMBED_BATCH = int(os.environ.get("EMBED_BATCH", "8"))
-# Seconds without a request after which the models are unloaded; 0 keeps them.
-MODEL_TTL = float(os.environ.get("MODEL_TTL", "0"))
+# Seconds idle before the models are unloaded, Immich's MACHINE_LEARNING_MODEL_TTL
+# default; 0 keeps them loaded.
+MODEL_TTL = float(os.environ.get("MODEL_TTL", "300"))
 
 if KEEP_HUMAN_FACES and not UPSTREAM_URL:
     # Answering with animals only would look like a complete result, and an Immich
