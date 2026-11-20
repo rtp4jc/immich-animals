@@ -9,7 +9,7 @@
 #   docker build -f sidecar/Dockerfile --build-arg MODEL_SOURCE=local -t animal-ml .
 #
 # Add --build-arg VARIANT=openvino (amd64 only) to run on an Intel GPU; the
-# container then needs --device /dev/dri.
+# container then needs the GPU's render node and group (see sidecar/README.md).
 #
 # Only the selected stages are built, so the other ones' inputs need not exist.
 ARG MODEL_SOURCE=remote
@@ -61,6 +61,10 @@ RUN apt-get update \
     && cd / && rm -rf /tmp/intel \
     && apt-get purge -y curl && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
+# Hands the GPU plugin's large transient startup buffers back to the OS, without
+# which loading the models peaks above 2 GB.
+ENV MALLOC_MMAP_THRESHOLD_=131072 \
+    MALLOC_TRIM_THRESHOLD_=131072
 
 FROM runtime-${VARIANT}
 ARG VARIANT
