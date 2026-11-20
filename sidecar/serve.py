@@ -39,6 +39,7 @@ BBOX_PAD = 0.1  # matches AnimalPipeline's crop, which the embedder was tuned on
 
 MODEL_DIR = Path(os.environ.get("MODEL_DIR", "models/onnx"))
 UPSTREAM_URL = os.environ.get("UPSTREAM_ML_URL", "").rstrip("/")
+UPSTREAM_TIMEOUT = float(os.environ.get("UPSTREAM_TIMEOUT", "120"))
 KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
     "1",
     "true",
@@ -200,7 +201,7 @@ _client: httpx.AsyncClient
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     global _client
-    async with httpx.AsyncClient(timeout=120) as _client:
+    async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as _client:
         yield
 
 
