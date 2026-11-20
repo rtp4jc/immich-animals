@@ -45,11 +45,9 @@ class ONNXDetector(_ONNXModel, DetectionModel):
     def _preprocess(
         self, image: np.ndarray
     ) -> tuple[np.ndarray, tuple[float, int, int]]:
-        """Letterbox, returning the scale and left/top padding that map boxes back.
-
-        YOLO trains on aspect-preserved images padded to square; stretched phone
-        photos cost the detector ~7pp recall on owner photos.
-        """
+        """Letterbox, returning the scale and left/top padding that map boxes back."""
+        # YOLO trains on aspect-preserved images padded to square; stretching photos
+        # instead costs recall.
         height, width = image.shape[:2]
         scale = min(self.input_size[0] / height, self.input_size[1] / width)
         h, w = round(height * scale), round(width * scale)
