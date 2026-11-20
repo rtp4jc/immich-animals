@@ -39,7 +39,28 @@ def _constant_model(path: Path, input_shape: list[int], output: np.ndarray, **me
 
 
 def _embedder(model_dir: Path, stem: str, vector: np.ndarray):
-    _constant_model(model_dir / f"{stem}.onnx", [1, 3, 8, 8], vector[None])
+    """An embedder that returns `vector` for every crop in the batch."""
+    nodes = [
+        helper.make_node("Flatten", ["in"], ["flat"], axis=1),
+        helper.make_node("ReduceMean", ["flat"], ["mean"], axes=[1]),
+        helper.make_node(
+            "Constant", [], ["zero"], value=numpy_helper.from_array(np.float32(0))
+        ),
+        helper.make_node(
+            "Constant", [], ["vector"], value=numpy_helper.from_array(vector[None])
+        ),
+        helper.make_node("Mul", ["mean", "zero"], ["zeros"]),
+        helper.make_node("Add", ["zeros", "vector"], ["out"]),
+    ]
+    graph = helper.make_graph(
+        nodes,
+        "fake",
+        [helper.make_tensor_value_info("in", TensorProto.FLOAT, ["n", 3, 8, 8])],
+        [helper.make_tensor_value_info("out", TensorProto.FLOAT, ["n", 512])],
+    )
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 13)])
+    model.ir_version = 8
+    onnx.save(model, model_dir / f"{stem}.onnx")
     prep = {"mean": [0.5] * 3, "std": [0.5] * 3}
     (model_dir / f"{stem}.json").write_text(json.dumps({"preprocessing": prep}))
 
@@ -66,6 +87,7 @@ def test_each_species_gets_its_own_threshold_embedder_and_mapping(
     rows = [
         [10, 10, 100, 100, 0.50, 0],  # dog
         [200, 200, 300, 300, 0.25, 1],  # cat, kept by CAT_MIN_SCORE=0.2
+        [300, 10, 400, 100, 0.35, 1],  # second cat, embedded in the same batch
         [400, 400, 500, 500, 0.10, 1],  # cat below its threshold
         [10, 400, 100, 500, 0.90, 2],  # unknown species
     ]
@@ -96,10 +118,11 @@ def test_each_species_gets_its_own_threshold_embedder_and_mapping(
         for f in response.json()["facial-recognition"]
     }
 
-    assert set(faces) == {0.5, 0.25}
+    assert set(faces) == {0.5, 0.25, 0.35}
     assert np.allclose(faces[0.5], shared)
-    cosine = faces[0.25] @ cat / np.linalg.norm(cat)
-    assert abs(cosine - np.sqrt(0.5 / 0.7)) < 0.1  # cat's own shift was applied
+    for score in (0.25, 0.35):
+        cosine = faces[score] @ cat / np.linalg.norm(cat)
+        assert abs(cosine - np.sqrt(0.5 / 0.7)) < 0.1  # cat's own shift was applied
 
 
 def _slow_detector_serve(tmp_path, monkeypatch, **env):
@@ -179,3 +202,43 @@ def test_human_faces_are_requested_while_animals_are_inferred(tmp_path, monkeypa
     response = asyncio.run(scenario())
     assert upstream_during_inference == [True]
     assert response.json()["facial-recognition"] == [human]
+
+
+def _upstream_serve(tmp_path, monkeypatch, handler):
+    """serve whose upstream client answers through `handler`."""
+    _constant_model(
+        tmp_path / "detector.onnx",
+        [1, 3, 640, 640],
+        np.zeros((1, 1, 6), np.float32),
+        names="{0: 'dog'}",
+    )
+    _embedder(tmp_path, "embedding", np.ones(512, np.float32))
+    serve = _load_serve(tmp_path, monkeypatch, UPSTREAM_ML_URL="http://upstream")
+    serve._client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    return serve
+
+
+def test_upstream_requests_survive_dropped_connections(tmp_path, monkeypatch):
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        if len(calls) < 3:
+            raise httpx.RemoteProtocolError("Server disconnected", request=request)
+        return httpx.Response(200, json={"clip": "[0.1]"})
+
+    serve = _upstream_serve(tmp_path, monkeypatch, handler)
+    response = asyncio.run(serve._post_upstream(b"body", "multipart/form-data"))
+
+    assert response.json() == {"clip": "[0.1]"}
+    assert calls == ["/predict"] * 3
+
+
+def test_ping_reports_an_unreachable_upstream(tmp_path, monkeypatch):
+    def handler(request):
+        raise httpx.ConnectError("Connection refused", request=request)
+
+    serve = _upstream_serve(tmp_path, monkeypatch, handler)
+    response = TestClient(serve.app).get("/ping")
+
+    assert response.status_code == 503

@@ -18,6 +18,8 @@ import hashlib
 import json
 import logging
 import os
+from collections import defaultdict
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import NamedTuple
 
@@ -30,12 +32,16 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import ORJSONResponse, PlainTextResponse, Response
 from starlette.concurrency import run_in_threadpool
 
+from preprocess import embedder_blob, letterbox
+
 TASK = "facial-recognition"
 BBOX_PAD = 0.1  # matches AnimalPipeline's crop, which the embedder was tuned on
 
 MODEL_DIR = Path(os.environ.get("MODEL_DIR", "models/onnx"))
 UPSTREAM_URL = os.environ.get("UPSTREAM_ML_URL", "").rstrip("/")
 UPSTREAM_TIMEOUT = float(os.environ.get("UPSTREAM_TIMEOUT", "120"))
+# Under the ~2 s Immich gives its whole ping, so a slow upstream fails ours first.
+UPSTREAM_PING_TIMEOUT = float(os.environ.get("UPSTREAM_PING_TIMEOUT", "1.5"))
 KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
     "1",
     "true",
@@ -46,6 +52,7 @@ KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
 # that species' embeddings cluster best. Detector classes not listed are ignored.
 SPECIES_DEFAULTS = {"dog": (0.3, 0.375), "cat": (0.3, 0.35)}
 IMMICH_MAX_DISTANCE = float(os.environ.get("IMMICH_MAX_DISTANCE", "0.5"))
+UPSTREAM_ATTEMPTS = 3
 
 
 def _session(name: str) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
@@ -123,39 +130,10 @@ embedders = {
 }
 
 
-def _blob(image: np.ndarray, size: tuple[int, int], interpolation: int) -> np.ndarray:
-    resized = cv2.resize(image, (size[1], size[0]), interpolation=interpolation)
-    return np.transpose(resized.astype(np.float32) / 255.0, (2, 0, 1))[None]
-
-
-def _letterbox(
-    image: np.ndarray, size: tuple[int, int]
-) -> tuple[np.ndarray, float, int, int]:
-    """The blob plus the scale and left/top padding that map boxes back to source pixels.
-
-    YOLO trains on aspect-preserved images padded to square; stretched phone
-    photos cost the detector ~7pp recall on owner photos.
-    """
-    height, width = image.shape[:2]
-    scale = min(size[0] / height, size[1] / width)
-    h, w = round(height * scale), round(width * scale)
-    top, left = (size[0] - h) // 2, (size[1] - w) // 2
-    canvas = np.full((*size, 3), 114, np.uint8)  # Ultralytics' pad colour
-    canvas[top : top + h, left : left + w] = cv2.resize(
-        image, (w, h), interpolation=cv2.INTER_LINEAR
-    )
-    return (
-        np.transpose(canvas.astype(np.float32) / 255.0, (2, 0, 1))[None],
-        scale,
-        left,
-        top,
-    )
-
-
 def _detect(rgb: np.ndarray) -> list[tuple[float, list[int], _Species]]:
     """Known-species detections above that species' min score, bbox in source pixels."""
     height, width = rgb.shape[:2]
-    blob, scale, left, top = _letterbox(rgb, _det_size)
+    blob, scale, left, top = letterbox(rgb, _det_size)
     raw = detector.run(None, {_det_input: blob})
     return [
         (
@@ -186,12 +164,26 @@ def _rescale(vector: np.ndarray, shift: float) -> np.ndarray:
     return _unit(mixed).astype(np.float32)
 
 
-def _embed(crop: np.ndarray, kind: _Species) -> np.ndarray:
-    embedder = embedders[kind.embedder_stem]
-    blob = _blob(crop, embedder.size, cv2.INTER_AREA)
-    blob = (blob - embedder.mean) / embedder.std
-    vector = embedder.session.run(None, {embedder.input_name: blob})[0][0]
-    return _rescale(vector, kind.shift) if 0 < kind.shift < 1 else vector
+def _embed(crops: list[tuple[np.ndarray, _Species]]) -> list[np.ndarray]:
+    """One session run per embedder, however many animals the photo has."""
+    vectors: list[np.ndarray] = [np.empty(0)] * len(crops)
+    by_stem = defaultdict(list)
+    for i, (_, kind) in enumerate(crops):
+        by_stem[kind.embedder_stem].append(i)
+    for stem, indices in by_stem.items():
+        embedder = embedders[stem]
+        batch = np.concatenate(
+            [
+                embedder_blob(crops[i][0], embedder.size, embedder.mean, embedder.std)
+                for i in indices
+            ]
+        )
+        for i, vector in zip(
+            indices, embedder.session.run(None, {embedder.input_name: batch})[0]
+        ):
+            shift = crops[i][1].shift
+            vectors[i] = _rescale(vector, shift) if 0 < shift < 1 else vector
+    return vectors
 
 
 def _pad(bbox: list[int], width: int, height: int) -> tuple[int, int, int, int]:
@@ -205,7 +197,17 @@ def _pad(bbox: list[int], width: int, height: int) -> tuple[int, int, int, int]:
     )
 
 
-app = FastAPI()
+_client: httpx.AsyncClient
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    global _client
+    async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as _client:
+        yield
+
+
+app = FastAPI(lifespan=_lifespan)
 logging.getLogger("uvicorn.error").info(
     "animal-ml: people=%s, upstream=%s, %s",
     KEEP_HUMAN_FACES,
@@ -220,7 +222,15 @@ logging.getLogger("uvicorn.error").info(
 
 
 @app.get("/ping")
-def ping() -> PlainTextResponse:
+async def ping() -> PlainTextResponse:
+    # Immich reads a pong as "ML works"; without upstream, CLIP search, OCR and
+    # human faces would all fail, so report that rather than hide it.
+    if UPSTREAM_URL:
+        try:
+            response = await _upstream("GET", "/ping", timeout=UPSTREAM_PING_TIMEOUT)
+            response.raise_for_status()
+        except httpx.HTTPError as error:
+            raise HTTPException(503, f"Upstream ML unavailable: {error!r}") from error
     return PlainTextResponse("pong")
 
 
@@ -259,23 +269,25 @@ def _decode(data: bytes) -> np.ndarray:
 
 def _animal_faces(rgb: np.ndarray) -> list[dict]:
     height, width = rgb.shape[:2]
-    faces = []
+    boxes, crops = [], []
     for score, bbox, kind in _detect(rgb):
         x1, y1, x2, y2 = _pad(bbox, width, height)
         crop = rgb[y1:y2, x1:x2]
         if crop.size == 0:
             continue
-        faces.append(
-            {
-                "boundingBox": {"x1": x1, "y1": y1, "x2": x2, "y2": y2},
-                # Immich expects the vector as a JSON string, not an array.
-                "embedding": orjson.dumps(
-                    _embed(crop, kind), option=orjson.OPT_SERIALIZE_NUMPY
-                ).decode(),
-                "score": score,
-            }
-        )
-    return faces
+        boxes.append(({"x1": x1, "y1": y1, "x2": x2, "y2": y2}, score))
+        crops.append((crop, kind))
+    return [
+        {
+            "boundingBox": box,
+            # Immich expects the vector as a JSON string, not an array.
+            "embedding": orjson.dumps(
+                vector, option=orjson.OPT_SERIALIZE_NUMPY
+            ).decode(),
+            "score": score,
+        }
+        for (box, score), vector in zip(boxes, _embed(crops))
+    ]
 
 
 async def _human_faces(body: bytes, content_type: str) -> list[dict]:
@@ -289,9 +301,20 @@ async def _human_faces(body: bytes, content_type: str) -> list[dict]:
 async def _post_upstream(body: bytes, content_type: str) -> httpx.Response:
     if not UPSTREAM_URL:
         raise HTTPException(503, "UPSTREAM_ML_URL is not set")
-    async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as client:
-        return await client.post(
-            f"{UPSTREAM_URL}/predict",
-            content=body,
-            headers={"content-type": content_type},
-        )
+    return await _upstream(
+        "POST", "/predict", content=body, headers={"content-type": content_type}
+    )
+
+
+async def _upstream(method: str, path: str, **kwargs) -> httpx.Response:
+    # httpx drops pooled connections that upstream closed cleanly, but one that
+    # died silently (upstream killed or restarted) fails the request before any
+    # answer and leaves the pool; several can die at once. Predictions are
+    # idempotent, so try again, each time on the next connection or a new one.
+    url = f"{UPSTREAM_URL}{path}"
+    for _ in range(UPSTREAM_ATTEMPTS - 1):
+        try:
+            return await _client.request(method, url, **kwargs)
+        except (httpx.NetworkError, httpx.RemoteProtocolError):
+            pass
+    return await _client.request(method, url, **kwargs)
