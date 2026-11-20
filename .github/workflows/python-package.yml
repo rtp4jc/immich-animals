@@ -41,3 +41,34 @@ jobs:
 
       - name: Test sidecar with pytest
         run: uv run --project sidecar --locked pytest sidecar
+
+  sidecar-openvino:
+    runs-on: ubuntu-24.04
+    env:
+      # Runners have no Intel GPU, so this still exercises the OpenVINO provider.
+      OPENVINO_DEVICE: CPU
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Test sidecar with pytest
+        run: uv run --project sidecar --locked --no-group cpu --group openvino pytest sidecar
+
+      - name: Build image
+        run: docker build -f sidecar/Dockerfile --build-arg VARIANT=openvino -t animal-ml:ci .
+
+      # OpenVINO falls back to the CPU provider silently, so check which one loaded.
+      - name: Smoke test
+        run: |
+          docker run -d --rm --name smoke -p 3003:3003 -e OPENVINO_DEVICE -e KEEP_HUMAN_FACES=false animal-ml:ci
+          for _ in $(seq 60); do curl -sf -o /dev/null http://localhost:3003/ping && break; sleep 2; done
+          docker logs smoke 2>&1 | grep 'animal-ml: OpenVINOExecutionProvider'
+          sudo apt-get install -y --no-install-recommends imagemagick
+          convert -size 320x240 xc:gray /tmp/blank.jpg
+          uv run --project sidecar --no-sync python sidecar/smoke_test.py /tmp/blank.jpg --url http://localhost:3003
+          docker logs smoke
+          docker rm -f smoke
