@@ -78,20 +78,24 @@ if KEEP_HUMAN_FACES and not UPSTREAM_URL:
 
 # Only the openvino image ships this provider; there the models run on the Intel GPU
 # (OPENVINO_DEVICE=CPU lets CI smoke-test the image on a runner without one).
-PROVIDERS = (
-    [
-        (
-            "OpenVINOExecutionProvider",
-            {"device_type": os.environ.get("OPENVINO_DEVICE", "GPU")},
-        )
-    ]
-    if "OpenVINOExecutionProvider" in ort.get_available_providers()
-    else ["CPUExecutionProvider"]
-)
+OPENVINO = "OpenVINOExecutionProvider" in ort.get_available_providers()
+OPENVINO_DEVICE = os.environ.get("OPENVINO_DEVICE", "GPU")
 
 
-def _session(name: str) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
-    session = ort.InferenceSession(str(MODEL_DIR / name), providers=PROVIDERS)
+def _session(
+    name: str, **openvino_options: str
+) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
+    providers = (
+        [
+            (
+                "OpenVINOExecutionProvider",
+                {"device_type": OPENVINO_DEVICE, **openvino_options},
+            )
+        ]
+        if OPENVINO
+        else ["CPUExecutionProvider"]
+    )
+    session = ort.InferenceSession(str(MODEL_DIR / name), providers=providers)
     spec = session.get_inputs()[0]
     return session, spec.name, tuple(spec.shape[2:])
 
@@ -159,7 +163,9 @@ class _Models(NamedTuple):
 
 
 def _load_models() -> _Models:
-    detector, det_input, det_size = _session("detector.onnx")
+    # The GPU's default FP16 moves detector scores enough to drop animals near the
+    # min score. The embedder holds up in FP16, and FP32 for both does not fit in 2 GB.
+    detector, det_input, det_size = _session("detector.onnx", precision="FP32")
     # Ultralytics writes class names as a Python dict literal, e.g. "{0: 'dog'}".
     names = ast.literal_eval(detector.get_modelmeta().custom_metadata_map["names"])
     species = {
