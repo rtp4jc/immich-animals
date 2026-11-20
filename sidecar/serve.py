@@ -40,6 +40,8 @@ BBOX_PAD = 0.1  # matches AnimalPipeline's crop, which the embedder was tuned on
 MODEL_DIR = Path(os.environ.get("MODEL_DIR", "models/onnx"))
 UPSTREAM_URL = os.environ.get("UPSTREAM_ML_URL", "").rstrip("/")
 UPSTREAM_TIMEOUT = float(os.environ.get("UPSTREAM_TIMEOUT", "120"))
+# Under the ~2 s Immich gives its whole ping, so a slow upstream fails ours first.
+UPSTREAM_PING_TIMEOUT = float(os.environ.get("UPSTREAM_PING_TIMEOUT", "1.5"))
 KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
     "1",
     "true",
@@ -222,11 +224,10 @@ logging.getLogger("uvicorn.error").info(
 @app.get("/ping")
 async def ping() -> PlainTextResponse:
     # Immich reads a pong as "ML works"; without upstream, CLIP search, OCR and
-    # human faces would all fail, so report that rather than hide it. Immich
-    # gives the whole check 2 s by default.
+    # human faces would all fail, so report that rather than hide it.
     if UPSTREAM_URL:
         try:
-            response = await _upstream("GET", "/ping", timeout=1.5)
+            response = await _upstream("GET", "/ping", timeout=UPSTREAM_PING_TIMEOUT)
             response.raise_for_status()
         except httpx.HTTPError as error:
             raise HTTPException(503, f"Upstream ML unavailable: {error!r}") from error
