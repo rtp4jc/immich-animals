@@ -46,7 +46,7 @@ UPSTREAM_URL = os.environ.get("UPSTREAM_ML_URL", "").rstrip("/")
 UPSTREAM_TIMEOUT = float(os.environ.get("UPSTREAM_TIMEOUT", "120"))
 # Short so an upstream that drops packets (host asleep) fails fast instead of
 # holding a job.
-UPSTREAM_CONNECT_TIMEOUT = float(os.environ.get("UPSTREAM_CONNECT_TIMEOUT", "5"))
+UPSTREAM_CONNECT_TIMEOUT = 5
 # Under the ~2 s Immich gives its whole ping, so a slow upstream fails ours first.
 UPSTREAM_PING_TIMEOUT = float(os.environ.get("UPSTREAM_PING_TIMEOUT", "1.5"))
 KEEP_HUMAN_FACES = os.environ.get("KEEP_HUMAN_FACES", "true").lower() in {
@@ -61,9 +61,9 @@ SPECIES_DEFAULTS = {"dog": (0.3, 0.375), "cat": (0.3, 0.35)}
 IMMICH_MAX_DISTANCE = float(os.environ.get("IMMICH_MAX_DISTANCE", "0.5"))
 UPSTREAM_ATTEMPTS = 3
 # ONNX Runtime already uses every core per run, so parallel runs only add memory.
-INFERENCE_CONCURRENCY = int(os.environ.get("INFERENCE_CONCURRENCY", "1"))
+INFERENCE_CONCURRENCY = 1
 # Caps the embedder batch, and with it peak memory, for photos with many animals.
-EMBED_BATCH = int(os.environ.get("EMBED_BATCH", "8"))
+EMBED_BATCH = 8
 # Seconds idle before the models are unloaded, Immich's MACHINE_LEARNING_MODEL_TTL
 # default; 0 keeps them loaded.
 MODEL_TTL = float(os.environ.get("MODEL_TTL", "300"))
@@ -73,12 +73,6 @@ if KEEP_HUMAN_FACES and not UPSTREAM_URL:
     # face refresh deletes every human face it does not find again.
     raise SystemExit(
         "animal-ml: UPSTREAM_ML_URL is required while KEEP_HUMAN_FACES is true"
-    )
-if INFERENCE_CONCURRENCY < 1 or EMBED_BATCH < 1:
-    # 0 would make face requests wait forever, and a negative batch would answer
-    # with empty embeddings.
-    raise SystemExit(
-        "animal-ml: INFERENCE_CONCURRENCY and EMBED_BATCH must be at least 1"
     )
 
 

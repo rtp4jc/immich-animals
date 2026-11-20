@@ -287,9 +287,8 @@ def test_embedder_batches_are_capped(tmp_path, monkeypatch):
         names="{0: 'dog'}",
     )
     _embedder(tmp_path, "embedding", np.ones(512, np.float32))
-    serve = _load_serve(
-        tmp_path, monkeypatch, KEEP_HUMAN_FACES="false", EMBED_BATCH="2"
-    )
+    serve = _load_serve(tmp_path, monkeypatch, KEEP_HUMAN_FACES="false")
+    monkeypatch.setattr(serve, "EMBED_BATCH", 2)
     session = serve._models.embedders["embedding"].session
     sizes = []
 
@@ -336,23 +335,6 @@ def test_animal_inference_runs_one_photo_at_a_time(tmp_path, monkeypatch):
     assert peak[0] == 1
 
 
-def test_upstream_connect_timeout_is_separate_from_read(tmp_path, monkeypatch):
-    serve = _plain_serve(
-        tmp_path,
-        monkeypatch,
-        UPSTREAM_ML_URL="http://upstream",
-        UPSTREAM_TIMEOUT="300",
-        UPSTREAM_CONNECT_TIMEOUT="2",
-    )
-
-    async def timeout():
-        async with serve._lifespan(serve.app):
-            return serve._client.timeout
-
-    result = asyncio.run(timeout())
-    assert (result.connect, result.read) == (2, 300)
-
-
 def test_idle_models_are_unloaded_and_reloaded(tmp_path, monkeypatch):
     serve = _plain_serve(
         tmp_path, monkeypatch, KEEP_HUMAN_FACES="false", MODEL_TTL="60"
@@ -390,18 +372,6 @@ def test_faces_are_refused_while_upstream_is_down(tmp_path, monkeypatch):
 
     assert response.status_code == 503
     assert "facial-recognition" not in response.text
-
-
-def test_invalid_limits_refuse_to_start(tmp_path, monkeypatch):
-    for env in ({"INFERENCE_CONCURRENCY": "0"}, {"EMBED_BATCH": "-1"}):
-        try:
-            _plain_serve(tmp_path, monkeypatch, KEEP_HUMAN_FACES="false", **env)
-        except SystemExit as error:
-            assert "at least 1" in str(error)
-        else:
-            raise AssertionError(f"serve started with {env}")
-        for key in env:
-            monkeypatch.delenv(key)
 
 
 def test_lifespan_unloads_idle_models(tmp_path, monkeypatch):

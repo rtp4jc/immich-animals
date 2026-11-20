@@ -106,9 +106,6 @@ Add them under `environment:` in the `docker-compose.override.yml` from step 1, 
 | `CAT_MIN_SCORE` | `0.3` | As `DOG_MIN_SCORE`, for cats. |
 | `CAT_MAX_DISTANCE` | `0.35` | As `DOG_MAX_DISTANCE`, for cats, whose embeddings sit closer together. |
 | `IMMICH_MAX_DISTANCE` | `0.5` | The Max Distance in your Immich settings. Change only if you changed that. |
-| `UPSTREAM_CONNECT_TIMEOUT` | `5` | Seconds to wait for a connection to upstream. Short, so an upstream host that is asleep fails a job quickly. |
-| `INFERENCE_CONCURRENCY` | `1` | Photos the animal models run on at the same time. Each run already uses every core; more only adds memory. |
-| `EMBED_BATCH` | `8` | Largest number of animals embedded in one run. Caps memory for photos with many animals. |
 | `MODEL_TTL` | `300` | Seconds without a face request after which the animal models are unloaded to free memory, like Immich's `MACHINE_LEARNING_MODEL_TTL`. The next photo loads them again. `0` keeps them loaded. |
 
 **NOTE**: `DOG_MAX_DISTANCE` (and `CAT_MAX_DISTANCE`) is tricky to change. You can't just do a refresh after changing 
