@@ -98,13 +98,14 @@ Add them under `environment:` in the `docker-compose.override.yml` from step 1, 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `UPSTREAM_ML_URL` | — | Your existing Immich ML container. Required: search and OCR are forwarded to it. |
+| `UPSTREAM_TIMEOUT` | `120` | How many seconds the sidecar will wait for a response from the Upstream ML container before failing. Increasing allows more time for slower systems/models. |
+| `UPSTREAM_PING_TIMEOUT` | `1.5` | How many seconds the sidecar's `/ping` waits for the Upstream ML container's `/ping`. Keep it under the ~2 s Immich allows for its own ping, or Immich gives up before the sidecar can answer. |
 | `KEEP_HUMAN_FACES` | `true` | `false` serves pets only and stops detecting human faces. A refresh will delete all human face edits you have made |
 | `DOG_MIN_SCORE` | `0.3` | How confident the detector must be for a dog. Lower finds more dogs and more wolves and foxes. Just requires a refresh. |
 | `DOG_MAX_DISTANCE` | `0.375` | **SEE NOTE BELOW** How alike two dogs must look to count as the same dog. Lower splits more, higher merges more. |
 | `CAT_MIN_SCORE` | `0.3` | As `DOG_MIN_SCORE`, for cats. |
 | `CAT_MAX_DISTANCE` | `0.35` | As `DOG_MAX_DISTANCE`, for cats, whose embeddings sit closer together. |
 | `IMMICH_MAX_DISTANCE` | `0.5` | The Max Distance in your Immich settings. Change only if you changed that. |
-| `UPSTREAM_TIMEOUT` | `120` | Seconds to wait for an answer from upstream. Raise it for a slow model, for example a large OCR model. |
 | `UPSTREAM_CONNECT_TIMEOUT` | `5` | Seconds to wait for a connection to upstream. Short, so an upstream host that is asleep fails a job quickly. |
 | `INFERENCE_CONCURRENCY` | `1` | Photos the animal models run on at the same time. Each run already uses every core; more only adds memory. |
 | `EMBED_BATCH` | `8` | Largest number of animals embedded in one run. Caps memory for photos with many animals. |
