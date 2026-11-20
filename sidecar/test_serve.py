@@ -14,6 +14,7 @@ import httpx
 import numpy as np
 import onnx
 import orjson
+import pytest
 from fastapi.testclient import TestClient
 from onnx import TensorProto, helper, numpy_helper
 
@@ -360,10 +361,11 @@ def test_idle_models_are_unloaded_and_reloaded(tmp_path, monkeypatch):
     assert serve._models is not None
 
 
-def test_faces_are_refused_while_upstream_is_down(tmp_path, monkeypatch):
+@pytest.mark.parametrize("error", [httpx.ConnectError, httpx.ReadTimeout])
+def test_faces_are_refused_while_upstream_is_down(tmp_path, monkeypatch, error):
     # Animals alone would look like a full answer to a face refresh.
     def handler(request):
-        raise httpx.ConnectError("Connection refused", request=request)
+        raise error("upstream down", request=request)
 
     serve = _upstream_serve(tmp_path, monkeypatch, handler)
     response = TestClient(serve.app).post(
@@ -392,10 +394,18 @@ def test_lifespan_unloads_idle_models(tmp_path, monkeypatch):
 
 
 def test_upstream_answers_without_faces_are_refused(tmp_path, monkeypatch):
-    bodies = iter([b'{"clip": "[0.1]"}', b"not json", b'{"facial-recognition": []}'])
+    answers = iter(
+        [
+            (500, b'{"detail": "Internal Server Error"}'),
+            (200, b'{"clip": "[0.1]"}'),
+            (200, b"not json"),
+            (200, b'{"facial-recognition": []}'),
+        ]
+    )
 
     def handler(request):
-        return httpx.Response(200, content=next(bodies))
+        status, content = next(answers)
+        return httpx.Response(status, content=content)
 
     serve = _upstream_serve(tmp_path, monkeypatch, handler)
     client = TestClient(serve.app)
@@ -405,7 +415,7 @@ def test_upstream_answers_without_faces_are_refused(tmp_path, monkeypatch):
             "/predict", data={"entries": json.dumps(ENTRIES)}, files={"image": _image()}
         )
 
-    assert [predict().status_code for _ in range(3)] == [503, 503, 200]
+    assert [predict().status_code for _ in range(4)] == [503, 503, 503, 200]
 
 
 def test_passthrough_answers_503_while_upstream_is_down(tmp_path, monkeypatch):

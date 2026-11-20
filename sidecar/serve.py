@@ -420,15 +420,11 @@ async def _human_faces(body: bytes, content_type: str) -> list[dict]:
     # tries its next URL, or the next Face Detection run picks the photo up again.
     upstream = await _post_upstream(body, content_type)
     try:
-        upstream.raise_for_status()
-        faces = orjson.loads(upstream.content)[TASK]
-    except (httpx.HTTPStatusError, orjson.JSONDecodeError, KeyError, TypeError):
-        faces = None
-    if not isinstance(faces, list):
+        return orjson.loads(upstream.content)[TASK]
+    except (orjson.JSONDecodeError, KeyError) as error:
         raise HTTPException(
             503, f"Upstream ML answered {upstream.status_code} without faces"
-        )
-    return faces
+        ) from error
 
 
 async def _post_upstream(body: bytes, content_type: str) -> httpx.Response:
