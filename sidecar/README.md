@@ -183,6 +183,39 @@ Building under the published tag shadows the released image locally, so the
 setup in step 1 runs your build without edits. `docker pull` it again to go
 back.
 
+### Intel GPU (OpenVINO)
+
+`--build-arg VARIANT=openvino` builds an amd64 image that runs both models on an
+Intel GPU through OpenVINO, the way Immich's `-openvino` image does. Releases
+publish it as `ghcr.io/rtp4jc/animal-ml:<version>-openvino` and
+`ghcr.io/rtp4jc/animal-ml:latest-openvino`.
+
+The container runs as a non-root user, so it needs the group that owns the GPU's
+render node as well as the GPU itself. Get that group's number on the host with
+`stat -c %g /dev/dri/renderD128` and add to the service from step 1:
+
+```yaml
+    devices:
+      - /dev/dri:/dev/dri
+    group_add:
+      - "992" # the number from stat
+```
+
+It needs about 2 GB of memory while loading the models, against about 0.8 GB for
+the CPU image. The models load again after every `MODEL_TTL` idle spell, so a
+memory limit has to leave room for that each time.
+
+The detector always runs in FP32, because FP16 drops animals near the min score
+and saves no memory. The embedder runs in the GPU's faster FP16, which matched the
+CPU image's accuracy in our tests; `OPENVINO_EMBEDDER_PRECISION=FP32` runs it at
+full precision for about 0.4 GB more memory and slower requests.
+
+Without access to the GPU, OpenVINO logs `Device GPU is not available` and the
+models quietly run on the CPU instead. Check that the `animal-ml:` line at the
+top of `docker logs animal_ml` names `OpenVINOExecutionProvider`.
+`OPENVINO_DEVICE` (default `GPU`) picks another OpenVINO device, e.g. `CPU` to
+test the image on a machine without an Intel GPU.
+
 ## Test
 
 `smoke_test.py` posts images exactly as Immich does and asserts the reply shape,

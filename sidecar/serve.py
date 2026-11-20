@@ -76,10 +76,28 @@ if KEEP_HUMAN_FACES and not UPSTREAM_URL:
     )
 
 
-def _session(name: str) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
-    session = ort.InferenceSession(
-        str(MODEL_DIR / name), providers=["CPUExecutionProvider"]
+# Only the openvino image ships this provider; there the models run on the Intel GPU
+# (OPENVINO_DEVICE=CPU lets CI smoke-test the image on a runner without one).
+OPENVINO = "OpenVINOExecutionProvider"
+OPENVINO_DEVICE = os.environ.get("OPENVINO_DEVICE", "GPU")
+# FP32 for the embedder too costs about 0.4 GB more memory and 50% slower inference.
+OPENVINO_EMBEDDER_PRECISION = os.environ.get("OPENVINO_EMBEDDER_PRECISION", "FP16")
+
+
+def _session(
+    name: str, precision: str
+) -> tuple[ort.InferenceSession, str, tuple[int, int]]:
+    providers = (
+        [
+            (
+                OPENVINO,
+                {"device_type": OPENVINO_DEVICE, "precision": precision},
+            )
+        ]
+        if OPENVINO in ort.get_available_providers()
+        else ["CPUExecutionProvider"]
     )
+    session = ort.InferenceSession(str(MODEL_DIR / name), providers=providers)
     spec = session.get_inputs()[0]
     return session, spec.name, tuple(spec.shape[2:])
 
@@ -102,7 +120,7 @@ def _load_embedder(stem: str) -> _Embedder:
     ImageNet normalisation is not baked into the graph and skipping it costs
     accuracy silently, so it is read rather than assumed.
     """
-    session, input_name, size = _session(f"{stem}.onnx")
+    session, input_name, size = _session(f"{stem}.onnx", OPENVINO_EMBEDDER_PRECISION)
     prep = json.loads((MODEL_DIR / f"{stem}.json").read_text())["preprocessing"]
     return _Embedder(
         session,
@@ -147,7 +165,9 @@ class _Models(NamedTuple):
 
 
 def _load_models() -> _Models:
-    detector, det_input, det_size = _session("detector.onnx")
+    # FP16 moves detector scores enough to drop animals near the min score, and saves
+    # no memory on the detector.
+    detector, det_input, det_size = _session("detector.onnx", "FP32")
     # Ultralytics writes class names as a Python dict literal, e.g. "{0: 'dog'}".
     names = ast.literal_eval(detector.get_modelmeta().custom_metadata_map["names"])
     species = {
@@ -311,7 +331,8 @@ async def _lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=_lifespan)
 logging.getLogger("uvicorn.error").info(
-    "animal-ml: people=%s, upstream=%s, %s",
+    "animal-ml: %s, people=%s, upstream=%s, %s",
+    _models.detector.get_providers()[0],
     KEEP_HUMAN_FACES,
     UPSTREAM_URL or "unset",
     "; ".join(
