@@ -201,10 +201,7 @@ def _unload_idle_models() -> bool:
     # Dropping the sessions frees ONNX Runtime's arenas; glibc keeps the freed
     # pages until asked to give them back.
     gc.collect()
-    try:
-        ctypes.CDLL("libc.so.6").malloc_trim(0)
-    except (OSError, AttributeError):
-        pass
+    ctypes.CDLL("libc.so.6").malloc_trim(0)
     return True
 
 
