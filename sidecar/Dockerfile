@@ -41,10 +41,12 @@ FROM python:3.12-slim AS runtime-openvino
 # Intel's OpenCL driver, which the OpenVINO GPU plugin talks to. Debian does not
 # package it, so these are the debs Immich's own openvino image pins
 # (machine-learning/scripts/install-intel-runtime.sh); the legacy pair covers
-# GPUs older than Tiger Lake.
+# GPUs older than Tiger Lake. intel-SHA256SUMS holds the digests GitHub
+# publishes for each asset.
+COPY sidecar/intel-SHA256SUMS /tmp/intel/SHA256SUMS
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ocl-icd-libopencl1 curl \
-    && mkdir /tmp/intel && cd /tmp/intel \
+    && cd /tmp/intel \
     && for url in \
         https://github.com/intel/intel-graphics-compiler/releases/download/v2.41.5/intel-igc-core-2_2.41.5+22716_amd64.deb \
         https://github.com/intel/intel-graphics-compiler/releases/download/v2.41.5/intel-igc-opencl-2_2.41.5+22716_amd64.deb \
@@ -54,6 +56,7 @@ RUN apt-get update \
         https://github.com/intel/intel-graphics-compiler/releases/download/igc-1.0.17537.24/intel-igc-opencl_1.0.17537.24_amd64.deb \
         https://github.com/intel/compute-runtime/releases/download/24.35.30872.36/intel-opencl-icd-legacy1_24.35.30872.36_amd64.deb; \
        do curl -fsSLO "$url" || exit 1; done \
+    && sha256sum -c SHA256SUMS \
     && dpkg -i *.deb \
     && cd / && rm -rf /tmp/intel \
     && apt-get purge -y curl && apt-get autoremove -y \
