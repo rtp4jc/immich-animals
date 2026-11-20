@@ -137,7 +137,7 @@ def _slow_detector_serve(tmp_path, monkeypatch, **env):
     serve = _load_serve(tmp_path, monkeypatch, **env)
     started, release, done = threading.Event(), threading.Event(), threading.Event()
 
-    def detect(rgb):
+    def detect(models, rgb):
         started.set()
         # Bounded, so a blocked event loop fails the test instead of hanging it.
         release.wait(timeout=5)
@@ -313,7 +313,7 @@ def test_animal_inference_runs_one_photo_at_a_time(tmp_path, monkeypatch):
     serve = _plain_serve(tmp_path, monkeypatch, KEEP_HUMAN_FACES="false")
     running, peak, lock = [0], [0], threading.Lock()
 
-    def detect(rgb):
+    def detect(models, rgb):
         with lock:
             running[0] += 1
             peak[0] = max(peak[0], running[0])
@@ -458,7 +458,7 @@ def test_queued_inference_is_dropped_when_upstream_fails(tmp_path, monkeypatch):
 
     serve = _upstream_serve(tmp_path, monkeypatch, handler)
     detected = []
-    monkeypatch.setattr(serve, "_detect", lambda rgb: detected.append(1) or [])
+    monkeypatch.setattr(serve, "_detect", lambda models, rgb: detected.append(1) or [])
 
     async def scenario():
         limiter = serve._inference_limiter()

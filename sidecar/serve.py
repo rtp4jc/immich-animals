@@ -216,10 +216,11 @@ async def _unload_models_when_idle() -> None:
             log.info("animal-ml: models unloaded after %.0f s idle", MODEL_TTL)
 
 
-def _detect(rgb: np.ndarray) -> list[tuple[float, list[int], _Species]]:
+def _detect(
+    models: _Models, rgb: np.ndarray
+) -> list[tuple[float, list[int], _Species]]:
     """Known-species detections above that species' min score, bbox in source pixels."""
     height, width = rgb.shape[:2]
-    models = _models  # held by _acquire_models for the whole request
     species = models.species
     blob, scale, left, top = letterbox(rgb, models.det_size)
     raw = models.detector.run(None, {models.det_input: blob})
@@ -252,14 +253,16 @@ def _rescale(vector: np.ndarray, shift: float) -> np.ndarray:
     return _unit(mixed).astype(np.float32)
 
 
-def _embed(crops: list[tuple[np.ndarray, _Species]]) -> list[np.ndarray]:
+def _embed(
+    models: _Models, crops: list[tuple[np.ndarray, _Species]]
+) -> list[np.ndarray]:
     """One session run per embedder, however many animals the photo has."""
     vectors: list[np.ndarray] = [np.empty(0)] * len(crops)
     by_stem = defaultdict(list)
     for i, (_, kind) in enumerate(crops):
         by_stem[kind.embedder_stem].append(i)
     for stem, all_indices in by_stem.items():
-        embedder = _models.embedders[stem]
+        embedder = models.embedders[stem]
         for start in range(0, len(all_indices), EMBED_BATCH):
             indices = all_indices[start : start + EMBED_BATCH]
             batch = np.concatenate(
@@ -392,23 +395,20 @@ def _decode(data: bytes) -> np.ndarray:
 
 
 def _animal_faces(rgb: np.ndarray) -> list[dict]:
-    _acquire_models()
+    height, width = rgb.shape[:2]
+    models = _acquire_models()
     try:
-        return _animal_faces_with_models(rgb)
+        boxes, crops = [], []
+        for score, bbox, kind in _detect(models, rgb):
+            x1, y1, x2, y2 = _pad(bbox, width, height)
+            crop = rgb[y1:y2, x1:x2]
+            if crop.size == 0:
+                continue
+            boxes.append(({"x1": x1, "y1": y1, "x2": x2, "y2": y2}, score))
+            crops.append((crop, kind))
+        vectors = _embed(models, crops)
     finally:
         _release_models()
-
-
-def _animal_faces_with_models(rgb: np.ndarray) -> list[dict]:
-    height, width = rgb.shape[:2]
-    boxes, crops = [], []
-    for score, bbox, kind in _detect(rgb):
-        x1, y1, x2, y2 = _pad(bbox, width, height)
-        crop = rgb[y1:y2, x1:x2]
-        if crop.size == 0:
-            continue
-        boxes.append(({"x1": x1, "y1": y1, "x2": x2, "y2": y2}, score))
-        crops.append((crop, kind))
     return [
         {
             "boundingBox": box,
@@ -418,7 +418,7 @@ def _animal_faces_with_models(rgb: np.ndarray) -> list[dict]:
             ).decode(),
             "score": score,
         }
-        for (box, score), vector in zip(boxes, _embed(crops))
+        for (box, score), vector in zip(boxes, vectors)
     ]
 
 
