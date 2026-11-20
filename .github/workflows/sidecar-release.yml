@@ -29,8 +29,17 @@ jobs:
         include:
           - runner: ubuntu-24.04
             platform: linux/amd64
+            variant: cpu
+            provider: CPUExecutionProvider
           - runner: ubuntu-24.04-arm
             platform: linux/arm64
+            variant: cpu
+            provider: CPUExecutionProvider
+          # onnxruntime-openvino has no arm64 wheels.
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+            variant: openvino
+            provider: OpenVINOExecutionProvider
     runs-on: ${{ matrix.runner }}
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
@@ -68,16 +77,21 @@ jobs:
           context: .
           file: sidecar/Dockerfile
           platforms: ${{ matrix.platform }}
-          build-args: MODEL_TAG=${{ steps.meta.outputs.tag }}
+          build-args: |
+            MODEL_TAG=${{ steps.meta.outputs.tag }}
+            VARIANT=${{ matrix.variant }}
           load: true
           tags: animal-ml:ci
 
       # B6: arm64 was never exercised before this. Both arches run the contract
       # test on their own native runner, so "supports arm64" is a measurement.
+      # Runners have no Intel GPU, hence OPENVINO_DEVICE=CPU; OpenVINO falls back to
+      # the CPU provider silently, so check which one loaded.
       - name: Smoke test
         run: |
-          docker run -d --rm --name smoke -p 3003:3003 -e KEEP_HUMAN_FACES=false animal-ml:ci
+          docker run -d --rm --name smoke -p 3003:3003 -e OPENVINO_DEVICE=CPU -e KEEP_HUMAN_FACES=false animal-ml:ci
           for _ in $(seq 60); do curl -sf -o /dev/null http://localhost:3003/ping && break; sleep 2; done
+          docker logs smoke 2>&1 | grep 'animal-ml: ${{ matrix.provider }}'
           sudo apt-get install -y --no-install-recommends imagemagick
           convert -size 320x240 xc:gray /tmp/blank.jpg
           pip install --quiet httpx
@@ -92,7 +106,9 @@ jobs:
           context: .
           file: sidecar/Dockerfile
           platforms: ${{ matrix.platform }}
-          build-args: MODEL_TAG=${{ steps.meta.outputs.tag }}
+          build-args: |
+            MODEL_TAG=${{ steps.meta.outputs.tag }}
+            VARIANT=${{ matrix.variant }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       # Artifact paths cannot contain a colon, so store the bare digest.
@@ -103,7 +119,7 @@ jobs:
           touch "/tmp/digests/${digest#sha256:}"
       - uses: actions/upload-artifact@v4
         with:
-          name: digest-${{ steps.meta.outputs.arch }}
+          name: digest-${{ matrix.variant }}-${{ steps.meta.outputs.arch }}
           path: /tmp/digests/*
           retention-days: 1
 
@@ -113,21 +129,29 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          pattern: digest-*
+          pattern: digest-cpu-*
           merge-multiple: true
-          path: /tmp/digests
+          path: /tmp/digests/cpu
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-openvino-*
+          merge-multiple: true
+          path: /tmp/digests/openvino
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create manifest list
+      - name: Create manifest lists
         run: |
           version="${{ needs.build.outputs.tag }}"
           version="${version#sidecar-v}"
-          docker buildx imagetools create \
-            -t "${{ env.IMAGE }}:${version}" \
-            -t "${{ env.IMAGE }}:latest" \
-            $(printf "${{ env.IMAGE }}@sha256:%s " $(ls /tmp/digests))
-          docker buildx imagetools inspect "${{ env.IMAGE }}:${version}"
+          for variant in cpu openvino; do
+            if [ "$variant" = cpu ]; then suffix=""; else suffix="-$variant"; fi
+            docker buildx imagetools create \
+              -t "${{ env.IMAGE }}:${version}${suffix}" \
+              -t "${{ env.IMAGE }}:latest${suffix}" \
+              $(printf "${{ env.IMAGE }}@sha256:%s " $(ls "/tmp/digests/$variant"))
+            docker buildx imagetools inspect "${{ env.IMAGE }}:${version}${suffix}"
+          done
