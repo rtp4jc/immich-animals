@@ -30,7 +30,7 @@ Next to your Immich `docker-compose.yml`, create `docker-compose.override.yml`:
 services:
   animal-ml:
     container_name: animal_ml
-    image: ghcr.io/rtp4jc/animal-ml:0.3.0
+    image: ghcr.io/rtp4jc/animal-ml:0.3.1
     environment:
       UPSTREAM_ML_URL: http://immich-machine-learning:3003
     restart: always
@@ -173,10 +173,10 @@ by `MODEL_TAG` and checks them against `SHA256SUMS`.
 
 ```bash
 # from the repo root
-docker buildx build -f sidecar/Dockerfile --load -t ghcr.io/rtp4jc/animal-ml:0.3.0 .
+docker buildx build -f sidecar/Dockerfile --load -t ghcr.io/rtp4jc/animal-ml:0.3.1 .
 
 # with the models already on disk in models/onnx/<VERSION>/release/
-docker buildx build -f sidecar/Dockerfile --build-arg MODEL_SOURCE=local --load -t ghcr.io/rtp4jc/animal-ml:0.3.0 .
+docker buildx build -f sidecar/Dockerfile --build-arg MODEL_SOURCE=local --load -t ghcr.io/rtp4jc/animal-ml:0.3.1 .
 ```
 
 Building under the published tag shadows the released image locally, so the
