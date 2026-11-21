@@ -13,7 +13,7 @@ conflicts = [[
 
 [[package]]
 name = "animal-ml-sidecar"
-version = "0.3.0"
+version = "0.3.1"
 source = { virtual = "." }
 default-groups = ["cpu", "dev"]
 dependencies = [
