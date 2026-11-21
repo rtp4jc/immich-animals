@@ -6,15 +6,36 @@ Read [README.md](README.md) first: setup, commands, architecture, and the script
 
 When two goals conflict, these decide.
 
-- **Recall over precision, within limits.** A missed dog is worse than an occasional false detection, as long as false positives stay rare enough not to clutter the People tab.
+- **Recall over precision, within limits.** A missed dog is worse than an occasional false detection, as long as false positives stay rare enough not to clutter the People tab. A duplicate face costs the user one merge; a dropped animal is simply gone.
 - **Over-fragment rather than over-merge.** Merging two people in Immich is easy; splitting one is not.
-- **Don't regress existing classes to ship a new one.** A new species waits until the classes we already support hold their numbers.
-- **Keep the Immich integration thin until there is an official one.** Immich changes quickly and the models are what matter, so the sidecar does the minimum and avoids anything that would conflict with upstream.
+- **Don't regress existing classes to ship a new one.** A new species waits until the classes we already support hold their numbers. The same goes for any fix: every column of the evaluation has to hold, not just the one it improves.
+- **Keep the Immich integration thin until there is an official one.** Immich changes quickly and the models are what matter, so the sidecar does the minimum and avoids anything that would conflict with upstream. Where Immich has the same setting, use its default.
 - **State of the art within Immich's model budget.** Aim for the best accuracy achievable at the size and latency of Immich's existing face and CLIP models.
 - **Reuse through generic contracts.** Define the problem (detection, embedding, evaluation) as contracts independent of any model or data provider, so backbones, losses and datasets plug in. Think before adding code, and restructure when the first shape turns out wrong.
-- **Benchmark on data that looks like a real library.** Select and judge models on owner-style photos of identities never seen in training, not on the training distribution.
-- **Write drift-prone details down once, where they're owned.** Metrics, model names and counts live in the model card or the config that sets them; other docs link there instead of restating them.
-- **Never harm the user's existing Immich data.** Human faces pass through untouched, and adding or removing the sidecar takes only a Refresh, never a Reset.
+- **Benchmark on data that looks like a real library.** Select and judge models on owner-style photos of identities never seen in training, not on the training distribution. A few photos from one library show a problem exists; they don't show a fix is net positive.
+- **Write drift-prone details down once, where they're owned.** Metrics, model names and counts live in the model card or the config that sets them; other docs link there instead of restating them. Comments and READMEs carry no benchmark figures or one-machine timings. A rough figure the user acts on, like the memory to reserve, is fine.
+- **Never harm the user's existing Immich data.** Human faces pass through untouched, and adding or removing the sidecar takes only a Refresh, never a Reset. A Refresh deletes every face missing from the answer, so when the sidecar can't give a complete answer it fails the request (503) rather than sending a partial one.
+
+## Proving a change
+
+How much evidence a PR needs depends on what it can change. Always test the PR merged into current `main`: the worst bugs merge cleanly (a hard-coded value undoing another PR's setting, a name another PR removed).
+
+| The change can affect | Evidence |
+| --- | --- |
+| Nothing at runtime (docs, comments, tests) | `ruff` and `pytest` |
+| Sidecar plumbing that shouldn't change output (concurrency, HTTP, Docker, lifecycle) | `scripts/evaluate_sidecar.py --baseline` against `main` shows 0 changed photos, plus a test for the new behaviour |
+| Which boxes come back, or the embeddings (filters, thresholds, preprocessing, runtimes, precision) | `evaluate_sidecar.py` tables before and after, and the changed photos it lists. Trade-offs get weighed against the tenets above |
+| A hardware or runtime variant | The same numbers from that hardware, under the memory limit the README asks users to set |
+
+The sidecar README's [Comparing against main](sidecar/README.md#comparing-against-main) has the commands. A test has to prove the path you meant actually ran: tiny fake models pass whichever runtime loaded them.
+
+## Sidecar rules
+
+- **Settings:** add an environment variable only when users on different hardware or libraries would pick different values, and give its README row the trade-off in one sentence. Everything else is a constant.
+- **Fallbacks** are fine only if they're visible: a log line naming what actually loaded, a README line on how to check, and a CI check where CI can run it.
+- **Optional variants** (the OpenVINO image) keep their packages, settings and release tags to themselves; the default image doesn't change.
+- **Downloads in the build** are checksummed, like the models.
+- **One definition per name.** A string or setting used in two places becomes one constant.
 
 ## Environment
 

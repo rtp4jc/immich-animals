@@ -204,7 +204,7 @@ After adding a source, check it parsed correctly with
 | [COCO 2017](https://cocodataset.org/#download) | `data/coco/images/{train2017,val2017}/` | Detection |
 | [DogFaceNet](https://github.com/GuillaumeMougeot/DogFaceNet#dataset) | `data/dogfacenet/DogFaceNet_224resized/`, `data/dogfacenet/DogFaceNet_alignment/` | Identity embedding |
 | [DogReID-1553](https://doi.org/10.7910/DVN/LVTRLG) | `data/dogreid/images/` (unzip `Images.zip`, rename to lowercase `images`), `data/dogreid/{splits,bounding_boxes,breeds}.tab` | Detection and identity embedding (owner phone photos); only the open-set `train` frames are loaded, so its query/gallery test stays held out |
-| [MPDD](https://doi.org/10.17632/v5j6m8dzhv.1) | `data/mpdd/MPDD/pytorch/` | Identity embedding (whole-body); its test identities also go into `sidecar-validation` |
+| [MPDD](https://doi.org/10.17632/v5j6m8dzhv.1) | `data/mpdd/MPDD/pytorch/` (`scripts/fetch_validation_set.py` downloads it) | Identity embedding (whole-body); its test identities also go into `sidecar-validation` |
 | [Stanford Dogs](http://vision.stanford.edu/aditya86/ImageNetDogs/) | `data/stanford_dogs/images/`, `data/stanford_dogs/annotation/` | Detection, keypoints |
 | [StanfordExtra](https://www.kaggle.com/datasets/ollieboyne/stanfordextra-dogs-dataset) | `data/stanford_dogs/stanford_extra_keypoints.json` | Keypoint labels |
 | [Oxford Pets](https://www.robots.ox.ac.uk/~vgg/data/pets/) | `data/oxford_pets/images/`, `data/oxford_pets/annotations/` | Detection (cats and dogs, boxed from the trimaps) |

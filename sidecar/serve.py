@@ -1,15 +1,8 @@
 """Answer Immich's machine-learning HTTP contract with animal models.
 
-Immich has one face-detection pipeline, so animals ride along in it: we answer
-the facial-recognition task with animals and forward it upstream for people as well.
-Every other task (CLIP, OCR) is passed through untouched, because Immich's
-`urls` list is failover rather than routing — whichever server answers has to
-answer everything.
-
-Immich's own Min Detection Score and Max Distance stay at whatever the user has
-them set to. Each species wants different values, so the sidecar applies its own
-thresholds and maps its embeddings onto Immich's, rather than asking the user to
-retune settings that are already right for people.
+facial-recognition answers with our animals plus upstream's people. Every other
+task is forwarded untouched: Immich's `urls` list is failover, not routing, so
+whichever server answers has to answer everything.
 """
 
 import ast
