@@ -228,10 +228,39 @@ uv run --project sidecar python sidecar/smoke_test.py dog.jpg --url http://local
 `test_serve.py` runs `serve.py` against tiny fake models, so it needs no
 downloads: `uv run --project sidecar pytest sidecar`.
 
-For tuning, `scripts/fetch_validation_set.py` builds a held-out set of named
-dogs and cats and animal-free negatives, and
-`scripts/evaluate_sidecar.py` sweeps detection recall against the false-positive
-rate and clusters the embeddings the way Immich does.
+### Comparing against main
+
+A change that can affect what the sidecar returns needs before and after
+numbers (see "Proving a change" in [AGENTS.md](../AGENTS.md)).
+`scripts/fetch_validation_set.py` downloads freely licensed photos of named dogs
+and cats, and animal-free ones, from Wikimedia Commons. `scripts/evaluate_sidecar.py`
+sweeps detection recall against false positives and clusters the embeddings
+the way Immich does. Both run in the training project's environment
+([Setup](../README.md#setup), about 6 GB with PyTorch).
+
+```bash
+# once: about 0.9 GB of photos, about 30 minutes
+uv run python scripts/fetch_validation_set.py
+
+# one sidecar built from main, one from your branch
+docker buildx build -f sidecar/Dockerfile --load -t animal-ml:main .   # on main
+docker buildx build -f sidecar/Dockerfile --load -t animal-ml:mine .   # on your branch
+EVAL="-e KEEP_HUMAN_FACES=false -e DOG_MIN_SCORE=0.1 -e CAT_MIN_SCORE=0.1 -e DOG_MAX_DISTANCE=0.5 -e CAT_MAX_DISTANCE=0.5"
+docker run -d --rm --name eval-main -p 3005:3003 $EVAL animal-ml:main
+docker run -d --rm --name eval-mine -p 3006:3003 $EVAL animal-ml:mine
+
+uv run python scripts/evaluate_sidecar.py --url http://localhost:3005 --cache main
+uv run python scripts/evaluate_sidecar.py --url http://localhost:3006 --cache mine --baseline main
+```
+
+`KEEP_HUMAN_FACES=false` lets the sidecar start without an Immich ML container.
+The low min scores let the sweep see detections under the 0.3 default. Max
+distances of 0.5 turn off the [stretch onto Immich's Max
+Distance](#how-the-thresholds-are-handled), so the clustering table's distances
+are the embeddings' own and two runs' embeddings can be compared directly.
+The last command ends by listing every photo whose detections changed. Commons
+changes over time, so your set won't match the model card photo for photo; only
+compare runs made on the same set.
 
 ## How the thresholds are handled
 

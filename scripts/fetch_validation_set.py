@@ -1,23 +1,8 @@
 #!/usr/bin/env python
-"""Build a held-out validation set for the Immich sidecar.
+"""Build data/sidecar-validation: named dogs and cats and animal-free photos from Wikimedia Commons, plus MPDD's held-out dogs.
 
-Two things the sidecar has to get right, and neither is measurable on the
-training splits: does it find the dog in a photo, and does it *avoid* firing on
-photos with no dog (every false positive becomes a junk "person" in Immich).
-
-    data/sidecar-validation/
-      identities/<slug>/*.jpg   photos of one individual dog (or cat-<slug>: cat)
-      negatives/*.jpg           photos with no dog at all
-      manifest.json             every file, its label, species, source URL and licence
-
-Sources: hand-picked Wikimedia Commons categories for named individual dogs and
-cats (free licences, but noisy — see NON_PHOTO), Commons "Quality images" categories
-for negatives, and the embedder's MPDD test identities (``data/mpdd``) for a
-second opinion on identity. MPDD images are reID-style crops, not snapshots, so
-the manifest tags every file with its source and the evaluator scores them apart.
-
-    uv run python scripts/fetch_validation_set.py
-    uv run python scripts/fetch_validation_set.py --limit 3   # smoke run
+uv run python scripts/fetch_validation_set.py
+uv run python scripts/fetch_validation_set.py --limit 3   # smoke run
 """
 
 import argparse
@@ -44,7 +29,7 @@ logger = setup_logging(__name__, logging.INFO)
 OUT_DIR = DATA_DIR / "sidecar-validation"
 API = "https://commons.wikimedia.org/w/api.php"
 # Commons blocks anonymous bots; a contactable UA is their stated requirement.
-UA = "immich-animals-validation/1.0 (https://github.com/ryan/immich-animals)"
+UA = "immich-animals-validation/1.0 (https://github.com/rtp4jc/immich-animals)"
 MIN_PHOTOS = 4  # fewer than this and an identity is useless for clustering
 
 # Categories holding one named dog each, picked by hand from Category:Individual
@@ -436,6 +421,7 @@ def fetch_negatives(limit: int, identity_urls: set[str]) -> list[dict]:
 
 def fetch_mpdd(limit: int | None) -> list[dict]:
     """MPDD's embedder test identities, so the sidecar is scored on dogs it never trained on."""
+    mpdd.fetch(DATA_DIR)
     by_identity = defaultdict(list)
     for row in torch_identity.splits(sources.load(Source.MPDD))["test"]:
         by_identity[row["identity_label"]].append(PROJECT_ROOT / row["file_path"])
@@ -487,15 +473,14 @@ def summarise(records: list[dict]) -> None:
 def main(args: argparse.Namespace) -> None:
     global OUT_DIR  # every path is built from it, and --out has to reach them all
     OUT_DIR = Path(args.out)
-    records = fetch_identities(
+    records = fetch_mpdd(args.limit)
+    records += fetch_identities(
         IDENTITY_CATEGORIES, "dog", args.limit, args.per_identity
     )
     cats = fetch_identities(CAT_CATEGORIES, "cat", args.limit, args.per_identity)
     # A photo filed under two cats shows both, so it labels neither.
     shared = {u for u, n in Counter(r["source_url"] for r in cats).items() if n > 1}
     records += [r for r in cats if r["source_url"] not in shared]
-    if not args.no_mpdd:
-        records += fetch_mpdd(args.limit)
     identity_urls = {r["source_url"] for r in records}
     records += fetch_negatives(args.limit or args.negatives, identity_urls)
 
@@ -517,5 +502,4 @@ if __name__ == "__main__":
     parser.add_argument("--out", default=str(OUT_DIR))
     parser.add_argument("--per-identity", type=int, default=30)
     parser.add_argument("--negatives", type=int, default=450)
-    parser.add_argument("--no-mpdd", action="store_true")
     main(parser.parse_args())
